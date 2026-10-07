@@ -1,0 +1,27 @@
+{
+    "name": "dkamary/game-docs",
+    "description": "Portail et documentations de rétro-ingénierie et de développement de jeux",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "dkamary"
+        }
+    ],
+    "require": {
+        "php": ">=8.1"
+    },
+    "config": {
+        "process-timeout": 0
+    },
+    "scripts": {
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "php -S localhost:8000"
+        ],
+        "start": "@serve"
+    },
+    "scripts-descriptions": {
+        "serve": "Démarre le serveur PHP sans limite de temps (timeout désactivé)"
+    }
+}
