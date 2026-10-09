@@ -132,6 +132,7 @@
       code.className = "language-" + lang;
       var raw = dedent(s.textContent);
       renderLines(code, raw, lang);
+      if (raw.split("\n").length <= 40) wrap.classList.add("short");   // impression : pas coupé entre deux pages
       pre.appendChild(code);
       wrap.appendChild(head); wrap.appendChild(pre);
       btn.addEventListener("click", function () {
@@ -294,13 +295,35 @@
     }, { passive: true });
   }
 
+  // Impression d'une page web : les réponses des questions (<details>) sont imprimées,
+  // puis les blocs reprennent leur état d'origine.
+  function setupPrint() {
+    var reopened = [];
+    window.addEventListener("beforeprint", function () {
+      reopened = Array.prototype.filter.call(document.querySelectorAll("details.quiz"), function (d) { return !d.open; });
+      reopened.forEach(function (d) { d.open = true; });
+    });
+    window.addEventListener("afterprint", function () {
+      reopened.forEach(function (d) { d.open = false; });
+      reopened = [];
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    // imprimer.html : document assemblé pour l'impression, sans interactivité.
+    var printDoc = document.body.classList.contains("print-doc");
     buildNav();
     buildTimecodes();
     buildCode();
+    if (printDoc) {
+      applyCodeWrap(true);
+      document.documentElement.setAttribute("data-ready", "1");
+      return;
+    }
     var links = buildToc();
     buildSteps(links);
     buildProgress();
     buildToTop();
+    setupPrint();
   });
 })();

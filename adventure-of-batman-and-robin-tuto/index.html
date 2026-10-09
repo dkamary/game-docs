@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masterclass Godot 4 : Batman &amp; Robin Megadrive (Legacy)</title>
+    <meta name="description" content="Archive legacy : première version du tutoriel en 7 tomes, conservée telle quelle pour référence. Les guides actuels la remplacent.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #07090e;
+            color: #d1d5db;
+        }
+        .font-retro {
+            font-family: 'Orbitron', sans-serif;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#07090e] text-slate-200 selection:bg-amber-400 selection:text-black">
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-950/60 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+            <a href="../" class="flex items-center gap-3">
+                <span class="text-2xl">🎮</span>
+                <div>
+                    <p class="text-xl font-bold font-retro tracking-wide bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 bg-clip-text text-transparent">
+                        Game Docs Hub
+                    </p>
+                    <p class="text-xs text-slate-400">&larr; Retour au portail</p>
+                </div>
+            </a>
+            <div class="text-xs font-mono uppercase tracking-wider bg-amber-950/60 border border-amber-700/50 px-3 py-1.5 rounded-full text-amber-300">
+                Legacy
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-6xl mx-auto px-6 py-12 w-full">
+        <div class="mb-8">
+            <h1 class="text-3xl font-extrabold text-white mb-2">Masterclass Godot 4 : Batman &amp; Robin Megadrive</h1>
+            <p class="text-slate-400">Première version du tutoriel, en 7 tomes.</p>
+        </div>
+
+        <!-- Legacy notice -->
+        <div class="mb-10 p-5 rounded-xl border border-amber-700/40 bg-amber-950/20 text-sm text-amber-100/90 leading-relaxed">
+            <p class="font-semibold text-amber-300 mb-1">Contenu archivé</p>
+            <p>
+                Ces tomes sont conservés tels quels comme <em>legacy code</em> et ne sont plus mis à jour.
+                Pour la version actuelle, consultez le
+                <a href="../batman-and-robin-pas-a-pas/" class="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">tutoriel pas à pas</a>
+                ou le
+                <a href="../batman-and-robin-godot-guide/" class="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">guide Godot</a>.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <a href="tome-01.html" class="group flex flex-col justify-between p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all duration-300 hover:-translate-y-1">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-mono uppercase tracking-wider text-amber-300 bg-amber-950/60 border border-amber-800/40 px-2.5 py-1 rounded-md">Tome 1</span>
+                        <span class="text-slate-500 group-hover:text-amber-300 transition-colors">➔</span>
+                    </div>
+                    <h2 class="text-lg font-bold text-white group-hover:text-amber-200 transition-colors mb-3">Batman &amp; Robin</h2>
+                    <p class="text-sm text-slate-400 leading-relaxed">Analyse et configuration exacte, arbre de nœuds professionnel.</p>
+                </div>
+            </a>
+
+            <a href="tome-02.html" class="group flex flex-col justify-between p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all duration-300 hover:-translate-y-1">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-mono uppercase tracking-wider text-amber-300 bg-amber-950/60 border border-amber-800/40 px-2.5 py-1 rounded-md">Tome 2</span>
+                        <span class="text-slate-500 group-hover:text-amber-300 transition-colors">➔</span>
+                    </div>
+                    <h2 class="text-lg font-bold text-white group-hover:text-amber-200 transition-colors mb-3">Armes &amp; ennemis</h2>
+                    <p class="text-sm text-slate-400 leading-relaxed">Le système balistique et les sbires du Joker.</p>
+                </div>
+            </a>
+
+            <a href="tome-03.html" class="group flex flex-col justify-between p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all duration-300 hover:-translate-y-1">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-mono uppercase tracking-wider text-amber-300 bg-amber-950/60 border border-amber-800/40 px-2.5 py-1 rounded-md">Tome 3</span>
+                        <span class="text-slate-500 group-hover:text-amber-300 transition-colors">➔</span>
+                    </div>
+                    <h2 class="text-lg font-bold text-white group-hover:text-amber-200 transition-colors mb-3">Game feel &amp; boss</h2>
+                    <p class="text-sm text-slate-400 leading-relaxed">Le système de vagues (spawner), l'interface (HUD) et les signaux.</p>
+                </div>
+            </a>
+
+            <a href="tome-04.html" class="group flex flex-col justify-between p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all duration-300 hover:-translate-y-1">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-mono uppercase tracking-wider text-amber-300 bg-amber-950/60 border border-amber-800/40 px-2.5 py-1 rounded-md">Tome 4</span>
+                        <span class="text-slate-500 group-hover:text-amber-300 transition-colors">➔</span>
+                    </div>
+                    <h2 class="text-lg font-bold text-white group-hover:text-amber-200 transition-colors mb-3">Polissage &amp; FX</h2>
+                    <p class="text-sm text-slate-400 leading-relaxed">L'esthétique 16 bits (shaders) et la performance avec l'object pooling.</p>
+                </div>
+            </a>
+
+            <a href="tome-05.html" class="group flex flex-col justify-between p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all duration-300 hover:-translate-y-1">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-mono uppercase tracking-wider text-amber-300 bg-amber-950/60 border border-amber-800/40 px-2.5 py-1 rounded-md">Tome 5</span>
+                        <span class="text-slate-500 group-hover:text-amber-300 transition-colors">➔</span>
+                    </div>
+                    <h2 class="text-lg font-bold text-white group-hover:text-amber-200 transition-colors mb-3">Menus &amp; systèmes</h2>
+                    <p class="text-sm text-slate-400 leading-relaxed">Dompter les Control Nodes et la navigation à la manette (focus).</p>
+                </div>
+            </a>
+
+            <a href="tome-06.html" class="group flex flex-col justify-between p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all duration-300 hover:-translate-y-1">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-mono uppercase tracking-wider text-amber-300 bg-amber-950/60 border border-amber-800/40 px-2.5 py-1 rounded-md">Tome 6</span>
+                        <span class="text-slate-500 group-hover:text-amber-300 transition-colors">➔</span>
+                    </div>
+                    <h2 class="text-lg font-bold text-white group-hover:text-amber-200 transition-colors mb-3">Co-op &amp; 3D</h2>
+                    <p class="text-sm text-slate-400 leading-relaxed">Multijoueur « Player 1 &amp; 2 » et caméra partagée.</p>
+                </div>
+            </a>
+
+            <a href="tome-07.html" class="group flex flex-col justify-between p-6 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all duration-300 hover:-translate-y-1">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-mono uppercase tracking-wider text-amber-300 bg-amber-950/60 border border-amber-800/40 px-2.5 py-1 rounded-md">Tome 7</span>
+                        <span class="text-slate-500 group-hover:text-amber-300 transition-colors">➔</span>
+                    </div>
+                    <h2 class="text-lg font-bold text-white group-hover:text-amber-200 transition-colors mb-3">Le stage final</h2>
+                    <p class="text-sm text-slate-400 leading-relaxed">Plateformes mobiles, one-way et changement de genre : shoot 'em up.</p>
+                </div>
+            </a>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
+        <p>Archive legacy — contenu figé, non maintenu</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Régénère index.html (point d'entrée GitHub Pages) depuis index.php à chaque commit
+ROOT=$(git rev-parse --show-toplevel)
+php "$ROOT/index.php" > "$ROOT/index.html" || exit 1
+git add "$ROOT/index.html"

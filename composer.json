@@ -19,9 +19,13 @@
             "Composer\\Config::disableProcessTimeout",
             "php -S localhost:8000"
         ],
-        "start": "@serve"
+        "start": "@serve",
+        "build": "php index.php > index.html",
+        "hooks": "git config core.hooksPath .githooks"
     },
     "scripts-descriptions": {
-        "serve": "Démarre le serveur PHP sans limite de temps (timeout désactivé)"
+        "serve": "Démarre le serveur PHP sans limite de temps (timeout désactivé)",
+        "build": "Génère index.html (point d'entrée GitHub Pages) à partir de index.php",
+        "hooks": "Active le hook pre-commit qui régénère index.html à chaque commit"
     }
 }

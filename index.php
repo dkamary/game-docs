@@ -1,4 +1,7 @@
 <?php
+// En CLI (composer run build), on génère la version statique pour GitHub Pages
+$static = PHP_SAPI === 'cli';
+
 // Scan for documentation directories containing index.html
 $docs = [];
 $items = scandir(__DIR__);
@@ -25,7 +28,8 @@ foreach ($items as $item) {
             'slug' => $item,
             'title' => $title,
             'description' => $desc,
-            'url' => '/' . rawurlencode($item) . '/'
+            // URL relative : fonctionne en local comme sous https://<user>.github.io/game-docs/
+            'url' => rawurlencode($item) . '/'
         ];
     }
 }
@@ -61,12 +65,12 @@ foreach ($items as $item) {
                     <h1 class="text-xl font-bold font-retro tracking-wide bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 bg-clip-text text-transparent">
                         Game Docs Hub
                     </h1>
-                    <p class="text-xs text-slate-400">Portail local de documentation de jeux</p>
+                    <p class="text-xs text-slate-400">Portail <?= $static ? '' : 'local ' ?>de documentation de jeux</p>
                 </div>
             </div>
             <div class="text-xs font-mono bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-slate-400 flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>localhost:8000</span>
+                <span><?= $static ? 'GitHub Pages' : 'localhost:8000' ?></span>
             </div>
         </div>
     </header>
@@ -113,7 +117,11 @@ foreach ($items as $item) {
 
     <!-- Footer -->
     <footer class="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
-        <p>Lancé avec <code class="text-slate-400">composer run serve</code> • PHP <?= PHP_VERSION ?></p>
+        <?php if ($static): ?>
+            <p>Version statique générée depuis <code class="text-slate-400">index.php</code> avec <code class="text-slate-400">composer run build</code></p>
+        <?php else: ?>
+            <p>Lancé avec <code class="text-slate-400">composer run serve</code> • PHP <?= PHP_VERSION ?></p>
+        <?php endif; ?>
     </footer>
 </body>
 </html>

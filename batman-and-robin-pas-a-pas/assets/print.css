@@ -1,0 +1,157 @@
+/* Pas-à-pas Godot — version imprimable (A4, fond clair).
+   Chargée avec media="print" par chaque page, et avec media="all" par imprimer.html
+   (le document complet assemblé par tools/build_print.py). */
+
+@page {
+  size: A4;
+  margin: 15mm 14mm 17mm;
+  @bottom-left {
+    content: "Batman & Robin × Godot — Le pas-à-pas";
+    font: 7.5pt "Inter", system-ui, sans-serif;
+    color: #7a8099;
+  }
+  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font: 600 7.5pt "Inter", system-ui, sans-serif;
+    color: #7a8099;
+  }
+}
+@page :first {
+  @bottom-left { content: none; }
+  @bottom-right { content: none; }
+}
+
+/* ---------- Palette claire (mêmes rôles de couleur que la version écran) ---------- */
+:root {
+  --bg: #ffffff;
+  --bg-2: #f4f5fa;
+  --panel: #f6f7fb;
+  --panel-2: #eceef6;
+  --line: #d6d9e6;
+  --ink: #1b1d2e;
+  --ink-soft: #383d56;
+  --muted: #6a7090;
+  --gold: #946300;
+  --red: #c0392b;
+  --green: #1e8a57;
+  --blue: #1f5fb8;
+  --purple: #6440c8;
+  --orange: #c05a00;
+  --teal: #0d8379;
+  --cyan: #0a7aa0;
+  --pink: #c02f57;
+  --godot: #2d68ab;
+  --code-bg: #f7f8fc;
+  color-scheme: light;
+}
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html { scroll-padding-top: 0; }
+body { background: #fff; background-image: none; color: var(--ink); font-size: 10pt; line-height: 1.5; }
+strong { color: #000; }
+a { color: var(--blue); text-decoration: none; }
+p, li { orphans: 3; widows: 3; }
+
+/* ---------- Ce qui ne sert qu'à l'écran ---------- */
+.topbar, .toc, details.toc-mobile, .to-top, .prevnext, .reset-progress, .print-links,
+h3.step .done-toggle, .code-head button, .code-head .lang,
+.card .progress, .card .progress-label { display: none !important; }
+
+.layout { display: block; max-width: none; padding: 0; margin: 0; }
+.content { max-width: none; }
+
+/* ---------- Titres et coupures de page ---------- */
+h1 { font-size: 24pt; margin: 4px 0 10px; }
+h2 { font-size: 15pt; margin: 22px 0 8px; padding-top: 10px; break-after: avoid; }
+h3 { font-size: 12pt; margin: 16px 0 6px; break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 12px 0 4px; break-after: avoid; }
+.kicker { color: var(--purple); }
+.lead { font-size: 11pt; color: var(--ink-soft); }
+
+.hero { background: linear-gradient(135deg, #efeafd, #f6f7fb 60%); border-color: var(--line); padding: 16px 18px 14px; break-inside: avoid; }
+.pill { background: #fff; color: var(--ink-soft); border-color: var(--line); }
+.pill.gold { color: var(--gold); border-color: #e2c785; }
+
+/* Étape : une case à cocher au crayon, à droite du titre. */
+h3.step { margin-top: 20px; padding: 7px 10px; background: var(--panel); break-inside: avoid; }
+h3.step::after { content: ""; margin-left: auto; flex: none; width: 11px; height: 11px; border: 1.5px solid var(--green); border-radius: 3px; }
+
+/* ---------- Encadrés ---------- */
+.callout { padding: 9px 12px 8px; margin: 10px 0; break-inside: avoid; background: var(--panel); }
+.callout.concept { background: linear-gradient(90deg, #f0ebff, var(--panel) 45%); }
+.callout.test { background: linear-gradient(90deg, #e8f6fc, var(--panel) 45%); }
+.callout.method { background: linear-gradient(90deg, #fbf3df, var(--panel) 45%); }
+.callout > .tag { font-size: 8pt; }
+
+/* ---------- Code ---------- */
+code { color: #6b4300; background: #f4efe2; border-color: #e5dcc4; }
+.code { background: var(--code-bg); border-color: var(--line); margin: 10px 0 14px; }
+.code.short { break-inside: avoid; }
+.code-head { background: var(--panel-2); color: var(--ink-soft); border-bottom-color: var(--line); padding: 5px 10px; font-size: 8pt; break-after: avoid; }
+.code pre[class*="language-"], .code pre { font-size: 8.3pt !important; line-height: 1.45 !important; padding: 8px 10px !important; overflow: visible !important; }
+.code code, .code pre code { color: #24283b; white-space: pre-wrap !important; overflow-wrap: anywhere; }
+.code pre code .ln { padding-left: calc(var(--i, 0) * 4ch + 2ch); text-indent: -2ch; break-inside: avoid; }
+pre.tree { background: var(--code-bg); color: var(--ink-soft); border-color: var(--line); font-size: 7pt; line-height: 1.45; padding: 8px 10px; overflow: visible; white-space: pre; break-inside: avoid; }
+
+/* Coloration syntaxique claire (remplace le thème sombre « tomorrow »). */
+code[class*="language-"], pre[class*="language-"] { color: #24283b; text-shadow: none; }
+.token.comment, .token.prolog, .token.doctype, .token.cdata { color: #6a737d; font-style: italic; }
+.token.punctuation { color: #4a4f63; }
+.token.property, .token.tag, .token.boolean, .token.number, .token.constant, .token.symbol, .token.deleted { color: #b35a00; }
+.token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted { color: #247a2a; }
+.token.operator, .token.entity, .token.url { color: #7b3db3; }
+.token.atrule, .token.attr-value, .token.keyword { color: #1f5fb8; font-weight: 600; }
+.token.function, .token.class-name { color: #a12f86; }
+.token.regex, .token.important, .token.variable, .token.annotation { color: #b3261e; }
+
+/* ---------- Tableaux, figures, divers ---------- */
+.table-wrap { overflow: visible; border-color: var(--line); break-inside: avoid; }
+table { font-size: 8.8pt; }
+th { background: var(--panel-2); white-space: normal; }
+th, td { padding: 5px 8px; border-bottom-color: var(--line); }
+tr { break-inside: avoid; }
+
+figure, figure.shot, figure.concept { break-inside: avoid; background: #fff; border-color: var(--line); }
+figure.concept { margin: 10px 0 14px; }
+figure.concept img { max-height: 105mm; width: auto; max-width: 100%; margin: 0 auto; }
+figure.concept figcaption, figure.shot figcaption { color: var(--ink-soft); font-size: 8.5pt; border-top-color: var(--line); }
+figure.concept figcaption b { color: var(--gold); }
+.shots { gap: 8px; margin: 10px 0 14px; }
+
+a.tc { color: #a5332a; background: #fbecea; border-color: #eab9b3; }
+kbd { color: var(--ink); background: #fff; border-color: #bfc4d6; }
+.menu { white-space: normal; }
+.commit { background: var(--code-bg); color: var(--ink-soft); border-color: #bfc4d6; font-size: 8.3pt; white-space: normal; overflow-wrap: anywhere; break-inside: avoid; }
+
+.learn > div, ol.loop li, .card { background: var(--panel); border-color: var(--line); break-inside: avoid; }
+.learn { break-inside: avoid; }
+.card h3 { color: var(--ink); }
+.card p { color: var(--ink-soft); }
+
+/* Questions : la réponse (contenu du <details>) est imprimée, en retrait, sous la question. */
+details.quiz { background: var(--panel); border-color: var(--line); break-inside: avoid; margin: 6px 0; }
+details.quiz summary { padding: 7px 10px; }
+details.quiz > div { padding: 6px 10px 8px 40px; font-size: 9.3pt; }
+
+.footer-note { color: var(--muted); }
+
+/* ---------- Document assemblé (imprimer.html) ---------- */
+section.chapter { break-before: page; }
+
+.cover { height: 262mm; display: flex; flex-direction: column; justify-content: center; text-align: left; padding: 0 6mm; break-after: page; }
+.cover .kicker { font-size: 10pt; }
+.cover h1 { font-size: 34pt; line-height: 1.1; margin: 10px 0 14px; }
+.cover .lead { font-size: 13pt; max-width: 150mm; }
+.cover .bat { font-size: 48pt; margin-bottom: 6mm; }
+.cover .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10mm; }
+.cover .edition { margin-top: auto; padding-top: 10mm; font-size: 9pt; color: var(--muted); border-top: 1px solid var(--line); }
+
+.print-toc h2 { border-top: 0; margin-top: 0; font-size: 18pt; }
+.print-toc ol { list-style: none; padding: 0; margin: 0; }
+.print-toc > ol > li { margin: 8px 0 4px; break-inside: avoid; }
+.print-toc a { display: flex; align-items: baseline; gap: 6px; color: var(--ink); }
+.print-toc .t { flex: none; max-width: 85%; }
+.print-toc .dots { flex: 1; border-bottom: 1px dotted #b5bacb; transform: translateY(-3px); }
+.print-toc .pg { flex: none; min-width: 6mm; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.print-toc > ol > li > a { font: 600 11pt var(--font-head); letter-spacing: .02em; text-transform: uppercase; }
+.print-toc li li { margin: 1px 0 1px 7mm; font-size: 8.8pt; }
+.print-toc li li a { color: var(--ink-soft); }
