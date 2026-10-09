@@ -25,6 +25,7 @@
 </section>
 
 <h2 id="flux">Le flux complet</h2>
+<figure class="concept"><img src="img/concepts/t10-flux.jpg" alt="Les écrans réels, dans l’ordre de la vidéo. Chacun est une scène Godot ; SceneFlow les enchaîne avec des fondus." loading="lazy"><figcaption><b>Les écrans réels, dans l’ordre de la vidéo.</b> Chacun est une scène Godot ; <code>SceneFlow</code> les enchaîne avec des fondus.</figcaption></figure>
 <pre class="tree">  ┌────────► Intro (attract) ──Start──┐
   │             (0:00–1:03)           ▼
   │  20 s sans touche ◄────────── Title ──OPTIONS──► Options ──Start──┐
@@ -124,6 +125,7 @@ func _ready() -> void:
 <div class="callout warn"><span class="tag">Musique de Jesper Kyd</span><p>La bande-son originale est en synthèse FM (YM2612) : Godot ne lit pas les fichiers VGM. Pour un projet personnel, convertis tes propres enregistrements en OGG. Pour un projet publiable, compose ou utilise une musique libre de droits.</p></div>
 
 <h2 id="intro">La cinématique d'intro</h2>
+<figure class="concept"><img src="img/concepts/t10-intro.jpg" alt="L’intro, plan par plan. Chaque plan est une piste de l’AnimationPlayer. (vidéo 0:08 → 0:55)" loading="lazy"><figcaption><b>L’intro, plan par plan.</b> Chaque plan est une piste de l’<code>AnimationPlayer</code>. (vidéo 0:08 → 0:55)</figcaption></figure>
 <p>Le découpage plan par plan, d'après la vidéo :</p>
 <div class="table-wrap"><table>
 <tr><th>Temps</th><th>Plan</th><th>Réalisation Godot</th></tr>
@@ -362,6 +364,8 @@ func _unhandled_input(event: InputEvent) -> void:
 <div class="callout warn"><span class="tag">Non observé</span><p>La partie analysée ne contient aucun game over : la présentation exacte de l'écran de continue est inconnue. Le décompte de 9 à 0 est une convention de l'époque, pas une observation.</p></div>
 
 <h2 id="hud">Le HUD</h2>
+<figure class="concept"><img src="img/concepts/t10-hud.jpg" alt="Le HUD original, décomposé. Chaque zone correspond à un nœud de hud.tscn. (vidéo 6:09)" loading="lazy"><figcaption><b>Le HUD original, décomposé.</b> Chaque zone correspond à un nœud de <code>hud.tscn</code>. (vidéo 6:09)</figcaption></figure>
+<figure class="concept"><img src="img/concepts/t10-zone-p2.jpg" alt="La zone du joueur 2 fait défiler ses messages ; pendant un boss, elle affiche « BOSS TIME » / « PLEASE WAIT »." loading="lazy"><figcaption><b>La zone du joueur 2</b> fait défiler ses messages ; pendant un boss, elle affiche « BOSS TIME » / « PLEASE WAIT ».</figcaption></figure>
 <figure class="shot" style="max-width:520px"><img src="img/hud.jpg" alt="HUD" style="aspect-ratio:3/1"><figcaption>Le HUD original (×2). <a class="tc" href="#">6:09</a></figcaption></figure>
 <pre class="tree">Hud (CanvasLayer, hud.gd)             groupe « hud » · layer = 10
 └── Root (Control, plein écran, mouse_filter = Ignore)

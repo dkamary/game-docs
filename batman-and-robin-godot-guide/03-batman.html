@@ -37,6 +37,7 @@
 <div class="callout fix"><span class="tag">Correction des docs existantes</span><p>Pas de glissade (doc A) : elle n'apparaît jamais. Le double saut de la doc B n'est pas observé non plus, donc il n'est pas implémenté ici. En revanche, la visée 8 directions et l'accroche au balcon, absentes des deux docs, sont indispensables au niveau 1.</p></div>
 
 <h2 id="etats">Le graphe d'états</h2>
+<figure class="concept"><img src="img/concepts/t03-etats-batman.jpg" alt="Chaque état de la machine, tel qu’il apparaît dans le jeu. Idle 2:53 · Run 1:47 · Air 2:05 · Crouch 5:07 · Hang 3:30 · a" loading="lazy"><figcaption><b>Chaque état de la machine, tel qu’il apparaît dans le jeu.</b> Idle 2:53 · Run 1:47 · Air 2:05 · Crouch 5:07 · Hang 3:30 · attaque aérienne 2:06 · coup de pied sauté 3:31 · Grabbed 2:51 · Victory 6:20.</figcaption></figure>
 <pre class="tree">                ┌──────── saut ────────┐
    ┌─────┐  ◄──►  ┌─────┐                ▼
    │ Idle│ croix  │ Run │ ── plus de sol ─►┌─────┐ ── haut + rebord ──►┌──────┐
@@ -73,6 +74,7 @@
 <div class="callout md"><span class="tag">Sprites</span><p>Les planches de <code>../batman-and-robin/spritesheets/</code> ne sont pas des grilles régulières. Dans l'éditeur <strong>SpriteFrames</strong>, utilise « Ajouter des images depuis une feuille de sprites » quand une rangée est régulière ; sinon crée des <code>AtlasTexture</code> avec la région de chaque image. Le code ci-dessous ne plante pas si une animation manque : il garde simplement l'animation en cours. Tu peux donc avancer avec un rectangle de couleur.</p></div>
 
 <h2 id="player-gd">Le script principal : données et verbes communs</h2>
+<figure class="concept"><img src="img/concepts/t03-tir-8-directions.jpg" alt="Le tir dans 8 directions. compute_aim() combine la croix (x, y) ; au sol, « bas » sert à s’accroupir et n’est pas une di" loading="lazy"><figcaption><b>Le tir dans 8 directions.</b> <code>compute_aim()</code> combine la croix (x, y) ; au sol, « bas » sert à s’accroupir et n’est pas une direction de tir. (vidéo 13:16, 13:30)</figcaption></figure>
 <p><code>player.gd</code> ne décide de rien : il stocke les réglages et offre des « verbes » (courir, sauter, tirer, encaisser) que les états utilisent.</p>
 <script type="text/x-code" data-lang="gdscript" data-file="res://player/player.gd">
 class_name Player
@@ -522,6 +524,7 @@ func physics_update(delta: float) -> void:
 <p>Les deux derniers sont des conforts modernes. Pour un ressenti strictement « 1995 », mets <code>coyote_time</code> et <code>jump_buffer</code> à 0.</p></div>
 
 <h3 id="melee">Melee : l'attaque au contact</h3>
+<figure class="concept"><img src="img/concepts/t03-attaque-contextuelle.jpg" alt="Un seul bouton, deux attaques. Si MeleeSense détecte une Hurtbox ennemie, c’est un coup ; sinon, un projectile. (vidéo 3" loading="lazy"><figcaption><b>Un seul bouton, deux attaques.</b> Si <code>MeleeSense</code> détecte une Hurtbox ennemie, c’est un coup ; sinon, un projectile. (vidéo 3:31, 4:10)</figcaption></figure>
 <script type="text/x-code" data-lang="gdscript" data-file="res://player/states/melee.gd">
 extends State
 ## Coup au contact. La Hitbox n'est active que sur les images « actives » du coup.
@@ -569,6 +572,7 @@ func physics_update(delta: float) -> void:
 <div class="callout concept"><span class="tag">Concept : images de préparation, actives et de récupération</span><p>Un coup se découpe en trois temps : la <strong>préparation</strong> (le bras recule, aucun dégât), les images <strong>actives</strong> (la Hitbox existe) et la <strong>récupération</strong> (vulnérable, rien ne se passe). Régler ces trois durées, c'est régler le « poids » d'une attaque. Toutes trois sont exposées en <code>@export</code>.</p></div>
 
 <h3 id="hang">Hang : suspendu sous le balcon</h3>
+<figure class="concept narrow"><img src="img/concepts/t03-hang.jpg" alt="Suspendu sous le balcon. La sonde des mains (HandProbe) touche la zone de rebord (couche 8) : on passe dans l’état Hang " loading="lazy"><figcaption><b>Suspendu sous le balcon.</b> La sonde des mains (<code>HandProbe</code>) touche la zone de rebord (couche 8) : on passe dans l’état Hang et la vitesse est annulée. (vidéo 3:30)</figcaption></figure>
 <script type="text/x-code" data-lang="gdscript" data-file="res://player/states/hang.gd">
 extends State
 ## Suspendu au rebord. Saut = grimper ; bas + saut = se laisser tomber.
@@ -706,6 +710,7 @@ func physics_update(delta: float) -> void:
 <div class="callout concept"><span class="tag">Pourquoi des compteurs plutôt que des <code>await</code> ?</span><p>L'ancienne doc A utilisait <code>await get_tree().create_timer(0.25).timeout</code> pour terminer une attaque. Si un coup arrive entre-temps, l'ancien <code>await</code> se réveille plus tard et remet l'état à IDLE au mauvais moment. Un compteur décrémenté dans <code>physics_update()</code> meurt avec l'état : quand on sort de l'état, il n'existe plus de minuterie fantôme.</p></div>
 
 <h2 id="camera">La caméra</h2>
+<figure class="concept"><img src="img/concepts/t03-camera-courbe.jpg" alt="La vitesse de la caméra, mesurée image par image dans la vidéo. Elle dépasse d’abord la vitesse de course pour rattraper" loading="lazy"><figcaption><b>La vitesse de la caméra, mesurée image par image dans la vidéo.</b> Elle dépasse d’abord la vitesse de course pour rattraper Batman (1), se stabilise à ~1,95 px/image (2), puis ralentit en douceur à l’arrêt (3). C’est la signature d’une caméra lissée avec anticipation, que reproduit <code>CameraRig</code>.</figcaption></figure>
 <div class="callout video"><span class="tag">Mesuré dans la vidéo</span><p>Quand Batman se met à courir, le défilement monte progressivement (6, 18, puis 30 px par 12 images) avant de se stabiliser à ~2 px/image. À l'arrêt, il retombe en douceur (18, 9, 4, 2). La caméra <strong>rattrape</strong> le joueur et <strong>anticipe</strong> dans sa direction ; elle ne lui est pas collée.</p></div>
 <script type="text/x-code" data-lang="gdscript" data-file="res://level/camera_rig.gd">
 class_name CameraRig

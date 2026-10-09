@@ -31,6 +31,7 @@
 </div>
 
 <h2 id="convoi">Le convoi : la vitesse sans bouger</h2>
+<figure class="concept narrow"><img src="img/concepts/t09-convoi.jpg" alt="Le convoi. Les véhicules restent en place dans le monde, c’est la rue qui défile derrière eux ; chaque véhicule est une " loading="lazy"><figcaption><b>Le convoi.</b> Les véhicules restent en place dans le monde, c’est la rue qui défile derrière eux ; chaque véhicule est une plateforme mobile. (vidéo 10:46)</figcaption></figure>
 <div class="callout concept"><span class="tag">Concept : le référentiel</span><p>Faire réellement rouler des camions à 200 km/h en suivant le joueur compliquerait tout : caméra, ennemis, projectiles. On inverse le point de vue : <strong>le convoi est immobile</strong> dans le monde, et c'est <strong>la rue qui défile</strong> derrière lui (<code>Parallax2D.autoscroll</code>). Le joueur ne voit aucune différence ; le code, lui, reste celui d'un niveau normal. Sur Mega Drive, c'est exactement pareil : le « mouvement » n'est qu'une valeur de défilement du plan de fond.</p></div>
 <pre class="tree">S3Convoy (Node2D, section.gd)            next_scene = res://screens/level_end.tscn
 ├── Street (Parallax2D)                    autoscroll = (-300, 0) · repeat_size = largeur · vitrines, réverbères
@@ -47,6 +48,7 @@
 ├── EnemyBullets (Pool) · Player · Camera · HUD</pre>
 
 <h3 id="vehicule">Le véhicule : une plateforme mobile</h3>
+<figure class="concept narrow"><img src="img/concepts/t09-ecarts.jpg" alt="Les écarts entre véhicules changent et obligent à sauter. (vidéo 11:43)" loading="lazy"><figcaption><b>Les écarts entre véhicules</b> changent et obligent à sauter. (vidéo 11:43)</figcaption></figure>
 <div class="callout video"><span class="tag">Observé dans la vidéo</span><p>Les écarts entre véhicules varient légèrement (<a class="tc" href="#">10:50</a>–<a class="tc" href="#">11:00</a>), les roues tournent, la séquence plateau → fourgon → plateau nu → voiture de police se répète (<a class="tc" href="#">11:44</a>–<a class="tc" href="#">12:03</a>).</p></div>
 <pre class="tree">ConvoyVehicle (AnimatableBody2D, convoy_vehicle.gd)   couche 2 « plateformes »
 ├── Body (Sprite2D)                      cabine + plateau
@@ -102,6 +104,7 @@ func _on_body_entered(body: Node2D) -> void:
 <p>Une <code>WaveArena</code> dont les vagues ne contiennent que <code>balloon_mine.tscn</code>, avec <code>origins = ["below", "right"]</code>, <code>max_alive</code> = 8, <code>spawn_interval</code> = 0,4 et un quota de 14 à 18. Les mines montent en oscillant ; Batman doit tirer en diagonale haute et à la verticale, ou les éviter. Une bonne occasion de placer un crâne (<a class="tc" href="#">12:24</a>).</p>
 
 <h2 id="joker">Le boss : la montgolfière du Joker</h2>
+<figure class="concept"><img src="img/concepts/t09-joker-passage.jpg" alt="Un passage complet de la montgolfière. Entrée petite et haute, approche, point le plus proche, éloignement, puis écran v" loading="lazy"><figcaption><b>Un passage complet de la montgolfière.</b> Entrée petite et haute, approche, point le plus proche, éloignement, puis écran vide avant le passage suivant. (vidéo 13:05 → 14:01)</figcaption></figure>
 <div class="callout video"><span class="tag">Observé dans la vidéo</span>
 <ul>
   <li>Chaque « passage » : entrée par un bord, <strong>petite et haute</strong> ; <strong>grossit en descendant</strong> vers le plateau ; traverse ; sort par l'autre bord, puis quelques secondes d'écran vide (<a class="tc" href="#">13:59</a>–<a class="tc" href="#">14:04</a>).</li>
@@ -247,6 +250,8 @@ func die_sequence() -> void:
 <div class="callout warn"><span class="tag">Ce qui n'est pas dans cette partie de la vidéo</span><p>D'autres descriptions du jeu évoquent une montgolfière qui <strong>rebondit au sol</strong> et <strong>charge à l'horizontale</strong>. Ces attaques n'apparaissent pas de 13:04 à 14:36. Si tu les vois dans un émulateur, ajoute un état <code>CHARGE</code> : échelle fixée à 1, <code>y = low_y</code>, traversée rapide (1,5 s) et Hurtbox active. C'est un bon exercice pour vérifier que tu maîtrises la machine à états.</p></div>
 
 <h3 id="arene-joker">L'arène du Joker</h3>
+<figure class="concept narrow"><img src="img/concepts/t09-joker-attaque.jpg" alt="L’attaque et la zone vulnérable. Les bombes tombent sous la nacelle ; la Hurtbox (sur la nacelle) n’est active que quand" loading="lazy"><figcaption><b>L’attaque et la zone vulnérable.</b> Les bombes tombent sous la nacelle ; la Hurtbox (sur la nacelle) n’est active que quand le ballon est assez grand, donc proche. (vidéo 13:16)</figcaption></figure>
+<figure class="concept"><img src="img/concepts/t09-joker-fin.jpg" alt="La fin du combat. Explosions en chaîne, Joker éjecté, puis K.O. sur le plateau et pose de victoire. (vidéo 14:24 → 14:33" loading="lazy"><figcaption><b>La fin du combat.</b> Explosions en chaîne, Joker éjecté, puis K.O. sur le plateau et pose de victoire. (vidéo 14:24 → 14:33)</figcaption></figure>
 <ul>
   <li>Le dernier véhicule est un plateau nu (<code>drift_amplitude</code> = 0) : un sol stable et dégagé (<a class="tc" href="#">13:00</a>).</li>
   <li>La <code>BossArena</code> fige la caméra au centre du plateau ; la rue continue de défiler derrière grâce à l'<code>autoscroll</code>.</li>

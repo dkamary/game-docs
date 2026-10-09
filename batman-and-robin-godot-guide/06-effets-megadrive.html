@@ -89,6 +89,7 @@ func compute(_camera_center: Vector2) -> void:
 </script>
 
 <h2 id="facade">Secret #1 : la façade pseudo-3D</h2>
+<figure class="concept"><img src="img/concepts/t06-facade-raster.jpg" alt="La façade pseudo-3D, mesurée. Chaque bande défile à sa propre vitesse ; la longueur des flèches est proportionnelle au d" loading="lazy"><figcaption><b>La façade pseudo-3D, mesurée.</b> Chaque bande défile à sa propre vitesse ; la longueur des flèches est proportionnelle au défilement mesuré par image. Le trottoir, où marchent les personnages, vaut 1.</figcaption></figure>
 <div class="callout video"><span class="tag">Mesuré dans la vidéo</span><p>Pendant la course de <a class="tc" href="#">4:42</a>–<a class="tc" href="#">4:46</a>, les bandes de la façade ne défilent pas à la même vitesse (tome 01). Rapportées au trottoir où marche Batman :</p>
 <div class="table-wrap"><table>
 <tr><th>Lignes</th><th>Zone</th><th>Mesuré</th><th>Facteur (trottoir = 1)</th></tr>
@@ -122,6 +123,8 @@ func compute(camera_center: Vector2) -> void:
 <div class="callout concept"><span class="tag">Concept : séparer le visuel de la collision</span><p>La façade est une image affichée par un shader ; elle ne sait rien de la physique. Le trottoir et le balcon sur lesquels Batman marche sont des <code>StaticBody2D</code> (ou une <code>TileMapLayer</code> invisible) dans le monde, à facteur 1. Le joueur ne marche jamais « sur l'image », mais sur une géométrie invisible alignée avec elle.</p></div>
 
 <h2 id="feu">Secret #2 : le feu ondulant</h2>
+<figure class="concept"><img src="img/concepts/t06-feu-images.jpg" alt="Les 6 images d’animation du feu de la banque, prises à 1/12 s d’intervalle. (vidéo 3:03)" loading="lazy"><figcaption><b>Les 6 images d’animation du feu de la banque</b>, prises à 1/12 s d’intervalle. (vidéo 3:03)</figcaption></figure>
+<figure class="concept narrow"><img src="img/concepts/t06-feu-amplitude.jpg" alt="L’amplitude de l’ondulation. Le décalage par ligne est presque nul à la base de la flamme et maximal au sommet : c’est l" loading="lazy"><figcaption><b>L’amplitude de l’ondulation.</b> Le décalage par ligne est presque nul à la base de la flamme et maximal au sommet : c’est le facteur <code>pow(height01, power)</code> du shader.</figcaption></figure>
 <div class="callout md"><span class="tag">Ce qu'explique Burton</span><p>« Une animation de quatre ou cinq images… je compte : <strong>six</strong>. » Puis un décalage horizontal par ligne : <strong>un peu en bas, beaucoup en haut</strong> (<a href="https://youtu.be/Z0S92Fs5gOg?t=135" target="_blank" rel="noopener">vidéo 1, 2:15</a>). Dans le jeu, ce sont les foyers qui sortent des fenêtres de la banque (<a class="tc" href="#">2:52</a>).</p></div>
 <script type="text/x-code" data-lang="glsl" data-file="res://fx/billowing_fire.gdshader">
 shader_type canvas_item;
@@ -185,12 +188,13 @@ func _process(delta: float) -> void:
 <div class="callout md"><span class="tag">Sur Mega Drive</span><p>La CRAM contient <strong>4 palettes de 16 couleurs</strong>. Chaque couleur fait 9 bits : 3 bits par canal, donc <strong>8 niveaux</strong> de rouge, de vert et de bleu. L'index 0 de chaque palette est transparent. Les tuiles et les sprites ne stockent pas des couleurs mais des <strong>index</strong> (0 à 15). Changer une palette recolore instantanément tout ce qui l'utilise. C'est ainsi que le jeu réalise :</p>
 <ul>
   <li>les <strong>fondus</strong> au noir entre les sections (<a class="tc" href="#">1:46</a>, <a class="tc" href="#">10:44</a>) ;</li>
-  <li>le <strong>flash blanc</strong> du crâne et de l'explosion de la banque (<a class="tc" href="#">2:46</a>) ;</li>
+  <li>le <strong>flash blanc</strong> du crâne et les flashs stroboscopiques de la banque, 3 images chacun (<a class="tc" href="#">2:44</a>) ;</li>
   <li>le <strong>basculement</strong> de la rue bleu nuit vers l'ambiance d'incendie (<a class="tc" href="#">2:50</a>) ;</li>
   <li>le <strong>flash pastel</strong> de la montgolfière touchée (<a class="tc" href="#">13:38</a>).</li>
 </ul></div>
 
 <h3 id="palette-fx">Fondus et flashs plein écran, par paliers</h3>
+<figure class="concept"><img src="img/concepts/t06-fondu-paliers.jpg" alt="Un fondu Mega Drive, mesuré. 8 paliers de 3 images chacun (0,4 s). Le bleu apparaît avant le rouge et le vert : chaque c" loading="lazy"><figcaption><b>Un fondu Mega Drive, mesuré.</b> 8 paliers de 3 images chacun (0,4 s). Le bleu apparaît avant le rouge et le vert : chaque canal remonte indépendamment, d’où la teinte bleutée des premiers paliers. (vidéo 1:46)</figcaption></figure>
 <p>Sur la console, un fondu au noir retire 1 niveau à chaque canal de chaque couleur, toutes les quelques images : <strong>8 paliers visibles</strong>, et des teintes qui « tournent » parce que les canaux n'atteignent pas zéro en même temps. Un fondu Godot lisse (<code>modulate</code> animé) n'a pas ce grain. Ce post-traitement le reproduit :</p>
 <script type="text/x-code" data-lang="glsl" data-file="res://fx/palette_fx.gdshader">
 shader_type canvas_item;
@@ -235,20 +239,20 @@ func set_flash(steps: int) -> void:
 	_mat.set_shader_parameter("flash", clampi(steps, 0, 7))
 
 
-## Fondu au noir en 8 paliers. frames_per_step = 4 donne ~0,5 s.
-func fade_out(frames_per_step := 4) -> void:
+## Fondu au noir en 8 paliers. Mesuré dans la vidéo (1:46) : 3 images par palier, soit 0,4 s.
+func fade_out(frames_per_step := 3) -> void:
 	for s in range(_fade, 8):
 		set_fade(s)
 		await _frames(frames_per_step)
 
 
-func fade_in(frames_per_step := 4) -> void:
+func fade_in(frames_per_step := 3) -> void:
 	for s in range(_fade, -1, -1):
 		set_fade(s)
 		await _frames(frames_per_step)
 
 
-## Flash blanc : le crâne (2 images) ou l'explosion de la banque (bien plus long).
+## Flash blanc : le crâne (2 images), chaque flash de la banque (3 images).
 func flash_white(frames := 2, steps := 7) -> void:
 	set_flash(steps)
 	await _frames(frames)
@@ -262,6 +266,7 @@ func _frames(n: int) -> void:
 <p>Une fois <code>PaletteFx</code> en place, tu peux remplacer le corps de <code>Fx.flash_screen()</code> (tome 04) par <code>PaletteFx.flash_white()</code>.</p>
 
 <h3 id="hit-flash">Le flash de dégâts d'un sprite</h3>
+<figure class="concept"><img src="img/concepts/t06-hit-flash.jpg" alt="Le flash de dégâts du Joker. Toute la montgolfière bascule vers une palette pastel pendant quelques images. (vidéo 13:37" loading="lazy"><figcaption><b>Le flash de dégâts du Joker.</b> Toute la montgolfière bascule vers une palette pastel pendant quelques images. (vidéo 13:37 → 13:38)</figcaption></figure>
 <script type="text/x-code" data-lang="glsl" data-file="res://fx/hit_flash.gdshader">
 shader_type canvas_item;
 // Teinte un sprite vers une couleur claire, comme une palette « touchée » de la CRAM.
@@ -310,6 +315,7 @@ func _process(delta: float) -> void:
 </script>
 
 <h3 id="indexe">Couleurs indexées : le basculement de palette de la banque</h3>
+<figure class="concept"><img src="img/concepts/t06-palette-bascule.jpg" alt="La même rue avant et après l’explosion. Les formes sont identiques, seules les couleurs changent : un changement de pale" loading="lazy"><figcaption><b>La même rue avant et après l’explosion.</b> Les formes sont identiques, seules les couleurs changent : un changement de palette, pas un nouveau décor. (vidéo 2:42, 2:57)</figcaption></figure>
 <div class="callout concept"><span class="tag">Concept : séparer la forme et la couleur</span><p>Une image indexée stocke pour chaque pixel un <strong>numéro de couleur</strong>, pas une couleur. La palette, à part, dit quelle couleur correspond à chaque numéro. On peut alors changer l'ambiance d'un décor entier (nuit → incendie) en changeant 16 couleurs, sans redessiner un seul pixel. C'est exactement ce qui se passe à <a class="tc" href="#">2:50</a>.</p></div>
 <p>Étape 1 : convertir une image en carte d'index et en palette, avec ce script d'éditeur.</p>
 <script type="text/x-code" data-lang="gdscript" data-file="res://tools/indexer.gd">
@@ -382,17 +388,19 @@ void fragment() {
 <p>Le même shader s'applique à un <code>Sprite2D</code>, à une <code>TileMapLayer</code> ou, en remplaçant <code>TEXTURE</code> par la texture du plan, au plan raster. Le tome 07 l'utilise pour l'explosion de la banque.</p>
 
 <h2 id="parallaxe">La parallaxe : du fond au premier plan</h2>
-<p>Pour les couches qui défilent d'un bloc (ciel, skyline, colonnes du Gem Expo), pas besoin de raster : <code>Parallax2D</code> (Godot 4.3+) suffit.</p>
+<figure class="concept"><img src="img/concepts/t06-gem-expo-mesure.jpg" alt="Contre-exemple mesuré. Dans le Gem Expo, colonnes, bannière et sol se déplacent exactement d’autant : pas de parallaxe i" loading="lazy"><figcaption><b>Contre-exemple mesuré.</b> Dans le Gem Expo, colonnes, bannière et sol se déplacent exactement d’autant : pas de parallaxe ici, tout est sur un seul plan. Mesurer avant de coder évite d’ajouter un effet qui n’existe pas.</figcaption></figure>
+<p>Pour les couches qui défilent d'un bloc (ciel, skyline, rue du convoi), pas besoin de raster : <code>Parallax2D</code> (Godot 4.3+) suffit.</p>
 <div class="table-wrap"><table>
 <tr><th>Couche</th><th><code>scroll_scale</code></th><th><code>repeat_size</code></th><th>Remarque</th></tr>
 <tr><td>Ciel, lune</td><td>(0.05, 0)</td><td>—</td><td>Quasi fixe</td></tr>
-<tr><td>Skyline (baies du Gem Expo)</td><td>(0.3, 0)</td><td>largeur de l'image</td><td>Boucle à l'infini</td></tr>
+<tr><td>Skyline (baies du Gem Expo)</td><td>(0.3, 0)</td><td>largeur de l'image</td><td>Facteur À CALIBRER (non mesuré de façon fiable)</td></tr>
 <tr><td>Plan de jeu</td><td>(1, 1)</td><td>—</td><td>TileMapLayer, ennemis, Batman</td></tr>
-<tr><td>Colonnes de marbre (Gem Expo)</td><td>(1.3, 1)</td><td>espacement des colonnes</td><td><code>z_index</code> = 10 : <strong>devant</strong> Batman (<a class="tc" href="#">6:24</a>)</td></tr>
+<tr><td>Rue du convoi (section 3)</td><td>(1, 0)</td><td>largeur de l'image</td><td><code>autoscroll</code> négatif : la rue défile seule (tome 09)</td></tr>
 </table></div>
 <div class="callout concept"><span class="tag">Concept : la parallaxe</span><p>Plus un objet est loin, moins il bouge quand la caméra se déplace. Un facteur &lt; 1 place la couche derrière le plan de jeu, un facteur &gt; 1 la place devant. Le raster de la façade n'est qu'une parallaxe dont le facteur change <em>à chaque ligne</em>.</p></div>
 
 <h2 id="echelle">Mise à l'échelle par paliers</h2>
+<figure class="concept"><img src="img/concepts/t06-echelle-paliers.jpg" alt="La montgolfière du Joker à trois distances. Petite = loin, géante = proche : toute la profondeur passe par la taille. (v" loading="lazy"><figcaption><b>La montgolfière du Joker à trois distances.</b> Petite = loin, géante = proche : toute la profondeur passe par la taille. (vidéo 13:05, 13:10, 13:23)</figcaption></figure>
 <div class="callout md"><span class="tag">Sur Mega Drive</span><p>Le VDP ne sait pas agrandir un sprite. Pour les sphères du bras de grue, Burton compte « 4 tailles de sphère orange et 2 de sphère noire » : des images <strong>pré-calculées</strong>, rangées dans la cartouche. La montgolfière du Joker qui s'approche et s'éloigne utilise forcément le même principe, avec des tailles discrètes.</p></div>
 <p>Godot sait agrandir en continu, mais un agrandissement lisse trahit le remake. On arrondit l'échelle à un petit nombre de paliers :</p>
 <script type="text/x-code" data-lang="gdscript" data-file="res://fx/fx.gd  (à ajouter à la classe Fx du tome 04)">
@@ -414,7 +422,7 @@ static func snap_scale(value: float, sizes: PackedFloat32Array) -> float:
 <tr><td>Fondus et flashs</td><td>Partout</td><td><code>PaletteFx</code></td></tr>
 <tr><td>Bascule nuit → incendie</td><td>Section 1</td><td><code>indexed.gdshader</code></td></tr>
 <tr><td>Flash de dégâts pastel</td><td>Boss</td><td><code>HitFlash</code></td></tr>
-<tr><td>Colonnes au premier plan</td><td>Section 2</td><td><code>Parallax2D</code>, scroll_scale &gt; 1</td></tr>
+<tr><td>Rue qui défile seule</td><td>Section 3</td><td><code>Parallax2D.autoscroll</code></td></tr>
 <tr><td>Ballon qui approche</td><td>Boss Joker</td><td><code>Fx.snap_scale</code></td></tr>
 </table></div>
 <div class="callout goal"><span class="tag">Objectif de l'étape</span>

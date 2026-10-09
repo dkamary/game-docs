@@ -25,6 +25,7 @@
 </section>
 
 <h2 id="regles">Les règles réelles</h2>
+<figure class="concept narrow"><img src="img/concepts/t04-bonus-cycle.jpg" alt="Le même bonus photographié à une seconde d’intervalle. Sa couleur, donc l’arme qu’il donne, change en permanence : c’est" loading="lazy"><figcaption><b>Le même bonus photographié à une seconde d’intervalle.</b> Sa couleur, donc l’arme qu’il donne, change en permanence : c’est un état cyclique. (vidéo 12:31 → 12:38)</figcaption></figure>
 <div class="table-wrap"><table>
 <tr><th>Couleur du bonus</th><th>Arme</th><th>Caractère (TASVideos)</th></tr>
 <tr><td style="color:var(--red)"><strong>Rouge / orange</strong></td><td>Batarang</td><td>Tir <strong>dispersé</strong> : plus de projectiles en éventail quand le niveau monte</td></tr>
@@ -107,6 +108,7 @@ static func get_data(id: StringName) -> WeaponData:
 </script>
 
 <h2 id="pool">La réserve de projectiles</h2>
+<figure class="concept narrow"><img src="img/concepts/t04-sprites-pool.jpg" alt="Pourquoi une réserve d’objets. Au moment du crâne, une douzaine d’explosions, des ballons et Batman partagent l’écran. L" loading="lazy"><figcaption><b>Pourquoi une réserve d’objets.</b> Au moment du crâne, une douzaine d’explosions, des ballons et Batman partagent l’écran. La console plafonne à 80 sprites : le jeu réserve un nombre fixe d’emplacements, exactement comme notre <code>Pool</code>. (vidéo 12:24)</figcaption></figure>
 <div class="callout md"><span class="tag">Sur Mega Drive</span><p>La console affiche au plus <strong>80 sprites</strong>, dont 20 par ligne. Les jeux réservent donc un nombre fixe d'emplacements pour les tirs du joueur. Quand ils sont tous pris, le bouton ne fait rien. C'est l'ancêtre exact du <em>pooling</em>.</p></div>
 <div class="callout concept"><span class="tag">Concept : réserve d'objets (object pooling)</span><p>Créer et détruire des nœuds en rafale (<code>instantiate()</code> puis <code>queue_free()</code>) coûte des allocations et des insertions dans l'arbre de scène. On fabrique les projectiles <strong>une fois</strong>, au chargement, puis on les « endort » et on les « réveille ». La clé pour une <code>Area2D</code> : <code>process_mode = DISABLED</code>. Avec le réglage par défaut <code>disable_mode = REMOVE</code>, Godot la retire aussi de la simulation physique. Un simple <code>hide()</code>, comme dans l'ancienne doc B, laisse la zone active : un batarang « rangé » blesse encore.</p></div>
 <script type="text/x-code" data-lang="gdscript" data-file="res://core/pool.gd">
@@ -226,6 +228,8 @@ func _on_screen_exited() -> void:
 </script>
 
 <h2 id="weapon-system">Le WeaponSystem : tir, niveaux et jauge</h2>
+<figure class="concept"><img src="img/concepts/t04-jauge-charge.jpg" alt="La jauge de charge, agrandie. Elle se remplit seule en ~1,1 s quand Batman ne tire pas, puis se vide d’un coup au tir su" loading="lazy"><figcaption><b>La jauge de charge, agrandie.</b> Elle se remplit seule en ~1,1 s quand Batman ne tire pas, puis se vide d’un coup au tir suivant. (vidéo 1:46.6 → 1:47.9)</figcaption></figure>
+<figure class="concept"><img src="img/concepts/t04-tir-puissant.jpg" alt="Le tir puissant. Jauge pleine : le projectile part, la jauge se vide, l’impact détruit les poubelles. (vidéo 1:47.8 → 1:" loading="lazy"><figcaption><b>Le tir puissant.</b> Jauge pleine : le projectile part, la jauge se vide, l’impact détruit les poubelles. (vidéo 1:47.8 → 1:48.2)</figcaption></figure>
 <script type="text/x-code" data-lang="gdscript" data-file="res://weapons/weapon_system.gd">
 class_name WeaponSystem
 extends Node
@@ -399,6 +403,7 @@ func collect(_player: Player) -> void:
 <div class="callout concept"><span class="tag">Concept : l'objet à état cyclique</span><p>C'est un mini-jeu de timing : le joueur doit toucher le bonus <em>au bon moment</em> pour avoir l'arme voulue. Une seule variable (<code>_index</code>) et un compteur suffisent. Le visuel (la couleur) n'est qu'une <strong>conséquence</strong> de l'état, recalculée par <code>_refresh()</code> : on ne stocke jamais deux fois la même information.</p></div>
 
 <h3 id="skull">Le crâne smart bomb et le bonus de charge</h3>
+<figure class="concept"><img src="img/concepts/t04-smart-bomb.jpg" alt="Le crâne smart bomb. Batman touche le crâne qui roule ; 2 images de blanc ; tous les ennemis à l’écran explosent. (vidéo" loading="lazy"><figcaption><b>Le crâne smart bomb.</b> Batman touche le crâne qui roule ; 2 images de blanc ; tous les ennemis à l’écran explosent. (vidéo 12:23 → 12:24)</figcaption></figure>
 <script type="text/x-code" data-lang="gdscript" data-file="res://fx/fx.gd">
 class_name Fx
 ## Effets visuels partagés.

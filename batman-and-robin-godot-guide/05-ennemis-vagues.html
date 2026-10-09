@@ -25,6 +25,7 @@
 </section>
 
 <h2 id="rythme">Le rythme observé</h2>
+<figure class="concept"><img src="img/concepts/t05-arene-go.jpg" alt="Le cycle d’une arène. La caméra est figée pendant la vague ; une fois l’écran nettoyé, la bulle « GO! » apparaît ; la ca" loading="lazy"><figcaption><b>Le cycle d’une arène.</b> La caméra est figée pendant la vague ; une fois l’écran nettoyé, la bulle « GO! » apparaît ; la caméra repart. (vidéo 2:20 → 2:27)</figcaption></figure>
 <div class="callout video"><span class="tag">Observé dans la vidéo</span>
 <ul>
   <li>La caméra s'arrête. Les ennemis <strong>tombent du haut</strong>, sautent du balcon ou entrent par les côtés.</li>
@@ -152,6 +153,7 @@ func _on_hurt(hitbox: Hitbox) -> void:
 <div class="callout concept"><span class="tag">Deux styles de machine à états</span><p>Pour Batman, on a utilisé une machine à états <strong>par nœuds</strong> : beaucoup d'états, beaucoup de logique. Pour un ennemi de quatre états, un simple <code>enum</code> et un <code>match</code> suffisent et se lisent d'un coup d'œil. Choisir la forme selon la complexité fait aussi partie du métier.</p></div>
 
 <h2 id="bestiaire">Le bestiaire du niveau 1</h2>
+<figure class="concept"><img src="img/concepts/t05-bestiaire.jpg" alt="Le bestiaire du niveau 1, extrait de la vidéo. Chaque ennemi a son script, qui hérite d’Enemy." loading="lazy"><figcaption><b>Le bestiaire du niveau 1, extrait de la vidéo.</b> Chaque ennemi a son script, qui hérite d’<code>Enemy</code>.</figcaption></figure>
 
 <h3 id="clown">Clown rayé</h3>
 <p>Il arrive en tombant ou en marchant, s'approche, frappe avec son aiguillon (la traînée bleue de <a class="tc" href="#">2:15</a>), recule et recommence. Sur le balcon, il saute en bas quand Batman passe dessous.</p>
@@ -337,6 +339,7 @@ func _shoot() -> void:
 </script>
 
 <h3 id="propeller">Têtes à hélice en formation</h3>
+<figure class="concept"><img src="img/concepts/t05-formations.jpg" alt="Deux formations de têtes à hélice. Une colonne qui descend puis serpente (6:52 → 6:55), puis une ligne qui traverse le h" loading="lazy"><figcaption><b>Deux formations de têtes à hélice.</b> Une colonne qui descend puis serpente (6:52 → 6:55), puis une ligne qui traverse le haut de l’écran (8:01). Toutes deux se dessinent avec une <code>Path2D</code>.</figcaption></figure>
 <div class="callout video"><span class="tag">Observé dans la vidéo</span><p>Elles arrivent en <strong>file indienne</strong> le long d'une trajectoire, puis s'alignent en haut de l'écran et lâchent haches ou bombes (<a class="tc" href="#">6:52</a>–<a class="tc" href="#">7:13</a>, <a class="tc" href="#">8:01</a>).</p></div>
 <div class="callout concept"><span class="tag">Concept : la trajectoire dessinée plutôt que programmée</span><p>Une <code>Path2D</code> se dessine à la souris dans l'éditeur. Chaque membre de la formation suit la même courbe avec un retard : on obtient une « chenille » sans aucune équation. Le level designer règle tout dans l'éditeur.</p></div>
 <script type="text/x-code" data-lang="gdscript" data-file="res://enemies/formation.gd">
@@ -506,6 +509,7 @@ func think(delta: float) -> void:
 <div class="callout warn"><span class="tag">Remarque</span><p>Ici, <code>kill()</code> donne aussi des points quand le ballon explose contre Batman. Si tu préfères l'éviter, ajoute à <code>kill()</code> un paramètre <code>award := true</code>.</p></div>
 
 <h2 id="destructibles">Poubelles, vitrines et cadeaux</h2>
+<figure class="concept"><img src="img/concepts/t05-destructible-empoignade.jpg" alt="À gauche, une poubelle (Breakable) éclate et lâche un bonus ; à droite, un costaud empoigne Batman (Thug → état Grabbed)" loading="lazy"><figcaption><b>À gauche, une poubelle (Breakable) éclate et lâche un bonus ; à droite, un costaud empoigne Batman (Thug → état Grabbed).</b> (vidéo 2:29, 2:51)</figcaption></figure>
 <p>Un seul script pour tout ce qui se casse : poubelles (bonus), petits cadeaux (bonus), paquet géant (un sbire en jaillit).</p>
 <script type="text/x-code" data-lang="gdscript" data-file="res://level/breakable.gd">
 class_name Breakable

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>08 · Section 2 : Gem Expo &amp; bras de grue — Batman &amp; Robin × Godot</title>
-<meta name="description" content="Section 2 : le Gem Expo en salles modulaires, les colonnes au premier plan, l'entrepôt, puis le mini-boss Harley Quinn et le bras de grue en sphères pseudo-3D (secret #3).">
+<meta name="description" content="Section 2 : le Gem Expo en salles modulaires, l'entrepôt, puis le mini-boss Harley Quinn et le bras de grue en sphères pseudo-3D (secret #3).">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
@@ -20,7 +20,7 @@
 <section class="hero">
   <div class="kicker">Tome 08</div>
   <h1>Section 2 : Gem Expo &amp; bras de grue</h1>
-  <p class="lead">Une exposition de joyaux construite en modules, des colonnes qui passent devant la caméra, un entrepôt en escaliers de caisses, puis le morceau de bravoure technique du niveau : le grappin de grue en sphères qui plonge dans la profondeur.</p>
+  <p class="lead">Une exposition de joyaux construite en modules, un entrepôt en escaliers de caisses, puis le morceau de bravoure technique du niveau : le grappin de grue en sphères qui plonge dans la profondeur.</p>
   <div class="meta"><span class="pill">Modules de niveau</span><span class="pill">Cinématique en jeu</span><span class="pill">Projection perspective</span><span class="pill">Tri en profondeur</span></div>
 </section>
 
@@ -31,6 +31,7 @@
 </div>
 
 <h2 id="gem-expo">Le Gem Expo en modules</h2>
+<figure class="concept"><img src="img/concepts/t08-modules.jpg" alt="Des salles réutilisées. La salle « bannière » de 6:24 revient à l’identique à 7:28 ; elle alterne avec la salle « baies " loading="lazy"><figcaption><b>Des salles réutilisées.</b> La salle « bannière » de 6:24 revient à l’identique à 7:28 ; elle alterne avec la salle « baies vitrées ». Chaque salle est une scène instanciée plusieurs fois.</figcaption></figure>
 <div class="callout video"><span class="tag">Observé dans la vidéo</span><p>La même salle revient plusieurs fois : colonnes de marbre, bannière « GEM EXPO », vitrines, plantes en pot, horloges (<a class="tc" href="#">6:24</a>, <a class="tc" href="#">7:28</a>, <a class="tc" href="#">8:32</a>). Elle alterne avec une salle à grandes baies vitrées sur la skyline (<a class="tc" href="#">7:51</a>).</p></div>
 <div class="callout md"><span class="tag">Sur Mega Drive</span><p>Une cartouche de 1995 n'a pas la place de stocker un décor unique de plusieurs milliers de pixels. Les niveaux sont faits de <strong>blocs</strong> (métatuiles) et de <strong>salles</strong> réutilisés. Ici, la répétition n'est pas une paresse : c'est une contrainte de mémoire transformée en rythme.</p></div>
 <div class="callout concept"><span class="tag">Concept : construire avec des modules</span><p>Dans Godot, une salle est une <strong>scène</strong> (<code>expo_hall.tscn</code>, <code>expo_windows.tscn</code>) qu'on instancie bout à bout dans la section. Corriger un détail dans la scène de la salle le corrige partout. Les arènes et les ennemis restent dans la scène de section : chaque instance de salle peut accueillir un combat différent.</p></div>
@@ -46,12 +47,11 @@
 │   ├── Warehouse (warehouse.tscn)        caisses (TileMapLayer couche 1)
 │   ├── HarleyFlyby (Area2D)              passage d'Harley en annonce
 │   └── BossArena → CraneHarley
-├── Columns (Parallax2D)                  scroll_scale (1.3, 1) · z_index = 10 : DEVANT Batman
 ├── EnemyBullets (Pool) · Player · Camera · HUD</pre>
 <ul>
   <li><strong>Vitrines :</strong> des comptoirs bas, en <code>StaticBody2D</code> one-way (couche 2) : on peut sauter dessus.</li>
   <li><strong>Vitres des baies :</strong> des <code>Breakable</code> avec <code>broken_texture</code> : le trou en étoile reste affiché.</li>
-  <li><strong>Colonnes :</strong> une couche <code>Parallax2D</code> au-dessus du plan de jeu. Elles masquent un instant Batman et les ennemis, comme dans le jeu. Garde-les assez fines pour que l'action reste lisible.</li>
+  <li><strong>Colonnes :</strong> elles font partie du décor de fond de chaque salle, au même plan que le mur : la mesure le confirme et Batman passe devant elles (voir tome 06). Pas besoin de couche à part.</li>
 </ul>
 
 <h3 id="formations">Les vagues de têtes à hélice</h3>
@@ -63,6 +63,7 @@
 <p>Relie la première au champ <code>formation</code> de la vague 1 et la seconde à la vague 2. Les deux courbes se dessinent à la souris : c'est là que se joue tout le rythme de la scène.</p>
 
 <h2 id="entrepot">L'entrepôt</h2>
+<figure class="concept narrow"><img src="img/concepts/t08-entrepot.jpg" alt="L’entrepôt. Les pyramides de caisses sont des blocs pleins à franchir en sautant. (vidéo 9:15)" loading="lazy"><figcaption><b>L’entrepôt.</b> Les pyramides de caisses sont des blocs pleins à franchir en sautant. (vidéo 9:15)</figcaption></figure>
 <p>Les pyramides de caisses sont des blocs pleins (couche 1) dans une <code>TileMapLayer</code> : Batman doit sauter de marche en marche, et les ennemis au sol butent dessus, ce qui crée des positions de tir intéressantes. Pense à des tuiles de 16×16, la hauteur d'une caisse à l'écran.</p>
 
 <h3 id="flyby">Harley passe : une annonce en pleine partie</h3>
@@ -96,6 +97,7 @@ func _on_body_entered(body: Node2D) -> void:
 <div class="callout concept"><span class="tag">Concept : le <code>Tween</code></span><p>Un <code>Tween</code> anime une propriété d'une valeur à une autre sur une durée, avec une courbe d'accélération. Pour une animation scriptée simple, c'est plus court qu'un <code>AnimationPlayer</code> et plus lisible qu'un calcul à la main dans <code>_process</code>. Il est créé sur le nœud animé (<code>h.create_tween()</code>) : si ce nœud disparaît, le tween s'arrête avec lui.</p></div>
 
 <h2 id="bras">Le mini-boss : Harley et le grappin de grue</h2>
+<figure class="concept"><img src="img/concepts/t08-grappin-profondeur.jpg" alt="La profondeur du grappin, dans le jeu. Au premier plan, il est grand et clair, et il blesse ; plus il s’enfonce, plus il" loading="lazy"><figcaption><b>La profondeur du grappin, dans le jeu.</b> Au premier plan, il est grand et clair, et il blesse ; plus il s’enfonce, plus il est petit et sombre, et il devient inoffensif. (vidéo 10:22, 10:04, 10:07)</figcaption></figure>
 <div class="shots two">
   <figure class="shot"><img src="img/mb-crane-arm.jpg" alt="Grappin au sol"><figcaption>Le grappin frappe le sol : 4 doigts de sphères cuivrées, chaîne de sphères sombres. <a class="tc" href="#">10:13</a></figcaption></figure>
   <figure class="shot"><img src="img/mb-harley.jpg" alt="Harley en vol"><figcaption>Harley en fauteuil-fusée ; la chaîne remonte vers la cabine de la grue. <a class="tc" href="#">10:20</a></figcaption></figure>
@@ -111,6 +113,7 @@ func _on_body_entered(body: Node2D) -> void:
 <p>(<a href="https://youtu.be/Z0S92Fs5gOg?t=172" target="_blank" rel="noopener">vidéo 1, 2:52</a>)</p></div>
 
 <h3 id="projection">La projection perspective en 4 lignes</h3>
+<figure class="concept narrow"><img src="img/concepts/t08-grappin-spheres.jpg" alt="Le grappin n’est qu’un assemblage de disques. Chaîne de sphères sombres (2 tailles d’image), pince de sphères orange (4 " loading="lazy"><figcaption><b>Le grappin n’est qu’un assemblage de disques.</b> Chaîne de sphères sombres (2 tailles d’image), pince de sphères orange (4 tailles). (vidéo 10:22)</figcaption></figure>
 <div class="callout concept"><span class="tag">Concept : de la 3D sur un écran 2D</span><p>On décrit le bras en <strong>3D</strong> (x à droite, y vers le bas, z vers le fond de l'écran). Pour l'afficher, on divise par la profondeur : un point deux fois plus loin paraît deux fois plus petit et deux fois plus proche du centre. Avec une « focale » <code>f</code> : <code>s = f / (f + z)</code>, puis <code>écran = (x, y) × s</code>. Le facteur <code>s</code> donne aussi la taille apparente et, ici, la luminosité. C'est toute la « 3D » du jeu.</p></div>
 <pre class="tree">CraneHarley (Node2D, crane_harley.gd)     score_value = 5000 · placé en haut-centre de l'arène
 ├── Health                                 max_health = 80 (À CALIBRER)
@@ -341,7 +344,7 @@ func die_sequence() -> void:
 
 <div class="callout goal"><span class="tag">Objectif de l'étape</span>
 <ul class="check">
-  <li>Le Gem Expo s'assemble avec deux salles réutilisées ; les colonnes passent devant Batman plus vite que le décor.</li>
+  <li>Le Gem Expo s'assemble avec deux salles réutilisées, colonnes comprises.</li>
   <li>Une chenille de têtes à hélice descend puis serpente ; une ligne traverse le haut de l'écran.</li>
   <li>Dans l'entrepôt, Harley passe en diagonale sans combattre.</li>
   <li>Le grappin suit Batman, s'abat, se referme, remonte et parfois s'enfonce dans le fond, plus petit et plus sombre.</li>

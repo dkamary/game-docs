@@ -162,3 +162,10 @@ ul.check li::before { content: ""; position: absolute; left: 2px; top: 5px; widt
 .prevnext a.next { text-align: right; }
 
 .footer-note { margin-top: 28px; font-size: 13px; color: var(--muted); }
+
+/* ---------- Illustrations annotées ---------- */
+figure.concept { margin: 18px 0 24px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+figure.concept img { width: 100%; height: auto; image-rendering: auto; }
+figure.concept.narrow { max-width: 560px; }
+figure.concept figcaption { font-size: 13.5px; color: var(--ink-soft); padding: 9px 12px 11px; line-height: 1.5; border-top: 1px solid var(--line); }
+figure.concept figcaption b { color: var(--gold); font-weight: 600; }

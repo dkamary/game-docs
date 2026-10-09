@@ -25,6 +25,7 @@
 </section>
 
 <h2 id="juice">Le ressenti de jeu</h2>
+<figure class="concept"><img src="img/concepts/t11-explosions.jpg" alt="Le ressenti du jeu original. Pas de tremblement d’écran ni de hit stop visibles : l’impact passe par la quantité d’explo" loading="lazy"><figcaption><b>Le ressenti du jeu original.</b> Pas de tremblement d’écran ni de hit stop visibles : l’impact passe par la quantité d’explosions et les flashs de palette. (vidéo 14:24 → 14:28)</figcaption></figure>
 <h3 id="shake">Tremblement de caméra (version corrigée)</h3>
 <p>L'algorithme « trauma » de l'ancienne doc B est le bon : une valeur de 0 à 1 qui décroît, et une amplitude proportionnelle à son carré. Seules les amplitudes changent : en 320×224, <strong>4 à 6 pixels</strong> suffisent ; 100 px représentaient un tiers de l'écran. On décale <code>offset</code> plutôt que la position, pour ne pas perturber le suivi du joueur.</p>
 <script type="text/x-code" data-lang="gdscript" data-file="res://level/camera_rig.gd  (ajouts)">
@@ -62,6 +63,7 @@ static func hit_stop(tree: SceneTree, duration := 0.05) -> void:
 <p>Le shader CRT du tome 4 de l'ancienne doc B (scanlines et aberration chromatique) fonctionne tel quel. Place-le dans un <code>CanvasLayer</code> de layer 101, donc <em>après</em> <code>PaletteFx</code> (layer 100) : sinon la quantification 9 bits « écraserait » les scanlines. Avec le mode d'étirement <code>viewport</code>, remplace 224 par la hauteur de la fenêtre si tu veux des scanlines plus fines que les pixels du jeu.</p>
 
 <h2 id="fidelite">Checklist de fidélité</h2>
+<figure class="concept"><img src="img/concepts/t11-planche-reference.jpg" alt="Planche de référence pour comparer ton remake à l’original, section par section." loading="lazy"><figcaption><b>Planche de référence</b> pour comparer ton remake à l’original, section par section.</figcaption></figure>
 <p>Coche au fur et à mesure en comparant ton jeu à la vidéo.</p>
 <h3 id="fid-general">Général</h3>
 <ul class="check">
@@ -81,7 +83,7 @@ static func hit_stop(tree: SceneTree, duration := 0.05) -> void:
 </ul>
 <h3 id="fid-s2">Section 2</h3>
 <ul class="check">
-  <li>Gem Expo modulaire, colonnes au premier plan plus rapides que le décor.</li>
+  <li>Gem Expo modulaire : la même salle revient, colonnes et bannière défilent avec le mur.</li>
   <li>Têtes à hélice en file indienne puis en ligne ; vitres qui restent brisées.</li>
   <li>Entrepôt en escaliers de caisses ; passage d'Harley en diagonale.</li>
   <li>Grappin d'environ 23 sphères : 4 tailles orange, 2 tailles noires, plus sombre et plus petit au fond, inoffensif au fond.</li>

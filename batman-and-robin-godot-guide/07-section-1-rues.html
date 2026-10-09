@@ -115,8 +115,9 @@ func game_over() -> void:
 <div class="callout concept"><span class="tag">Concept : le rythme tension / détente</span><p>Arène (tension, écran figé) → couloir (détente, on avance) → arène… Le joueur respire entre deux combats, et l'apparition d'un nouvel ennemi ou d'un bonus dans un couloir est d'autant plus lisible. Quand tu places tes arènes, garde cette alternance.</p></div>
 
 <h2 id="banque">L'explosion de la banque</h2>
-<div class="callout video"><span class="tag">Observé dans la vidéo</span><p><a class="tc" href="#">2:44</a> : explosions en chaîne à l'étage → <a class="tc" href="#">2:46</a>–<a class="tc" href="#">2:48</a> : écran blanc → <a class="tc" href="#">2:49</a> : explosions → <a class="tc" href="#">2:50</a> : la palette a changé (violet et ocre), des flammes géantes sortent des fenêtres, des débris tombent en continu jusqu'au boss.</p></div>
-<div class="callout concept"><span class="tag">Concept : cacher un changement sous un flash</span><p>Changer d'un coup tout le décor serait brutal. Le blanc plein écran sert de <strong>rideau</strong> : pendant qu'on ne voit rien, on change la palette, on active les feux et on lance les débris. Quand le blanc retombe, le monde a changé et le cerveau du joueur l'accepte comme la conséquence de l'explosion.</p></div>
+<div class="callout video"><span class="tag">Mesuré dans la vidéo (60 i/s)</span><p>De <a class="tc" href="#">2:43.9</a> à <a class="tc" href="#">2:50.4</a>, des explosions en chaîne secouent l'étage, accompagnées de <strong>flashs blancs stroboscopiques</strong> : environ 24 flashs, <strong>chacun de 3 images exactement</strong>, espacés de 0,15 à 0,5 s. Ce n'est pas un écran blanc continu. La palette bascule vers le violet et l'ocre à <a class="tc" href="#">2:49.6</a>, pendant les derniers flashs. Ensuite, les flammes géantes sortent des fenêtres et les débris tombent en continu jusqu'au boss.</p></div>
+<figure class="concept"><img src="img/concepts/t07-banque-sequence.jpg" alt="Séquence de l'explosion de la banque" loading="lazy"><figcaption><b>La séquence, image par image.</b> Avant ; un flash de 3 images ; des explosions entre deux flashs ; le flash pendant lequel la palette bascule ; la rue en feu. (vidéo 2:43 → 2:52)</figcaption></figure>
+<div class="callout concept"><span class="tag">Concept : cacher un changement sous un flash</span><p>Changer d'un coup tout le décor serait brutal. Les flashs servent de <strong>rideau</strong> : c'est pendant l'un d'eux qu'on change la palette, qu'on active les feux et qu'on lance les débris. Quand le blanc retombe, le monde a changé et le cerveau du joueur l'accepte comme la conséquence de l'explosion. Le stroboscope crée en plus une sensation de chaos sans aucun sprite supplémentaire.</p></div>
 <script type="text/x-code" data-lang="gdscript" data-file="res://sections/s1/bank_event.gd">
 extends Area2D
 ## Déclencheur (masque 3) : explosion de la Bank of Gotham City.
@@ -141,31 +142,43 @@ func _on_body_entered(body: Node2D) -> void:
 	_run()
 
 
+@export var duration := 6.5           ## mesuré : 2:43.9 → 2:50.4
+@export var switch_at := 5.7          ## mesuré : la palette bascule à 2:49.6
+@export var flash_gap := Vector2(0.15, 0.5)   ## intervalle aléatoire entre deux flashs
+
+
 func _run() -> void:
-	# 1. Explosions en chaîne sur les fenêtres.
-	for m in blast_points:
-		Fx.explosion(m.global_position, get_parent())
-		await get_tree().create_timer(0.12).timeout
-	# 2. Le rideau blanc, avec quelques pulsations.
-	PaletteFx.set_flash(7)
-	await get_tree().create_timer(0.6).timeout
-	# 3. Pendant qu'on ne voit rien : nouvelle palette, feux, débris.
+	var t := 0.0
+	var switched := false
+	while t < duration:
+		# Un flash blanc de 3 images exactement, comme mesuré dans la vidéo.
+		# C'est pendant un flash, quand on ne voit rien, qu'on change le monde.
+		PaletteFx.set_flash(7)
+		if not switched and t >= switch_at:
+			switched = true
+			_switch_to_fire()
+		await PaletteFx.flash_white(3, 7)
+		t += 3.0 / 60.0
+		# Entre deux flashs : des explosions à l'étage.
+		var m: Marker2D = blast_points.pick_random()
+		Fx.explosion(m.global_position + Vector2(randf_range(-16, 16), randf_range(-8, 8)), get_parent())
+		var gap := randf_range(flash_gap.x, flash_gap.y)
+		await get_tree().create_timer(gap).timeout
+		t += gap
+	if not switched:
+		_switch_to_fire()
+
+
+func _switch_to_fire() -> void:
 	facade.material.set_shader_parameter("plane", fire_texture)
 	fires.show()
 	debris.emitting = true
-	for i in 4:
-		PaletteFx.set_flash(7 - i)
-		await get_tree().create_timer(0.35).timeout
-	PaletteFx.set_flash(0)
-	# 4. Encore quelques explosions pour accompagner le retour à l'image.
-	for m in blast_points:
-		Fx.explosion(m.global_position + Vector2(randf_range(-16, 16), 0), get_parent())
-		await get_tree().create_timer(0.08).timeout
 </script>
-<div class="callout warn"><span class="tag">À calibrer</span><p>On voit un écran blanc sur trois images échantillonnées à une seconde d'intervalle : il peut s'agir d'un blanc continu ou d'un clignotement rapide. Le code donne un blanc franc suivi d'un retour par paliers ; vérifie dans un émulateur. Pour une bascule plus fidèle encore, utilise la façade indexée et <code>indexed.gdshader</code> du tome 06, et anime <code>blend_step</code> de 0 à 7 sous le flash.</p></div>
+<div class="callout warn"><span class="tag">Accessibilité</span><p>24 flashs blancs en 6 s, c'est un stroboscope qui peut gêner les personnes photosensibles. Fidèle à l'original, mais pense à une option qui remplace <code>flash_white(3, 7)</code> par <code>flash_white(3, 3)</code> (flash atténué). Pour une bascule plus fidèle encore, utilise la façade indexée et <code>indexed.gdshader</code> du tome 06.</p></div>
 <p>Pour les débris : un <code>CPUParticles2D</code> enfant de la caméra, émetteur en rectangle de 320×4 au-dessus de l'écran (<code>emission_shape = Rectangle</code>), <code>gravity</code> (0, 30), <code>lifetime</code> 6 s, une petite texture de papier, et une rotation aléatoire.</p>
 
 <h2 id="boss-base">Une base pour les trois boss</h2>
+<figure class="concept"><img src="img/concepts/t07-vitalite.jpg" alt="La pastille centrale, agrandie. Elle descend par à-coups au rythme des impacts et tombe à 00 à la destruction : c’est la" loading="lazy"><figcaption><b>La pastille centrale, agrandie.</b> Elle descend par à-coups au rythme des impacts et tombe à 00 à la destruction : c’est la vitalité du boss que renvoie <code>Boss.vitality()</code>. (vidéo 4:47 → 6:16)</figcaption></figure>
 <p>Les trois boss du niveau partagent : une vitalité affichée de 99 à 00, un démarrage déclenché par une arène, une séquence de mort et des points.</p>
 <script type="text/x-code" data-lang="gdscript" data-file="res://bosses/boss.gd">
 class_name Boss
@@ -245,7 +258,9 @@ func _on_body_entered(body: Node2D) -> void:
 <div class="callout concept"><span class="tag">Concept : <code>call_group</code>, le message à qui veut l'entendre</span><p>Le boss ne sait pas si un HUD existe. Il « crie » <code>show_boss</code> à tous les nœuds du groupe <code>hud</code>. S'il n'y en a aucun (scène de test), rien ne se passe et rien ne plante. C'est un découplage encore plus fort que les signaux.</p></div>
 
 <h2 id="harley-machine">Le boss 1 : la machine d'Harley</h2>
+<figure class="concept"><img src="img/concepts/t07-boss1-phases.jpg" alt="Les trois phases de la machine d’Harley. A : canon rotatif et salves en arc · B : socle détruit, bombes éjectées · C : m" loading="lazy"><figcaption><b>Les trois phases de la machine d’Harley.</b> A : canon rotatif et salves en arc · B : socle détruit, bombes éjectées · C : mât télescopique, Harley exposée au niveau du balcon. (vidéo 4:58, 5:23, 6:12)</figcaption></figure>
 <h3 id="phases">Les trois phases</h3>
+<figure class="concept narrow"><img src="img/concepts/t07-tir-balistique.jpg" alt="Le lob d’Harley. On fixe la durée du vol et on résout l’équation du mouvement pour obtenir la vitesse de départ : la bom" loading="lazy"><figcaption><b>Le lob d’Harley.</b> On fixe la durée du vol et on résout l’équation du mouvement pour obtenir la vitesse de départ : la bombe tombe là où se trouvait Batman. (vidéo 6:12)</figcaption></figure>
 <div class="table-wrap"><table>
 <tr><th>Phase</th><th>Vitalité</th><th>Partie vulnérable</th><th>Attaque</th><th>Mouvement</th></tr>
 <tr><td>A · complète</td><td>99 → 66</td><td>Capsule et canon</td><td>Salves de 4 boules en arc, canon qui balaie de l'horizontale à la verticale</td><td>Glisse de gauche à droite</td></tr>
@@ -451,7 +466,7 @@ static func ballistic(from: Vector2, to: Vector2, gravity: float, time: float) -
 <div class="callout goal"><span class="tag">Objectif de l'étape</span>
 <ul class="check">
   <li>La section apparaît par un fondu en 8 paliers (via <code>SceneFlow</code>) ; les arènes s'enchaînent avec leurs « GO! ».</li>
-  <li>À la banque : explosions, écran blanc, puis rue en feu, flammes ondulantes, papiers qui tombent.</li>
+  <li>À la banque : explosions et flashs stroboscopiques de 3 images, puis rue en feu, flammes ondulantes, papiers qui tombent.</li>
   <li>Le boss glisse, tire des arcs de boules, perd son socle à 66, son dôme à 33, puis Harley monte sur son mât.</li>
   <li>À 00 : explosions, pose de victoire, +5 000, fondu, chargement de la section 2.</li>
 </ul></div>

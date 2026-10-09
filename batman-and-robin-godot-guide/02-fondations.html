@@ -40,6 +40,7 @@
 </table></div>
 
 <h2 id="projet">Configurer le projet</h2>
+<figure class="concept"><img src="img/concepts/t02-resolution.jpg" alt="320 × 224 pixels. À gauche, l’écran du jeu en résolution native agrandi ×2 ; à droite, une loupe ×5 : chaque carré est u" loading="lazy"><figcaption><b>320 × 224 pixels.</b> À gauche, l’écran du jeu en résolution native agrandi ×2 ; à droite, une loupe ×5 : chaque carré est un pixel. Le mode d’étirement <code>viewport</code> conserve exactement cette grille. (vidéo 1:50)</figcaption></figure>
 <p>Crée un projet Godot 4.5 (moteur de rendu <em>Compatibility</em> ou <em>Forward+</em>, peu importe ici), puis règle les paramètres suivants dans <strong>Projet → Paramètres du projet</strong> (active « Paramètres avancés »). Voici l'extrait équivalent de <code>project.godot</code> :</p>
 <script type="text/x-code" data-lang="ini" data-file="project.godot (extrait)">
 [display]
@@ -158,6 +159,7 @@ func _axis(axis: JoyAxis, value: float) -> InputEventJoypadMotion:
 └── tools/             setup_inputs.gd, indexer.gd                 (scripts d'éditeur)</pre>
 
 <h2 id="couches">Les couches de collision</h2>
+<figure class="concept"><img src="img/concepts/t02-couches-collision.jpg" alt="Les couches de collision, posées sur une vraie image du jeu. Le sol (1), le balcon traversable (2), le rebord d’accroche" loading="lazy"><figcaption><b>Les couches de collision, posées sur une vraie image du jeu.</b> Le sol (1), le balcon traversable (2), le rebord d’accroche (8), le corps de Batman (3), ceux des clowns (4) et un bonus (7). (vidéo 2:06)</figcaption></figure>
 <div class="callout concept"><span class="tag">Concept : couches et masques</span><p>Chaque objet physique <strong>est</strong> sur certaines couches (<code>collision_layer</code>) et <strong>regarde</strong> certaines couches (<code>collision_mask</code>). Un batarang n'a pas besoin de tester les murs du décor ni les autres batarangs : bien régler les masques évite à la fois des bugs et des calculs inutiles.</p></div>
 <div class="table-wrap"><table>
 <tr><th>N°</th><th>Nom</th><th>Qui est dessus</th><th>Qui la regarde</th></tr>
@@ -330,6 +332,7 @@ func reset() -> void:
 </script>
 
 <h3 id="hitbox-hurtbox">Hitbox et Hurtbox : qui frappe, qui encaisse</h3>
+<figure class="concept narrow"><img src="img/concepts/t02-hitbox-hurtbox.jpg" alt="Hitbox contre Hurtbox, dans le jeu. L’aiguillon du clown (rouge) est une Hitbox ; il ne fait mal que s’il chevauche la H" loading="lazy"><figcaption><b>Hitbox contre Hurtbox, dans le jeu.</b> L’aiguillon du clown (rouge) est une Hitbox ; il ne fait mal que s’il chevauche la Hurtbox de Batman (vert). Le corps de Batman qui sert à marcher est une troisième forme, séparée. (vidéo 2:06)</figcaption></figure>
 <p>La <strong>Hitbox</strong> est la zone qui fait mal (poing, batarang, bombe). La <strong>Hurtbox</strong> est la zone vulnérable (le corps). Les séparer du <code>CollisionShape2D</code> qui sert à marcher permet par exemple de rendre Batman invincible sans qu'il tombe à travers le sol.</p>
 <script type="text/x-code" data-lang="gdscript" data-file="res://core/hurtbox.gd">
 class_name Hurtbox

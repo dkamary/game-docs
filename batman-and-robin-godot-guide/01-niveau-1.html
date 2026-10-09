@@ -48,9 +48,9 @@
 <tr><td><a class="tc" href="#">1:25</a></td><td>Titre → menu → options → sélection du personnage</td><td>START / OPTIONS ; CREDITS · MUSIC TEST · SOUND TEST ; PLAYER SELECT Batman / Robin</td></tr>
 <tr><td><a class="tc" href="#">1:39</a></td><td>Batmobile puis carte-titre</td><td>« LEVEL ONE — HAPPY BIRTHDAY TO ME! »</td></tr>
 <tr><td><a class="tc" href="#">1:46</a></td><td><strong>Section 1</strong> : rue de Gotham</td><td>Façade à balcon praticable, clowns, arène → GO!</td></tr>
-<tr><td><a class="tc" href="#">2:44</a></td><td>Explosion de la Bank of Gotham City</td><td>Flash blanc de 3 s, la palette passe du bleu nuit au violet/ocre, flammes géantes, débris en pluie</td></tr>
+<tr><td><a class="tc" href="#">2:44</a></td><td>Explosion de la Bank of Gotham City</td><td>6,5 s de flashs blancs stroboscopiques (3 images chacun), la palette passe du bleu nuit au violet/ocre, flammes géantes, débris en pluie</td></tr>
 <tr><td><a class="tc" href="#">4:46</a></td><td><strong>Boss 1</strong> : machine d'Harley</td><td>3 phases, vitalité 99 → 00, +5 000 points, pose de victoire</td></tr>
-<tr><td><a class="tc" href="#">6:23</a></td><td><strong>Section 2</strong> : Gem Expo</td><td>Colonnes de marbre au premier plan, têtes à hélice en formation</td></tr>
+<tr><td><a class="tc" href="#">6:23</a></td><td><strong>Section 2</strong> : Gem Expo</td><td>Grandes colonnes de marbre, têtes à hélice en formation</td></tr>
 <tr><td><a class="tc" href="#">9:09</a></td><td>Entrepôt de caisses</td><td>Pyramides de caisses, Harley passe en fauteuil-fusée (<a class="tc" href="#">9:25</a>)</td></tr>
 <tr><td><a class="tc" href="#">9:48</a></td><td><strong>Mini-boss</strong> : Harley + grappin de grue</td><td>Grappin en sphères (secret #3 de Burton), +5 000 points</td></tr>
 <tr><td><a class="tc" href="#">10:44</a></td><td><strong>Section 3</strong> : convoi de camions</td><td>Défilement continu, sauts entre véhicules, ballons-mines, cadeaux</td></tr>
@@ -92,7 +92,7 @@
 <ul>
   <li><strong>Deux niveaux de jeu :</strong> le trottoir et le balcon, qui court sur toute la façade. Les ennemis sautent du balcon. Batman peut s'accrocher dessous, puis grimper ou tirer depuis cette position.</li>
   <li><strong>Rythme :</strong> la caméra se bloque, des vagues tombent du haut ou arrivent par les côtés. Une fois l'écran nettoyé, une bulle « GO! » apparaît à droite (<a class="tc" href="#">2:25</a>, <a class="tc" href="#">3:18</a>, <a class="tc" href="#">3:37</a>, <a class="tc" href="#">4:42</a>) et la caméra repart.</li>
-  <li><strong>Événement scripté :</strong> à <a class="tc" href="#">2:44</a>, explosions en chaîne à l'étage de la banque, flash blanc d'environ 3 s, puis toute la palette du décor bascule vers une ambiance d'incendie. Les foyers sont animés et des débris (papiers, billets) tombent en continu.</li>
+  <li><strong>Événement scripté :</strong> à <a class="tc" href="#">2:44</a>, explosions en chaîne à l'étage de la banque et environ 24 flashs blancs de 3 images (mesurés à 60 i/s), puis toute la palette du décor bascule vers une ambiance d'incendie. Les foyers sont animés et des débris (papiers, billets) tombent en continu.</li>
   <li><strong>Décor destructible :</strong> les poubelles explosent et lâchent des bonus, les vitrines se brisent et les trous restent affichés.</li>
 </ul>
 
@@ -113,7 +113,7 @@
 
 <h2 id="section2">Section 2 : Gem Expo, entrepôt et mini-boss</h2>
 <div class="shots">
-  <figure class="shot"><img src="img/s12-gem-expo.jpg" alt="Gem Expo"><figcaption>GEM EXPO : colonnes de marbre au premier plan, bannière, sol en damier. <a class="tc" href="#">6:24</a></figcaption></figure>
+  <figure class="shot"><img src="img/s12-gem-expo.jpg" alt="Gem Expo"><figcaption>GEM EXPO : grandes colonnes de marbre, bannière, sol en damier. <a class="tc" href="#">6:24</a></figcaption></figure>
   <figure class="shot"><img src="img/s12-propellers.jpg" alt="Têtes à hélice"><figcaption>Vague de têtes à hélice, avec explosions en chapelet. <a class="tc" href="#">6:58</a></figcaption></figure>
   <figure class="shot"><img src="img/s12-go.jpg" alt="Panneau GO"><figcaption>La bulle « GO! » signale la fin de l'arène. <a class="tc" href="#">7:49</a></figcaption></figure>
   <figure class="shot"><img src="img/s12-pickup.jpg" alt="Bonus d'arme"><figcaption>Bonus d'arme au sol (couleur cyclique). <a class="tc" href="#">8:41</a></figcaption></figure>
@@ -121,7 +121,7 @@
   <figure class="shot"><img src="img/s12-harley-teaser.jpg" alt="Harley passe"><figcaption>Harley traverse l'écran en fauteuil-fusée : annonce du mini-boss. <a class="tc" href="#">9:27</a></figcaption></figure>
 </div>
 <ul>
-  <li><strong>Premier plan :</strong> les colonnes de marbre défilent plus vite que l'action et la masquent en partie. C'est une couche de parallaxe <em>devant</em> le joueur.</li>
+  <li><strong>Colonnes :</strong> d'énormes colonnes de marbre rythment le décor. Mesure faite à 60 i/s (tome 06) : elles défilent exactement à la même vitesse que le mur et le sol, et Batman passe devant elles. Ce sont des éléments du plan de décor, pas une couche de premier plan.</li>
   <li><strong>Décor en boucle :</strong> la même salle (colonnes, bannière, vitrines) revient plusieurs fois. Le niveau est construit avec des modules répétés.</li>
   <li><strong>Têtes à hélice :</strong> petits drones-jouets en tête de clown qui arrivent en file indienne (colonne verticale), puis s'alignent en haut de l'écran et lâchent des haches ou des bombes.</li>
   <li><strong>Entrepôt :</strong> le sol monte et descend au gré des pyramides de caisses. Au fond, des verrières et des piles de caisses bleues.</li>
