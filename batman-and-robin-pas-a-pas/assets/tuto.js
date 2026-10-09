@@ -86,6 +86,22 @@
     });
   }
 
+  // Retour à la ligne dans les blocs de code : une préférence commune à toutes les pages.
+  // Par défaut, activé sur petit écran (lecture sur téléphone), désactivé sinon.
+  function codeWrapPref() {
+    var v = load("code-wrap");
+    if (v === "1") return true;
+    if (v === "0") return false;
+    return window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+  }
+
+  function applyCodeWrap(on) {
+    document.querySelectorAll(".code").forEach(function (c) { c.classList.toggle("wrap", on); });
+    document.querySelectorAll(".code-head .wrap-toggle").forEach(function (b) {
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
   function buildCode() {
     document.querySelectorAll('script[type="text/x-code"]').forEach(function (s) {
       var lang = s.dataset.lang || "text";
@@ -94,20 +110,32 @@
       var head = document.createElement("div");
       head.className = "code-head";
       var file = document.createElement("span");
+      file.className = "file";
       file.textContent = s.dataset.file || "";
       var l = document.createElement("span");
       l.className = "lang"; l.textContent = lang;
+      var wrapBtn = document.createElement("button");
+      wrapBtn.type = "button";
+      wrapBtn.className = "wrap-toggle";
+      wrapBtn.textContent = "↩ Lignes";
+      wrapBtn.title = "Retour à la ligne automatique (pour les petits écrans)";
+      wrapBtn.addEventListener("click", function () {
+        var on = wrapBtn.getAttribute("aria-pressed") !== "true";
+        store("code-wrap", on ? "1" : "0");
+        applyCodeWrap(on);
+      });
       var btn = document.createElement("button");
       btn.type = "button"; btn.textContent = "Copier";
-      head.appendChild(file); head.appendChild(l); head.appendChild(btn);
+      head.appendChild(file); head.appendChild(l); head.appendChild(wrapBtn); head.appendChild(btn);
       var pre = document.createElement("pre");
       var code = document.createElement("code");
       code.className = "language-" + lang;
-      code.textContent = dedent(s.textContent);
+      var raw = dedent(s.textContent);
+      renderLines(code, raw, lang);
       pre.appendChild(code);
       wrap.appendChild(head); wrap.appendChild(pre);
       btn.addEventListener("click", function () {
-        var txt = code.textContent;
+        var txt = raw;   // le texte d'origine, tabulations comprises
         var done = function () { btn.textContent = "Copié ✓"; setTimeout(function () { btn.textContent = "Copier"; }, 1400); };
         if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done, done);
         else {
@@ -119,7 +147,24 @@
       });
       s.replaceWith(wrap);
     });
-    if (window.Prism) window.Prism.highlightAll();
+    applyCodeWrap(codeWrapPref());
+  }
+
+  function escapeHtml(t) {
+    return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  // Une ligne de code = un bloc dont le retrait vient des tabulations de tête (--i).
+  // Quand le retour à la ligne est actif, la suite d'une ligne coupée reste alignée
+  // sous son indentation (retrait suspendu) : on garde la lecture de la structure GDScript.
+  function renderLines(code, raw, lang) {
+    var grammar = window.Prism && window.Prism.languages[lang];
+    code.innerHTML = raw.split("\n").map(function (line) {
+      var tabs = line.match(/^\t*/)[0].length;
+      var body = line.slice(tabs);
+      var html = grammar ? window.Prism.highlight(body, grammar, lang) : escapeHtml(body);
+      return '<span class="ln" style="--i:' + tabs + '">' + html + "</span>";
+    }).join("");
   }
 
   function buildToc() {
@@ -129,14 +174,24 @@
     if (!heads.length) { toc.remove(); return; }
     toc.insertAdjacentHTML("beforeend", "<h4>Sur cette page</h4>");
     var links = [];
+    // Version repliable du sommaire, affichée sous le bandeau sur tablette et téléphone.
+    var mobile = document.createElement("details");
+    mobile.className = "toc-mobile";
+    mobile.innerHTML = "<summary>Sur cette page</summary><nav aria-label=\"Sommaire de la page\"></nav>";
+    var mobileNav = mobile.querySelector("nav");
     heads.forEach(function (h) {
       var a = document.createElement("a");
       a.href = "#" + h.id;
       a.textContent = h.textContent;
       if (h.tagName === "H3") a.className = "lvl3";
       toc.appendChild(a);
-      links.push([h, a]);
+      var m = a.cloneNode(true);
+      m.addEventListener("click", function () { mobile.open = false; });
+      mobileNav.appendChild(m);
+      links.push([h, a, m]);
     });
+    var hero = document.querySelector(".content .hero");
+    if (hero) hero.insertAdjacentElement("afterend", mobile);
     if ("IntersectionObserver" in window) {
       var obs = new IntersectionObserver(function (entries) {
         entries.forEach(function (e) {
@@ -159,7 +214,10 @@
       var n = document.querySelectorAll("h3.step.is-done").length;
       store("done:" + page, String(n));
       (tocLinks || []).forEach(function (p) {
-        if (p[0].classList.contains("step")) p[1].style.color = p[0].classList.contains("is-done") ? "var(--green)" : "";
+        if (!p[0].classList.contains("step")) return;
+        var done = p[0].classList.contains("is-done");
+        p[1].style.color = done ? "var(--green)" : "";
+        if (p[2]) p[2].classList.toggle("done", done);
       });
     }
     steps.forEach(function (h) {
@@ -213,6 +271,29 @@
     });
   }
 
+  // Bouton « retour en haut », visible après un peu de défilement (pages longues sur mobile).
+  function buildToTop() {
+    var a = document.createElement("a");
+    a.className = "to-top";
+    a.href = "#";
+    a.setAttribute("aria-label", "Revenir en haut de la page");
+    a.textContent = "↑";
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    document.body.appendChild(a);
+    var tick = false;
+    window.addEventListener("scroll", function () {
+      if (tick) return;
+      tick = true;
+      requestAnimationFrame(function () {
+        a.classList.toggle("show", window.scrollY > 800);
+        tick = false;
+      });
+    }, { passive: true });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     buildNav();
     buildTimecodes();
@@ -220,5 +301,6 @@
     var links = buildToc();
     buildSteps(links);
     buildProgress();
+    buildToTop();
   });
 })();

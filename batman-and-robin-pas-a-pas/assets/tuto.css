@@ -62,3 +62,89 @@ ol.loop { counter-reset: loop; list-style: none; padding: 0; display: grid; grid
 ol.loop li { counter-increment: loop; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 14px; color: var(--ink-soft); }
 ol.loop li::before { content: counter(loop); display: block; font: 700 22px/1 var(--font-head); color: var(--gold); margin-bottom: 6px; }
 ol.loop li strong { display: block; color: var(--ink); margin-bottom: 2px; }
+
+/* ---------- Lecture : césure, mots longs ---------- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+h1, h2, h3 { overflow-wrap: break-word; hyphens: auto; }
+p code, li code, td code, summary code, figcaption code { overflow-wrap: anywhere; }
+
+/* ---------- Sommaire repliable (petits écrans) ---------- */
+details.toc-mobile { display: none; margin: 0 0 22px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+details.toc-mobile summary { cursor: pointer; padding: 12px 14px; font-weight: 600; color: var(--ink); list-style: none; }
+details.toc-mobile summary::-webkit-details-marker { display: none; }
+details.toc-mobile summary::after { content: "▾"; float: right; color: var(--muted); }
+details.toc-mobile[open] summary::after { content: "▴"; }
+details.toc-mobile nav { padding: 4px 6px 10px; border-top: 1px solid var(--line); }
+details.toc-mobile a { display: block; padding: 8px 10px; color: var(--ink-soft); text-decoration: none; border-radius: 6px; }
+details.toc-mobile a.lvl3 { padding-left: 24px; font-size: 14px; color: var(--muted); }
+details.toc-mobile a.done { color: var(--green); }
+details.toc-mobile a:active { background: var(--panel-2); }
+
+/* ---------- Retour en haut ---------- */
+.to-top { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(21, 25, 53, .92); color: var(--gold); font-size: 20px; text-decoration: none; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.to-top.show { opacity: 1; pointer-events: auto; }
+
+/* ---------- Code : retour à la ligne à la demande ---------- */
+.code-head .file { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.code-head .lang { margin-left: 0; }
+.code-head button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.code pre code .ln { display: block; padding-left: calc(var(--i, 0) * 4ch); min-height: 1.55em; }
+.code.wrap pre, .code.wrap pre code { white-space: pre-wrap !important; overflow-wrap: anywhere; word-break: normal; }
+.code.wrap pre code .ln { padding-left: calc(var(--i, 0) * 4ch + 2ch); text-indent: -2ch; }
+
+/* ---------- Tablettes et téléphones ---------- */
+@media (max-width: 960px) {
+  details.toc-mobile { display: block; }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 16px; line-height: 1.6; }
+
+  /* Barre du haut : la marque se réduit, le sélecteur d'étape prend la place. */
+  .topbar { gap: 10px; padding: 8px 12px; }
+  .brand { font-size: 15px; }
+  .brand span { display: none; }
+  .topbar select { flex: 1; min-width: 0; max-width: none; padding: 9px 10px; font-size: 14px; }
+
+  .layout { padding: 16px 16px 72px; }
+  .hero { padding: 18px 16px 16px; border-radius: 12px; }
+  .lead { font-size: 16.5px; }
+  h1 { font-size: 27px; }
+  h2 { font-size: 22px; margin: 40px 0 12px; }
+  h3 { font-size: 18.5px; }
+  h4 { font-size: 16px; }
+
+  /* Titres d'étape : le bouton passe sous le titre, en grand (cible tactile). */
+  h3.step { padding: 12px; margin-top: 34px; }
+  h3.step .done-toggle { margin-left: 0; width: 100%; min-height: 40px; font-size: 13px; }
+
+  .callout { padding: 12px 12px 10px; margin: 16px 0; }
+  .callout ol, .callout ul { padding-left: 20px; }
+  ul, ol { padding-left: 20px; }
+
+  /* Menus de l'éditeur : retour à la ligne autorisé sur petit écran. */
+  .menu { white-space: normal; }
+
+  /* Code et arborescences : plus compacts, défilement horizontal conservé. */
+  .code pre[class*="language-"], .code pre { font-size: 12.5px !important; padding: 12px !important; }
+  .code-head { flex-wrap: wrap; gap: 6px 8px; padding: 6px 8px 6px 10px; }
+  .code-head .lang { display: none; }
+  .code-head button { min-height: 34px; padding: 6px 10px; }
+  pre.tree { font-size: 11.5px; padding: 12px; }
+
+  /* Tableaux : plus serrés, en-têtes sur plusieurs lignes. */
+  table { font-size: 13.5px; }
+  th, td { padding: 7px 9px; }
+  th { white-space: normal; }
+
+  .commit { flex-wrap: wrap; font-size: 12.5px; white-space: normal; overflow-wrap: anywhere; }
+  ol.loop { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .learn { grid-template-columns: 1fr; }
+  .cards { grid-template-columns: 1fr; }
+  figure.shot, figure.concept.narrow { max-width: none !important; }
+  details.quiz summary { padding: 12px; }
+
+  /* Précédent / suivant : l'un sous l'autre. */
+  .prevnext { flex-direction: column; margin-top: 44px; }
+  .prevnext a.next { text-align: left; }
+}
