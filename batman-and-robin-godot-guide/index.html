@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Batman &amp; Robin × Godot 4.5 — Guide vérifié du niveau 1</title>
+<meta name="description" content="Tutoriel complet et vérifié image par image : recréer le niveau 1 « Happy Birthday to Me! » de The Adventures of Batman &amp; Robin (Mega Drive) dans Godot 4.5 en GDScript, en apprenant les concepts de programmation de jeu vidéo.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Guide fusionné · vérifié sur la vidéo</div>
+  <h1>Recréer le niveau 1 de <em>The Adventures of Batman &amp; Robin</em> dans Godot 4.5</h1>
+  <p class="lead">De l'intro d'Arkham jusqu'à la chute du Joker, en passant par la machine d'Harley Quinn, le Gem Expo, le bras de grue en sphères et le convoi de camions. Chaque mécanique est d'abord <strong>observée dans la vidéo</strong> (horodatage cliquable), puis <strong>expliquée côté Mega Drive</strong>, puis <strong>codée en GDScript</strong> — avec le concept de programmation de jeu qu'elle enseigne.</p>
+  <div class="meta">
+    <span class="pill gold">Godot 4.5+ · GDScript typé</span>
+    <span class="pill">Résolution 320 × 224</span>
+    <span class="pill">Mega Drive · Clockwork Tortoise · 1995</span>
+    <span class="pill">Niveau 1 : « Happy Birthday to Me! »</span>
+  </div>
+</section>
+
+<h2 id="pourquoi">Pourquoi ce troisième guide ?</h2>
+<p>Tu disposais de deux documentations : <a href="../batman-and-robin/">les « secrets de programmation »</a> et <a href="../adventure-of-batman-and-robin-tuto/tome-01.html">le tutoriel en 7 tomes</a>. Avant de les fusionner, je les ai confrontées à trois sources primaires :</p>
+<ol>
+  <li><strong>Le playthrough</strong> <a href="https://youtu.be/EDaIlrfxRnE" target="_blank" rel="noopener">NintendoComplete</a>, visionné trois fois de 0:00 à 14:37 : une image par seconde sur toute la durée, puis des ralentis à 8 images/s et des arrêts sur image en pleine résolution sur les moments ambigus. J'ai aussi mesuré la vitesse de défilement, bande par bande, à 60 images/s.</li>
+  <li><strong>Les deux vidéos <em>Coding Secrets</em></strong> de Jon Burton (<a href="https://youtu.be/Z0S92Fs5gOg" target="_blank" rel="noopener">partie 1</a>, <a href="https://youtu.be/M7b0uUEl5hc" target="_blank" rel="noopener">partie 2</a>), transcrites mot à mot.</li>
+  <li><strong>Une source écrite indépendante</strong> pour les règles qui ne se voient pas à l'écran (armes, niveaux de puissance) : la soumission <a href="https://tasvideos.org/9346S" target="_blank" rel="noopener">TASVideos #9346</a>.</li>
+</ol>
+<p>Résultat : la base Godot des deux docs est souvent bonne, mais <strong>une grande partie du contenu propre au jeu est inventée</strong> (char d'assaut, grue à boulet, usine chimique, dirigeable en 3 phases, tramage Bayer, tunnel polaire, armes « laser / homing »…). Le <a href="00-audit.html">tome 00</a> détaille point par point ce qui est juste et ce qui est faux. Les tomes suivants reconstruisent tout sur des bases vérifiées.</p>
+
+<h2 id="conventions">Comment lire ce guide</h2>
+<p>Chaque tome suit le même schéma, matérialisé par des encadrés de couleur :</p>
+<div class="callout video"><span class="tag">Observé dans la vidéo</span><p>Ce que montre le playthrough, avec un lien horodaté qui ouvre la vidéo au bon moment : <a class="tc" href="#">2:52</a>.</p></div>
+<div class="callout md"><span class="tag">Sur Mega Drive</span><p>Comment la console de 1995 s'y prenait (VDP, plans, H-Scroll, palettes, sprites…).</p></div>
+<div class="callout concept"><span class="tag">Concept de programmation de jeu</span><p>L'idée générale réutilisable dans n'importe quel jeu (machine à états, pooling, arène à vagues, raster…).</p></div>
+<div class="callout warn"><span class="tag">Non vérifié / à calibrer</span><p>Ce que ni la vidéo ni les sources ne permettent d'affirmer. Le code l'expose en <code>@export</code> pour que tu puisses l'ajuster.</p></div>
+<div class="callout fix"><span class="tag">Correction des docs existantes</span><p>Les endroits où ce guide contredit volontairement l'une des deux anciennes docs.</p></div>
+<div class="callout goal"><span class="tag">Objectif de l'étape</span><p>Le résultat jouable attendu à la fin de la section.</p></div>
+
+<h2 id="plan">Le plan</h2>
+<div class="cards">
+  <a class="card" href="00-audit.html"><span class="num">00</span><h3>Audit des docs existantes</h3><p>Ce qui est juste, ce qui est faux, ce qui manque, avec preuves.</p></a>
+  <a class="card" href="01-niveau-1.html"><span class="num">01</span><h3>Le niveau 1 décortiqué</h3><p>Frise minutée 0:00–14:37, HUD, ennemis, boss, mesures. Le document de conception de référence.</p></a>
+  <a class="card" href="02-fondations.html"><span class="num">02</span><h3>Fondations Godot</h3><p>Projet 320×224, entrées façon manette 3 boutons, autoloads, composants de base.</p></a>
+  <a class="card" href="03-batman.html"><span class="num">03</span><h3>Batman</h3><p>Machine à états, saut, visée 8 directions, attaque contextuelle, suspension au balcon, caméra lissée.</p></a>
+  <a class="card" href="04-armes.html"><span class="num">04</span><h3>Armes &amp; bonus</h3><p>Batarang / bolas / shuriken, niveaux 1–7, jauge de charge automatique, smart bomb crâne, pooling.</p></a>
+  <a class="card" href="05-ennemis-vagues.html"><span class="num">05</span><h3>Ennemis &amp; vagues</h3><p>Clowns, costauds, tireurs, têtes à hélice, ballons-mines. Arènes verrouillées et panneau « GO! ».</p></a>
+  <a class="card" href="06-effets-megadrive.html"><span class="num">06</span><h3>Effets Mega Drive</h3><p>Plan raster ligne par ligne, feu ondulant, palettes, fondus, flash, mise à l'échelle par paliers.</p></a>
+  <a class="card" href="07-section-1-rues.html"><span class="num">07</span><h3>Section 1 : rues</h3><p>Rue de Gotham, banque en feu, boss : la machine d'Harley en trois phases.</p></a>
+  <a class="card" href="08-section-2-gem-expo.html"><span class="num">08</span><h3>Section 2 : Gem Expo</h3><p>Exposition de joyaux, entrepôt, mini-boss Harley et le bras de grue en sphères pseudo-3D.</p></a>
+  <a class="card" href="09-section-3-convoi-joker.html"><span class="num">09</span><h3>Section 3 : convoi &amp; Joker</h3><p>Camions en mouvement, ballons-mines, boss : la montgolfière du Joker.</p></a>
+  <a class="card" href="10-ecrans-flux.html"><span class="num">10</span><h3>Écrans &amp; flux</h3><p>Intro Arkham, titre, options, sélection, carte-titre, HUD, game over, enchaînement des scènes.</p></a>
+  <a class="card" href="11-finitions.html"><span class="num">11</span><h3>Finitions &amp; annexes</h3><p>Le « juice », la checklist de fidélité, l'option coop, l'export, le glossaire et les sources.</p></a>
+</div>
+
+<h2 id="concepts">Les concepts de programmation de jeu, tome par tome</h2>
+<div class="table-wrap"><table>
+<tr><th>Tome</th><th>Concepts appris</th></tr>
+<tr><td>02</td><td>Boucle de jeu, pas de temps fixe (60 Hz), résolution virtuelle, composition par composants, couches de collision, singletons (autoloads)</td></tr>
+<tr><td>03</td><td>Machine à états finis, physique « arcade » (gravité, saut à hauteur variable), boîtes de frappe / boîtes de vulnérabilité, invincibilité temporaire, caméra lissée avec anticipation</td></tr>
+<tr><td>04</td><td>Conception pilotée par les données (Resources), réserve d'objets (pooling), signaux / patron Observateur, objets à états cycliques</td></tr>
+<tr><td>05</td><td>Héritage contre composition, IA par états, « directeur » de vagues, verrouillage de caméra, tables de butin</td></tr>
+<tr><td>06</td><td>Shaders <code>canvas_item</code>, raster (effets par ligne de balayage), couleurs indexées et palettes, quantification, parallaxe, pseudo-3D par projection</td></tr>
+<tr><td>07–09</td><td>Conception de boss (phases, télégraphie, fenêtres de vulnérabilité), cinématique procédurale, pseudo-3D (projection perspective, tri en profondeur), plateformes mobiles, défilement automatique</td></tr>
+<tr><td>10</td><td>Interfaces <code>Control</code>, focus manette, machine à états du jeu (titre → niveau → game over), transitions, bus audio</td></tr>
+<tr><td>11</td><td>Ressenti de jeu (hit stop, flash, tremblement), profilage, export, multijoueur local</td></tr>
+</table></div>
+
+<h2 id="prerequis">Prérequis</h2>
+<ul>
+  <li><strong>Godot 4.5 ou plus récent</strong> (le guide utilise <code>Parallax2D</code> et <code>TileMapLayer</code>, apparus en 4.3, et l'échelle entière de la fenêtre).</li>
+  <li>Les bases de GDScript : variables, fonctions, nœuds et scènes. Le reste est expliqué.</li>
+  <li>Les planches de sprites déjà présentes dans <code>../batman-and-robin/spritesheets/</code> (Batman, Robin, Joker, sbires du Joker, intro, cartes-titres). Tant qu'un sprite manque, le guide utilise des formes de substitution.</li>
+  <li>Facultatif mais très utile : un émulateur avec avance image par image (BizHawk, Kega Fusion, Genesis Plus GX) pour calibrer les valeurs signalées « à calibrer ».</li>
+</ul>
+<div class="callout warn"><span class="tag">Droits sur les ressources</span><p>Les sprites, la musique de Jesper Kyd et les logos appartiennent à leurs ayants droit (DC Comics, Warner Bros., Sega). Ce projet est un exercice d'apprentissage personnel : ne publie pas de build qui contient ces ressources.</p></div>
+
+<h2 id="sources">Sources</h2>
+<ul>
+  <li>Playthrough de référence : <a href="https://youtu.be/EDaIlrfxRnE" target="_blank" rel="noopener">The Adventures of Batman &amp; Robin (Genesis) Playthrough — NintendoComplete</a> (analysé de 0:00 à 14:37).</li>
+  <li>Jon Burton, <em>Coding Secrets</em> : <a href="https://youtu.be/Z0S92Fs5gOg" target="_blank" rel="noopener">How did this SEGA Genesis Game achieve the "Impossible"?</a> et <a href="https://youtu.be/M7b0uUEl5hc" target="_blank" rel="noopener">Part 2</a>.</li>
+  <li><a href="https://tasvideos.org/9346S" target="_blank" rel="noopener">TASVideos — soumission #9346</a> (armes, niveaux de puissance, crâne, bonus de charge, logique des vagues).</li>
+  <li><a href="https://en.wikipedia.org/wiki/The_Adventures_of_Batman_%26_Robin_(video_game)" target="_blank" rel="noopener">Wikipédia (EN)</a> : développeur Clockwork Tortoise, musique de Jesper Kyd, scénario de Mr. Freeze.</li>
+  <li>Les deux documentations précédentes du dépôt, conservées telles quelles.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>

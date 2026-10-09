@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>00 · Audit des documentations existantes — Batman &amp; Robin × Godot</title>
+<meta name="description" content="Vérification point par point des deux documentations existantes face au playthrough, aux vidéos Coding Secrets et à TASVideos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Tome 00</div>
+  <h1>Audit des documentations existantes</h1>
+  <p class="lead">Ce qui est juste, ce qui est faux et ce qui manque dans les deux docs du dépôt, vérifié contre la vidéo, les transcriptions de Jon Burton et TASVideos.</p>
+  <div class="meta"><span class="pill">Doc A : batman-and-robin/ (README + index.html)</span><span class="pill">Doc B : adventure-of-batman-and-robin-tuto/ (7 tomes)</span></div>
+</section>
+
+<h2 id="verdict">Verdict en bref</h2>
+<div class="table-wrap"><table>
+<tr><th>Aspect</th><th>Doc A — « secrets »</th><th>Doc B — tutoriel 7 tomes</th></tr>
+<tr><td>Faits matériels Mega Drive</td><td class="ok">Fiables</td><td>—</td></tr>
+<tr><td>Techniques de Jon Burton</td><td class="mid">3 justes sur 7, mal situées dans le jeu ; 2 inventées</td><td>—</td></tr>
+<tr><td>Contenu du niveau 1</td><td class="ko">Majoritairement inventé</td><td class="ko">Très vague, boss faux</td></tr>
+<tr><td>Armes et règles de jeu</td><td class="ko">Inventées</td><td class="mid">Partiel</td></tr>
+<tr><td>Pédagogie Godot</td><td class="mid">Shaders intéressants, code de joueur fragile</td><td class="ok">Bonne (composants, signaux, pooling, menus)</td></tr>
+<tr><td>Code utilisable tel quel</td><td class="mid">Shaders oui, contrôleur à reprendre</td><td class="ko">Ne compile pas en l'état : classes et signaux jamais définis</td></tr>
+</table></div>
+<p>En résumé : la doc A a de bonnes intuitions techniques mais <strong>décrit un niveau 1 qui n'existe pas</strong>. La doc B est un bon cours généraliste sur Godot, mais <strong>ne colle presque jamais au jeu réel</strong> et ses fragments de code ne s'assemblent pas. Le nouveau guide garde la pédagogie de B et les techniques correctes de A, et remplace tout le reste par ce que montrent les sources.</p>
+
+<h2 id="niveau">Le niveau 1 réel face aux docs</h2>
+<p>Voici le déroulé constaté dans la vidéo (détaillé au <a href="01-niveau-1.html">tome 01</a>), comparé aux deux docs :</p>
+<div class="table-wrap"><table>
+<tr><th>Moment réel</th><th>Ce que montre la vidéo</th><th>Ce que disaient les docs</th><th>Verdict</th></tr>
+<tr><td><a class="tc" href="#">1:28</a></td><td>Menu <strong>START / OPTIONS</strong>. Options : <code>CREDITS</code>, <code>MUSIC TEST</code>, <code>SOUND TEST</code>. Le joueur 2 rejoint en appuyant sur START.</td><td>A : solo/coop, difficulté Normal/Hard/Mania, configuration des touches, mots de passe</td><td class="ko">Faux</td></tr>
+<tr><td><a class="tc" href="#">1:43</a></td><td>Carte-titre « LEVEL ONE — HAPPY BIRTHDAY TO ME! »</td><td>A : même nom</td><td class="ok">Juste</td></tr>
+<tr><td><a class="tc" href="#">1:46</a>–<a class="tc" href="#">4:45</a></td><td>Rue de Gotham la nuit, façade avec <strong>balcon praticable</strong>, puis explosion de la <strong>Bank of Gotham City</strong> et rue en feu</td><td>A : rue sous l'orage, pluie, projecteurs tramés Bayer</td><td class="mid">Partiel (pas de pluie ni de projecteurs)</td></tr>
+<tr><td><a class="tc" href="#">2:50</a></td><td><strong>Flammes géantes ondulantes</strong> qui sortent des fenêtres de la banque</td><td>A : flammes dans une « usine chimique » du stage 1-2</td><td class="ko">Mal situé</td></tr>
+<tr><td><a class="tc" href="#">4:46</a>–<a class="tc" href="#">6:21</a></td><td>Boss : <strong>machine d'Harley Quinn</strong> en forme de montgolfière mécanique. Phase A canon rotatif, phase B socle détruit, phase C dôme détruit puis mât télescopique avec Harley au sommet</td><td>A : char blindé, mines à chenilles, cockpit. B : rien</td><td class="mid">Partiel (« robot tank » selon d'autres sources, mais phases fausses)</td></tr>
+<tr><td><a class="tc" href="#">6:23</a>–<a class="tc" href="#">9:47</a></td><td><strong>GEM EXPO</strong> (exposition de joyaux, colonnes de marbre au premier plan) puis <strong>entrepôt</strong> de caisses</td><td>A : usine chimique, geysers de vapeur, barils toxiques</td><td class="ko">Faux</td></tr>
+<tr><td><a class="tc" href="#">9:48</a>–<a class="tc" href="#">10:43</a></td><td>Mini-boss : <strong>Harley en fauteuil-fusée</strong> + <strong>grappin de grue fait de sphères</strong> qui frappe le sol</td><td>A : grue de démolition, boulet pendulaire, dynamite</td><td class="ko">Faux</td></tr>
+<tr><td><a class="tc" href="#">10:44</a>–<a class="tc" href="#">13:03</a></td><td><strong>Convoi de camions</strong> en mouvement, ballons-mines, cadeaux</td><td>A : « Funhouse » sur les toits avec vue sur la cathédrale</td><td class="ko">Faux</td></tr>
+<tr><td><a class="tc" href="#">13:04</a>–<a class="tc" href="#">14:36</a></td><td>Boss : <strong>montgolfière du Joker</strong> (nacelle en forme de bouche) qui s'approche et s'éloigne par mise à l'échelle et lâche des grappes de bombes</td><td>A : dirigeable à rotation pseudo-Mode 7, Jack-in-the-box, dentiers, gaz qui inverse les commandes, piqué en 8. B : dirigeable avec laser</td><td class="ko">Faux</td></tr>
+<tr><td>Tous les boss</td><td>La pastille « 99 » en haut au centre est la <strong>vitalité du boss</strong> : elle atteint 00 pile à sa destruction (<a class="tc" href="#">6:16</a>, <a class="tc" href="#">10:34</a>, <a class="tc" href="#">14:23</a>)</td><td>Non mentionné</td><td class="mid">Manquant</td></tr>
+</table></div>
+
+<h2 id="secrets">Les « 7 secrets » de la doc A face aux vidéos de Jon Burton</h2>
+<div class="callout fix"><span class="tag">Correction</span><p>Jon Burton (fondateur de Traveller's Tales) n'a <strong>pas</strong> développé ce jeu : il l'analyse de l'extérieur sur sa chaîne <em>Coding Secrets</em> (il précise même qu'« un des créateurs du jeu » l'a contacté après la vidéo). Le jeu est de <strong>Clockwork Tortoise</strong>. Ses vidéos numérotent <strong>8</strong> secrets, plus une partie « effets réutilisés ».</p></div>
+<div class="table-wrap"><table>
+<tr><th>Doc A</th><th>Ce que dit vraiment Burton</th><th>Dans le niveau 1 ?</th><th>Verdict</th></tr>
+<tr><td>1 · Sol 3D par cisaillement</td><td><a href="https://youtu.be/Z0S92Fs5gOg?t=36" target="_blank" rel="noopener">#1 « 3D Level Scrolling »</a> : chaque ligne est décalée horizontalement d'une valeur différente (le sol de <em>Toy Story</em>). Ici, c'est toute la façade, en plusieurs couches, avec une version pré-cisaillée hors écran qui boucle.</td><td>Oui : la rue de la section 1</td><td class="ok">Juste</td></tr>
+<tr><td>2 · Flammes ondulantes</td><td><a href="https://youtu.be/Z0S92Fs5gOg?t=132" target="_blank" rel="noopener">#2 « Billowing Fire »</a> : animation de <strong>6 images</strong> + décalage horizontal par ligne, faible en bas et fort en haut.</td><td>Oui : la banque en feu, section 1</td><td class="mid">Technique juste, lieu faux</td></tr>
+<tr><td>3 · Serpent de sphères Lissajous</td><td><a href="https://youtu.be/Z0S92Fs5gOg?t=172" target="_blank" rel="noopener">#3 « 3D Crane Arm »</a> : environ 20 sphères en sprites, 4 tailles de sphère orange et 2 de sphère noire, assombrissement par mise à jour de la palette quand le bras part au fond.</td><td>Oui : le <strong>grappin de grue</strong> du mini-boss Harley</td><td class="mid">Technique proche, objet faux</td></tr>
+<tr><td>4 · Rotation du dirigeable du Joker</td><td><a href="https://youtu.be/Z0S92Fs5gOg?t=284" target="_blank" rel="noopener">#4 « Full Screen Rotation »</a> : défilement vertical par colonnes de 16 px combiné au défilement par ligne. Plus une interruption à mi-écran pour faire tourner séparément décor, vaisseau et plateforme.</td><td><strong>Non</strong> : niveau ultérieur, pas le Joker</td><td class="mid">Technique juste, attribution fausse</td></tr>
+<tr><td>5 · Route OutRun de la Batmobile</td><td><a href="https://youtu.be/M7b0uUEl5hc?t=160" target="_blank" rel="noopener">#7 « 3D Road »</a> : route en damier dans l'espace (on y court à pied), lignes étirées par interruption horizontale, H-Scroll pour les virages, couleurs échangées ligne par ligne.</td><td>Non</td><td class="ko">Scène inventée (pas de Batmobile jouable)</td></tr>
+<tr><td>6 · Projecteur Bayer 4×4 sur l'écran titre</td><td><a href="https://youtu.be/M7b0uUEl5hc?t=36" target="_blank" rel="noopener">#6 « 2D Vector Spotlight »</a> : faisceau d'un boss volant, tracé en mémoire vidéo <strong>2 pixels à la fois</strong> (un octet), d'où les bords crénelés. Aucune matrice Bayer n'est mentionnée.</td><td>Non</td><td class="ko">Bayer inventé, scène et horodatage faux</td></tr>
+<tr><td>7 · Tunnel polaire</td><td>Tunnel = <strong>sol « Toy Story » étiré, retourné et appliqué aux deux plans</strong> (avant et arrière). Pas de coordonnées polaires.</td><td>Non</td><td class="ko">Faux</td></tr>
+<tr><td>—</td><td><a href="https://youtu.be/Z0S92Fs5gOg?t=404" target="_blank" rel="noopener">#5 « 3D Buildings »</a> : lignes sautées ou doublées pour écraser ou étirer les façades.</td><td>Non</td><td class="mid">Manquant</td></tr>
+<tr><td>—</td><td><a href="https://youtu.be/M7b0uUEl5hc?t=208" target="_blank" rel="noopener">#8 « 2D Textured Vector »</a> : droïdes en triangles texturés obtenus comme la route, avec reflet des lignes.</td><td>Non</td><td class="mid">Manquant</td></tr>
+</table></div>
+<p><strong>Conséquence pour le projet :</strong> seuls les secrets <strong>#1 (façade), #2 (feu) et #3 (bras en sphères)</strong> servent au niveau 1. Le niveau 1 utilise aussi des effets que Burton ne commente pas : fondus et flashs de palette, changement de palette quand la banque explose, mise à l'échelle par paliers de la montgolfière, parallaxe des colonnes au premier plan. Ils sont tous traités au <a href="06-effets-megadrive.html">tome 06</a>.</p>
+
+<h2 id="armes">Armes et règles de jeu</h2>
+<div class="table-wrap"><table>
+<tr><th>Doc</th><th>Affirmation</th><th>Réalité (sources)</th><th>Verdict</th></tr>
+<tr><td>A</td><td>Rouge = batarang électrique + laser ; vert = shurikens ; bleu = bolas à tête chercheuse</td><td>TASVideos : <strong>rouge = batarangs</strong> (tir dispersé), <strong>vert = bolas</strong> (plus gros dégâts par projectile, pas de dispersion), <strong>bleu = shurikens</strong> (le plus faible). Ramasser la même couleur augmente le niveau de l'arme, jusqu'à <strong>7</strong>.</td><td class="ko">Faux</td></tr>
+<tr><td>A</td><td>Maintenir le bouton pour charger</td><td>La barre sous le score <strong>se remplit seule</strong> quand on ne tire pas (<a class="tc" href="#">1:46</a>–<a class="tc" href="#">1:47</a>) ; le tir suivant libère le tir puissant et vide la barre. La description de la vidéo dit : « laisser la barre se remplir avant d'attaquer ».</td><td class="ko">Faux</td></tr>
+<tr><td>A</td><td>Smart bomb avec flash blanc</td><td>Bonus <strong>crâne</strong> qui roule au sol : flash blanc plein écran et destruction de tout ce qui est à l'écran (<a class="tc" href="#">2:06</a>, <a class="tc" href="#">12:24</a>)</td><td class="ok">Juste</td></tr>
+<tr><td>A</td><td>Glissade (SLIDE)</td><td>Jamais observée sur 14 minutes</td><td class="ko">Non observé</td></tr>
+<tr><td>B</td><td>Double saut avec salto</td><td>Non observé ; on voit en revanche une attaque aérienne tournoyante, cape déployée (<a class="tc" href="#">2:06</a>, <a class="tc" href="#">6:04</a>)</td><td class="mid">Non vérifié</td></tr>
+<tr><td>B</td><td>Attaque contextuelle : mêlée si l'ennemi est proche, batarang sinon</td><td>Confirmé par la description du manuel (boutons A ou C)</td><td class="ok">Juste</td></tr>
+<tr><td>A, B</td><td>—</td><td>Manquants : <strong>tir dans 8 directions</strong>, <strong>suspension sous le balcon</strong> (<a class="tc" href="#">3:30</a>), coup de pied sauté, bonus d'arme qui <strong>change de couleur</strong> (<a class="tc" href="#">12:30</a>), panneau « GO! » de fin de vague, pose de victoire</td><td class="mid">Manquant</td></tr>
+<tr><td>B</td><td>Ennemis générés aléatoirement à gauche ou à droite de la caméra</td><td>Arènes verrouillées : les ennemis arrivent par vagues avec un quota, la suivante ne démarre qu'une fois l'écran nettoyé, puis « GO! » (<a class="tc" href="#">2:25</a>)</td><td class="ko">Faux</td></tr>
+<tr><td>B</td><td>Multiplicateur de combo, caméra coop qui zoome</td><td>Ni l'un ni l'autre n'existe dans le jeu (pas de zoom matériel sur Mega Drive)</td><td class="ko">Inventé</td></tr>
+</table></div>
+
+<h2 id="code">Qualité du code</h2>
+<h3 id="code-a">Doc A</h3>
+<ul>
+  <li><strong>Shaders :</strong> globalement corrects et lisibles. Défaut de fond : le sol cisaillé et le feu s'animent avec <code>TIME</code>, alors que sur Mega Drive le décalage par ligne dépend de la <strong>position de la caméra</strong>. Le décor défile donc même quand Batman est immobile.</li>
+  <li><strong>Contrôleur joueur :</strong> <code>await get_tree().create_timer(...)</code> dans l'attaque et les dégâts crée des courses : si un second coup arrive pendant l'attente, l'ancien timer remet l'état à IDLE au mauvais moment. La mêlée scanne <code>get_overlapping_bodies()</code> au lieu d'utiliser de vraies boîtes de frappe.</li>
+  <li><strong>Boss en MultiMesh :</strong> l'idée (un seul appel de dessin) est bonne, mais elle s'applique au bras de grue, pas à un serpent.</li>
+</ul>
+<h3 id="code-b">Doc B</h3>
+<ul>
+  <li><strong>Ne compile pas en l'état :</strong> la classe <code>State</code>, le signal <code>Transitioned</code>, la classe <code>HurtboxComponent</code> et son signal <code>on_damage_taken</code> sont utilisés mais jamais définis.</li>
+  <li><strong>Hit stop bogué (tome 3) :</strong> <code>Engine.time_scale = 0.0</code> fige aussi le <code>Timer</code> chargé de remettre le temps à 1. Le jeu reste gelé. Il faut <code>get_tree().create_timer(0.05, true, false, true)</code>, dont le dernier argument ignore l'échelle de temps.</li>
+  <li><strong>Boss (tome 3) :</strong> modifie <code>velocity</code> sans jamais appeler <code>move_and_slide()</code>, donc le boss ne bouge pas.</li>
+  <li><strong>Pool de projectiles (tome 4) :</strong> <code>hide()</code> et <code>set_process(false)</code> ne désactivent pas la détection d'une <code>Area2D</code> : les batarangs « rangés » blessent encore. Il faut couper <code>monitoring</code> et <code>monitorable</code>, ou passer <code>process_mode</code> à <code>DISABLED</code>.</li>
+  <li><strong>« Garbage collector » :</strong> Godot n'a pas de ramasse-miettes pour les nœuds. Le coût d'<code>instantiate()</code> vient de l'allocation et de l'insertion dans l'arbre, pas d'un GC.</li>
+  <li><strong>Tremblement de caméra :</strong> l'algorithme « trauma » est bon, mais un décalage maximal de 100×75 px représente un tiers de l'écran en 320×224. Il faut 4 à 6 px.</li>
+  <li><strong>Tome 1 :</strong> le mode d'étirement <code>canvas_items</code> lisse les pixels sous-entiers. Pour un rendu Mega Drive fidèle et des effets par ligne exacts, il faut <code>viewport</code> avec mise à l'échelle entière.</li>
+</ul>
+
+<h2 id="conserve">Ce que le nouveau guide conserve</h2>
+<div class="table-wrap"><table>
+<tr><th>Élément</th><th>Origine</th><th>Où dans ce guide</th></tr>
+<tr><td>Architecture par composants, Hitbox / Hurtbox, machine à états par nœuds</td><td>Doc B tome 1</td><td>Tomes 02–03, complétés pour compiler</td></tr>
+<tr><td>Projectile ajouté à la scène et non au joueur, <code>VisibleOnScreenNotifier2D</code></td><td>Doc B tome 2</td><td>Tome 04</td></tr>
+<tr><td>HUD découplé par signaux, tremblement « trauma », fondu entre scènes, ducking audio, menus et focus manette, ConfigFile</td><td>Doc B tomes 3–5</td><td>Tomes 10–11, corrigés</td></tr>
+<tr><td><code>AnimatableBody2D</code> pour les plateformes mobiles</td><td>Doc B tome 7</td><td>Tome 09 : les camions du convoi</td></tr>
+<tr><td>Matrice matériel Mega Drive vers Godot, explication des secrets #1, #2 et #3</td><td>Doc A</td><td>Tome 06, réécrit pour être piloté par la caméra et fidèle à la ligne près</td></tr>
+<tr><td>Résolution 320×224, 60 Hz, sélection Batman / Robin, nom du niveau</td><td>Docs A et B</td><td>Tomes 02 et 10</td></tr>
+</table></div>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>

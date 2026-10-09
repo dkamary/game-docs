@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · Fondations du projet Godot — Batman &amp; Robin × Godot</title>
+<meta name="description" content="Configurer Godot 4.5 en 320x224 pixel-perfect à 60 Hz, entrées façon manette Mega Drive, couches de collision, autoload Game et composants de base.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Tome 02</div>
+  <h1>Fondations du projet Godot</h1>
+  <p class="lead">Un projet qui « pense » comme une Mega Drive : 320×224 pixels, 60 images par seconde, une manette à trois boutons. Puis les briques réutilisables qui serviront à Batman, aux ennemis et aux boss.</p>
+  <div class="meta"><span class="pill">Boucle de jeu</span><span class="pill">Résolution virtuelle</span><span class="pill">Composants</span><span class="pill">Machine à états</span></div>
+</section>
+
+<h2 id="matrice">De la Mega Drive à Godot</h2>
+<p>Avant d'écrire du code, il faut savoir à quoi correspond chaque pièce de la console dans Godot. Cette table reprend et corrige la matrice de l'ancienne doc A.</p>
+<div class="table-wrap"><table>
+<tr><th>Mega Drive (1995)</th><th>Rôle</th><th>Équivalent Godot 4.5</th></tr>
+<tr><td>Motorola 68000 à 7,67 MHz</td><td>Logique du jeu</td><td>GDScript</td></tr>
+<tr><td>Interruption VBlank à 60 Hz (NTSC)</td><td>Le jeu avance d'un « pas » par image</td><td><code>_physics_process(delta)</code> à 60 ticks/s</td></tr>
+<tr><td>VDP : plans A et B (tuiles 8×8, défilement matériel)</td><td>Décors</td><td><code>TileMapLayer</code>, <code>Parallax2D</code>, ou un plan « raster » maison (tome 06)</td></tr>
+<tr><td>Table H-Scroll (un décalage par ligne)</td><td>Parallaxe et déformations ligne par ligne</td><td>Shader avec un tableau de 224 décalages (tome 06)</td></tr>
+<tr><td>VSRAM (défilement vertical par colonnes de 16 px)</td><td>Rotations, ondulations verticales</td><td>Shader (non utilisé dans le niveau 1)</td></tr>
+<tr><td>80 sprites matériels, 20 par ligne</td><td>Personnages, projectiles</td><td><code>Sprite2D</code>, <code>AnimatedSprite2D</code></td></tr>
+<tr><td>CRAM : 4 palettes de 16 couleurs, 9 bits</td><td>Couleurs, fondus, flashs</td><td><code>modulate</code>, shaders de palette (tome 06)</td></tr>
+<tr><td>Plan « Window » fixe</td><td>Interface</td><td><code>CanvasLayer</code> (le HUD)</td></tr>
+<tr><td>Z80 + YM2612 (FM) + PSG</td><td>Musique de Jesper Kyd, bruitages</td><td><code>AudioStreamPlayer</code> + bus audio</td></tr>
+</table></div>
+
+<h2 id="projet">Configurer le projet</h2>
+<p>Crée un projet Godot 4.5 (moteur de rendu <em>Compatibility</em> ou <em>Forward+</em>, peu importe ici), puis règle les paramètres suivants dans <strong>Projet → Paramètres du projet</strong> (active « Paramètres avancés »). Voici l'extrait équivalent de <code>project.godot</code> :</p>
+<script type="text/x-code" data-lang="ini" data-file="project.godot (extrait)">
+[display]
+window/size/viewport_width=320
+window/size/viewport_height=224
+window/size/window_width_override=1280
+window/size/window_height_override=896
+window/stretch/mode="viewport"
+window/stretch/aspect="keep"
+window/stretch/scale_mode="integer"
+
+[physics]
+common/physics_ticks_per_second=60
+common/max_physics_steps_per_frame=8
+2d/default_gravity=900.0
+
+[rendering]
+textures/canvas_textures/default_texture_filter=0
+2d/snap/snap_2d_transforms_to_pixel=true
+2d/snap/snap_2d_vertices_to_pixel=true
+</script>
+<div class="table-wrap"><table>
+<tr><th>Réglage</th><th>Pourquoi</th></tr>
+<tr><td>320 × 224</td><td>Mode H40 de la Mega Drive en NTSC : la résolution du jeu original.</td></tr>
+<tr><td>Fenêtre 1280 × 896</td><td>Exactement ×4 : chaque pixel du jeu devient un carré de 4×4.</td></tr>
+<tr><td>Stretch <code>viewport</code> + échelle <code>integer</code></td><td>Le jeu est réellement rendu en 320×224, puis agrandi. Un sprite ne peut jamais être à mi-pixel, et un shader « ligne par ligne » voit <strong>exactement 224 lignes</strong>. Avec <code>canvas_items</code> (choix de l'ancienne doc B), l'image est rendue en grand et les effets par ligne deviennent faux.</td></tr>
+<tr><td>Filtre <code>Nearest</code></td><td>Pas de lissage : pixels nets.</td></tr>
+<tr><td>Snap au pixel</td><td>Les positions à virgule (caméra lissée, vitesses fractionnaires) sont arrondies à l'affichage, sans tremblement.</td></tr>
+<tr><td>60 ticks physiques</td><td>Un tick = une image Mega Drive. Les vitesses mesurées en px/image se convertissent directement.</td></tr>
+</table></div>
+<div class="callout md"><span class="tag">Sur Mega Drive</span><p>L'écran NTSC est en 4:3 ; 320×224 affiché en 4:3 donne des pixels légèrement plus hauts que larges. La plupart des remakes ignorent ce détail. Si tu veux le reproduire, garde l'échelle entière désactivée et utilise une fenêtre de 1280×960 : tu perds alors la netteté parfaite.</p></div>
+
+<h2 id="boucle">La boucle de jeu et les « pixels par image »</h2>
+<div class="callout concept"><span class="tag">Concept : la boucle de jeu à pas fixe</span>
+<p>Un jeu est une boucle : <em>lire les entrées → mettre à jour le monde → dessiner</em>, recommencée en permanence. Sur Mega Drive, la mise à jour a lieu une fois par image (VBlank, 60 Hz), et toutes les vitesses s'expriment en <strong>pixels par image</strong>, souvent en virgule fixe 8.8.</p>
+<p>Dans Godot, <code>_physics_process(delta)</code> est appelé à intervalle fixe (60 fois/s grâce à nos réglages) : c'est là qu'on met <strong>tout le gameplay</strong>. <code>_process(delta)</code> suit la fréquence d'affichage et sert aux effets purement visuels. On écrit les vitesses en px/s (px/image × 60) et on multiplie par <code>delta</code> : le code reste correct même si on change un jour la fréquence.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="Conversion (exemple)">
+# Mesuré au tome 01 : la caméra défile à ~1,95 px par image quand Batman court.
+const MD_FPS := 60.0
+const RUN_SPEED := 1.95 * MD_FPS   # ≈ 117 px/s
+
+func _physics_process(delta: float) -> void:
+	position.x += RUN_SPEED * delta   # 117 px/s × 1/60 s = 1,95 px par tick
+</script>
+
+<h2 id="entrees">Les entrées : une manette à trois boutons</h2>
+<p>La manette Mega Drive a une croix, <strong>A, B, C</strong> et <strong>Start</strong>. D'après le manuel, A et C déclenchent l'attaque contextuelle (mêlée au contact, projectile à distance). On met le saut sur B. On crée des <em>actions</em> abstraites : le code ne parle jamais de touches, seulement d'actions.</p>
+<div class="table-wrap"><table>
+<tr><th>Action</th><th>Clavier (position physique)</th><th>Manette</th><th>Mega Drive</th></tr>
+<tr><td><code>move_left</code> / <code>move_right</code> / <code>move_up</code> / <code>move_down</code></td><td>Flèches ou W A S D (= Z Q S D sur AZERTY)</td><td>Croix + stick gauche</td><td>Croix</td></tr>
+<tr><td><code>attack</code></td><td>J et L</td><td>X et B (Xbox)</td><td>A et C</td></tr>
+<tr><td><code>jump</code></td><td>K et Espace</td><td>A (Xbox)</td><td>B</td></tr>
+<tr><td><code>start</code></td><td>Entrée</td><td>Start / Menu</td><td>Start</td></tr>
+</table></div>
+<p>Tu peux les saisir à la main dans <strong>Projet → Paramètres → Contrôles</strong>, ou exécuter une fois ce script d'éditeur (<strong>Fichier → Exécuter</strong> dans l'éditeur de script), puis recharger le projet :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://tools/setup_inputs.gd">
+@tool
+extends EditorScript
+## Crée les actions d'entrée du projet. À exécuter une seule fois (Fichier > Exécuter),
+## puis Projet > Recharger le projet en cours.
+
+func _run() -> void:
+	var actions := {
+		"move_left":  [_key(KEY_LEFT), _key(KEY_A), _pad(JOY_BUTTON_DPAD_LEFT), _axis(JOY_AXIS_LEFT_X, -1.0)],
+		"move_right": [_key(KEY_RIGHT), _key(KEY_D), _pad(JOY_BUTTON_DPAD_RIGHT), _axis(JOY_AXIS_LEFT_X, 1.0)],
+		"move_up":    [_key(KEY_UP), _key(KEY_W), _pad(JOY_BUTTON_DPAD_UP), _axis(JOY_AXIS_LEFT_Y, -1.0)],
+		"move_down":  [_key(KEY_DOWN), _key(KEY_S), _pad(JOY_BUTTON_DPAD_DOWN), _axis(JOY_AXIS_LEFT_Y, 1.0)],
+		"attack":     [_key(KEY_J), _key(KEY_L), _pad(JOY_BUTTON_X), _pad(JOY_BUTTON_B)],
+		"jump":       [_key(KEY_K), _key(KEY_SPACE), _pad(JOY_BUTTON_A)],
+		"start":      [_key(KEY_ENTER), _pad(JOY_BUTTON_START)],
+	}
+	for action_name: String in actions:
+		ProjectSettings.set_setting("input/" + action_name, {
+			"deadzone": 0.4,
+			"events": actions[action_name],
+		})
+	ProjectSettings.save()
+	print("Actions créées : ", actions.keys())
+
+func _key(code: Key) -> InputEventKey:
+	var e := InputEventKey.new()
+	e.physical_keycode = code   # position physique : WASD devient ZQSD sur AZERTY
+	return e
+
+func _pad(button: JoyButton) -> InputEventJoypadButton:
+	var e := InputEventJoypadButton.new()
+	e.button_index = button
+	return e
+
+func _axis(axis: JoyAxis, value: float) -> InputEventJoypadMotion:
+	var e := InputEventJoypadMotion.new()
+	e.axis = axis
+	e.axis_value = value
+	return e
+</script>
+
+<h2 id="arborescence">L'arborescence du projet</h2>
+<p>Elle est fixée dès maintenant : tous les chemins <code>res://</code> des tomes suivants s'y réfèrent.</p>
+<pre class="tree">res://
+├── autoload/          game.gd, scene_flow.gd, audio.gd          (singletons)
+├── core/              state.gd, state_machine.gd, health.gd,
+│                      hitbox.gd, hurtbox.gd, pool.gd             (briques génériques)
+├── player/            player.tscn, player.gd, hero_data.gd, states/*.gd
+├── weapons/           weapon_data.gd, weapon_system.gd, projectile.tscn/.gd,
+│                      data/batarang.tres, bolas.tres, shuriken.tres
+├── pickups/           weapon_pickup.tscn, skull_bomb.tscn, ...
+├── enemies/           enemy.gd, clown.tscn, thug.tscn, gunner.tscn,
+│                      propeller_head.tscn, balloon_mine.tscn
+├── level/             wave_arena.gd, wave_data.gd, camera_rig.gd, go_sign.tscn
+├── fx/                raster_plane.gd, *.gdshader, explosion.tscn
+├── bosses/            boss_vitality.gd, harley_machine/, crane_harley/, joker_balloon/
+├── sections/          s1_streets.tscn, s2_gem_expo.tscn, s3_convoy.tscn
+├── screens/           intro, title, options, player_select, title_card, game_over
+├── ui/                hud.tscn, hud.gd
+├── art/  audio/  fonts/
+└── tools/             setup_inputs.gd, indexer.gd                 (scripts d'éditeur)</pre>
+
+<h2 id="couches">Les couches de collision</h2>
+<div class="callout concept"><span class="tag">Concept : couches et masques</span><p>Chaque objet physique <strong>est</strong> sur certaines couches (<code>collision_layer</code>) et <strong>regarde</strong> certaines couches (<code>collision_mask</code>). Un batarang n'a pas besoin de tester les murs du décor ni les autres batarangs : bien régler les masques évite à la fois des bugs et des calculs inutiles.</p></div>
+<div class="table-wrap"><table>
+<tr><th>N°</th><th>Nom</th><th>Qui est dessus</th><th>Qui la regarde</th></tr>
+<tr><td>1</td><td>monde</td><td>Sols, murs (StaticBody, TileMapLayer)</td><td>Corps du joueur et des ennemis, projectiles qui s'écrasent</td></tr>
+<tr><td>2</td><td>plateformes</td><td>Balcon, caisses, plateaux de camions (collision « one-way »)</td><td>Corps du joueur et des ennemis</td></tr>
+<tr><td>3</td><td>corps_joueur</td><td>CharacterBody2D de Batman</td><td>Bonus</td></tr>
+<tr><td>4</td><td>corps_ennemis</td><td>CharacterBody2D des ennemis</td><td>Zone de mêlée du joueur (détection de proximité)</td></tr>
+<tr><td>5</td><td>hurtbox_joueur</td><td>Hurtbox de Batman</td><td>Hitbox ennemies (coups, balles, bombes)</td></tr>
+<tr><td>6</td><td>hurtbox_ennemis</td><td>Hurtbox des ennemis et des boss</td><td>Hitbox du joueur (poing, projectiles)</td></tr>
+<tr><td>7</td><td>bonus</td><td>Objets à ramasser</td><td>Corps du joueur</td></tr>
+<tr><td>8</td><td>rebords</td><td>Zones d'accroche sous le balcon</td><td>Sonde « mains » de Batman</td></tr>
+</table></div>
+<script type="text/x-code" data-lang="ini" data-file="project.godot (extrait)">
+[layer_names]
+2d_physics/layer_1="monde"
+2d_physics/layer_2="plateformes"
+2d_physics/layer_3="corps_joueur"
+2d_physics/layer_4="corps_ennemis"
+2d_physics/layer_5="hurtbox_joueur"
+2d_physics/layer_6="hurtbox_ennemis"
+2d_physics/layer_7="bonus"
+2d_physics/layer_8="rebords"
+</script>
+<p>Pour s'en servir dans le code sans nombres magiques :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/layers.gd">
+class_name Layers
+## Masques de bits des couches physiques (couche n => bit n-1).
+
+const WORLD := 1 << 0
+const PLATFORMS := 1 << 1
+const PLAYER_BODY := 1 << 2
+const ENEMY_BODY := 1 << 3
+const PLAYER_HURTBOX := 1 << 4
+const ENEMY_HURTBOX := 1 << 5
+const PICKUPS := 1 << 6
+const LEDGES := 1 << 7
+</script>
+
+<h2 id="game">L'autoload <code>Game</code> : l'état de la partie</h2>
+<p>Certaines données doivent survivre aux changements de scène : score, vies, crédits, personnage choisi, arme en main. On les range dans un <strong>autoload</strong>, un nœud que Godot crée au démarrage et garde en vie. Dans <strong>Projet → Paramètres → Globals → Autoload</strong>, ajoute ce script sous le nom <code>Game</code>.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://autoload/game.gd  (Autoload « Game »)">
+extends Node
+## État global de la partie. Le HUD l'écoute via ses signaux (patron Observateur).
+
+signal score_changed(score: int)
+signal lives_changed(lives: int)
+signal credits_changed(credits: int)
+signal weapon_changed(weapon_id: StringName, level: int)
+
+enum Hero { BATMAN, ROBIN }
+
+const START_LIVES := 2          # constaté : « 2 » dans le médaillon en début de partie
+const START_CREDITS := 6        # constaté : « CREDIT 06 »
+const MAX_WEAPON_LEVEL := 7     # TASVideos : niveau maximal 7
+
+## À CALIBRER : les vies montent à 3 puis 4 pendant la section 2 (palier de score ?).
+var extra_life_every := 20000
+
+var hero: Hero = Hero.BATMAN
+var score := 0
+var lives := START_LIVES
+var credits := START_CREDITS
+var weapon_id: StringName = &"batarang"
+var weapon_level := 1
+var current_section := ""       ## chemin de la section en cours : point de reprise du « continue »
+var _next_extra_life := 0
+
+
+func new_game(selected: Hero) -> void:
+	hero = selected
+	credits = START_CREDITS
+	_reset_run()
+
+
+func continue_game() -> bool:
+	## Renvoie false s'il ne reste plus de crédit.
+	if credits <= 0:
+		return false
+	credits -= 1
+	credits_changed.emit(credits)
+	_reset_run()
+	return true
+
+
+func _reset_run() -> void:
+	score = 0
+	lives = START_LIVES
+	weapon_id = &"batarang"
+	weapon_level = 1
+	_next_extra_life = extra_life_every
+	score_changed.emit(score)
+	lives_changed.emit(lives)
+	weapon_changed.emit(weapon_id, weapon_level)
+
+
+func add_score(points: int) -> void:
+	score += points
+	score_changed.emit(score)
+	while extra_life_every > 0 and score >= _next_extra_life:
+		_next_extra_life += extra_life_every
+		add_life()
+
+
+func add_life() -> void:
+	lives += 1
+	lives_changed.emit(lives)
+
+
+## Appelé à la mort du joueur. Renvoie true s'il peut réapparaître.
+func lose_life() -> bool:
+	if lives <= 0:
+		return false
+	lives -= 1
+	lives_changed.emit(lives)
+	return true
+
+
+func set_weapon(id: StringName, level: int) -> void:
+	weapon_id = id
+	weapon_level = clampi(level, 1, MAX_WEAPON_LEVEL)
+	weapon_changed.emit(weapon_id, weapon_level)
+</script>
+
+<h2 id="composants">Les composants de base</h2>
+<div class="callout concept"><span class="tag">Concept : composition plutôt qu'héritage</span><p>Batman, un clown et la montgolfière du Joker ont tous de la vie, peuvent être touchés et peuvent frapper. Plutôt que d'écrire trois fois la même logique ou de créer une hiérarchie de classes géante, on fabrique de petits <strong>composants</strong> (des nœuds avec un seul rôle) qu'on assemble dans chaque scène. C'est l'approche de l'ancienne doc B, ici complétée pour que tout compile.</p></div>
+
+<h3 id="health">Health : la vie</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/health.gd">
+class_name Health
+extends Node
+## Points de vie génériques : joueur, ennemis et boss.
+
+signal changed(current: int, maximum: int)
+signal damaged(amount: int)
+signal died
+
+@export var max_health := 8
+var current := 0
+var invincible := false
+
+
+func _ready() -> void:
+	current = max_health
+
+
+func is_dead() -> bool:
+	return current <= 0
+
+
+func damage(amount: int) -> void:
+	if invincible or is_dead() or amount <= 0:
+		return
+	current = maxi(current - amount, 0)
+	damaged.emit(amount)
+	changed.emit(current, max_health)
+	if current == 0:
+		died.emit()
+
+
+func heal(amount: int) -> void:
+	if is_dead():
+		return
+	current = mini(current + amount, max_health)
+	changed.emit(current, max_health)
+
+
+func reset() -> void:
+	current = max_health
+	changed.emit(current, max_health)
+</script>
+
+<h3 id="hitbox-hurtbox">Hitbox et Hurtbox : qui frappe, qui encaisse</h3>
+<p>La <strong>Hitbox</strong> est la zone qui fait mal (poing, batarang, bombe). La <strong>Hurtbox</strong> est la zone vulnérable (le corps). Les séparer du <code>CollisionShape2D</code> qui sert à marcher permet par exemple de rendre Batman invincible sans qu'il tombe à travers le sol.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/hurtbox.gd">
+class_name Hurtbox
+extends Area2D
+## Zone vulnérable. Ne détecte rien elle-même : ce sont les Hitbox qui la trouvent.
+
+signal hurt(hitbox: Hitbox)
+
+@export var health: Health
+## Pendant l'invincibilité (clignotement), les coups sont ignorés.
+var invincible := false
+
+
+func _ready() -> void:
+	monitoring = false   # une Hurtbox est « vue », elle ne regarde pas
+
+
+func take_hit(hitbox: Hitbox) -> bool:
+	## Renvoie true si le coup a porté.
+	if invincible or (health != null and health.is_dead()):
+		return false
+	if health != null:
+		health.damage(hitbox.damage)
+	hurt.emit(hitbox)
+	return true
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/hitbox.gd">
+class_name Hitbox
+extends Area2D
+## Zone qui inflige des dégâts aux Hurtbox présentes dans son masque de collision.
+
+signal landed(hurtbox: Hurtbox)
+
+@export var damage := 1
+## Poussée appliquée à la cible (x orienté vers l'avant de l'attaquant).
+@export var knockback := Vector2(120, -80)
+## Pour un projectile : se désactive après le premier impact.
+@export var single_hit := false
+## Sens de l'attaquant : 1 vers la droite, -1 vers la gauche (mis à jour par le porteur).
+var facing := 1
+var _already_hit: Array[Hurtbox] = []
+
+
+func _ready() -> void:
+	monitorable = false   # personne n'a besoin de « voir » une hitbox
+	area_entered.connect(_on_area_entered)
+
+
+## À appeler à chaque nouvelle attaque (coup de poing suivant, projectile recyclé).
+func reset_hits() -> void:
+	_already_hit.clear()
+
+
+func _on_area_entered(area: Area2D) -> void:
+	var hurtbox := area as Hurtbox
+	if hurtbox == null or hurtbox in _already_hit:
+		return
+	_already_hit.append(hurtbox)
+	if hurtbox.take_hit(self):
+		landed.emit(hurtbox)
+		if single_hit:
+			set_deferred("monitoring", false)
+
+
+func get_knockback() -> Vector2:
+	return Vector2(knockback.x * facing, knockback.y)
+</script>
+<div class="callout warn"><span class="tag">Piège classique</span><p>On ne modifie pas <code>monitoring</code> ou le <code>disabled</code> d'une forme de collision pendant un signal de collision : on utilise <code>set_deferred()</code>. Sinon Godot affiche l'erreur « Function blocked during in/out signal ».</p></div>
+
+<h3 id="fsm">State et StateMachine : le cerveau</h3>
+<div class="callout concept"><span class="tag">Concept : la machine à états finis</span><p>Un personnage est toujours dans <strong>un seul état</strong> à la fois (au sol, en l'air, suspendu, touché…). Chaque état a son propre script, avec <code>enter()</code> à l'entrée, <code>exit()</code> à la sortie et <code>physics_update()</code> à chaque tick. Un état demande lui-même à passer au suivant. On évite ainsi les forêts de <code>if is_jumping and not is_hurt and ...</code>.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/state.gd">
+class_name State
+extends Node
+## Classe de base d'un état. Les états concrets surchargent les fonctions utiles.
+
+## Émis pour demander une transition. Toujours émis via transition_to().
+signal finished(next_state: StringName, data: Dictionary)
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	pass
+
+
+func exit() -> void:
+	pass
+
+
+func update(_delta: float) -> void:
+	pass
+
+
+func physics_update(_delta: float) -> void:
+	pass
+
+
+func transition_to(next_state: StringName, data: Dictionary = {}) -> void:
+	finished.emit(next_state, data)
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/state_machine.gd">
+class_name StateMachine
+extends Node
+## Gère des états enfants. Le propriétaire appelle physics_update() depuis son _physics_process.
+
+signal state_changed(previous: StringName, current: StringName)
+
+@export var initial_state: State
+var state: State
+var _states: Dictionary = {}   # StringName -> State
+
+
+func _ready() -> void:
+	for child in get_children():
+		if child is State:
+			_states[child.name] = child
+			child.finished.connect(_on_state_finished)
+	if initial_state == null and get_child_count() > 0:
+		initial_state = get_child(0) as State
+	# On attend que le propriétaire soit prêt (ses @onready sont résolus après nous).
+	await owner.ready
+	state = initial_state
+	state.enter(&"", {})
+
+
+func physics_update(delta: float) -> void:
+	if state:
+		state.physics_update(delta)
+
+
+func update(delta: float) -> void:
+	if state:
+		state.update(delta)
+
+
+func force(next_state: StringName, data: Dictionary = {}) -> void:
+	## Transition imposée de l'extérieur (dégâts, mort, cinématique).
+	_on_state_finished(next_state, data)
+
+
+func current_name() -> StringName:
+	return state.name if state else &""
+
+
+func _on_state_finished(next_state: StringName, data: Dictionary) -> void:
+	if not _states.has(next_state):
+		push_error("État inconnu : %s" % next_state)
+		return
+	var previous: StringName = state.name if state else &""
+	if state:
+		state.exit()
+	state = _states[next_state]
+	state.enter(previous, data)
+	state_changed.emit(previous, next_state)
+</script>
+<div class="callout concept"><span class="tag">Pourquoi <code>await owner.ready</code> ?</span><p>Dans Godot, les enfants sont prêts avant leur parent. Quand la machine à états démarre, les variables <code>@onready</code> de Batman ne sont pas encore remplies. Attendre le signal <code>ready</code> du propriétaire de la scène garantit que le premier <code>enter()</code> trouve tout en place. Chaque état récupère son personnage avec <code>owner</code>, le nœud racine de la scène.</p></div>
+
+<h2 id="test">Scène de test</h2>
+<p>Pour vérifier les fondations, crée <code>res://level/test_room.tscn</code> :</p>
+<pre class="tree">TestRoom (Node2D)
+├── Floor (StaticBody2D)          couche 1 « monde »
+│   ├── CollisionShape2D          rectangle 320×16 en y = 208
+│   └── ColorRect                 320×16, gris : le sol visible
+├── Balcony (StaticBody2D)        couche 2 « plateformes »
+│   └── CollisionShape2D          rectangle 200×8 en y = 112, One Way Collision = activé
+└── Camera2D</pre>
+<div class="callout goal"><span class="tag">Objectif de l'étape</span>
+<ul class="check">
+  <li>La fenêtre s'ouvre en 1280×896, l'image est nette et pixelisée.</li>
+  <li>Le moniteur de Godot (Débogueur → Moniteurs) affiche 60 ticks physiques par seconde.</li>
+  <li>Les actions <code>move_*</code>, <code>jump</code>, <code>attack</code> et <code>start</code> existent dans la carte des entrées.</li>
+  <li><code>Game</code> est accessible depuis n'importe quel script : <code>Game.add_score(100)</code>.</li>
+  <li>Les scripts de <code>res://core/</code> se chargent sans erreur.</li>
+</ul></div>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot 4 Masterclass : B&R Megadrive - Tome 5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-main: #0f172a; /* Slate 900 */
+            --bg-panel: #1e293b; /* Slate 800 */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-bat-blue: #3b82f6;
+            --accent-amber: #f59e0b; /* Batcomputer yellow/amber */
+            --accent-cyan: #06b6d4; /* UI highlight */
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4, .title-font {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        .code-block {
+            background-color: #020617; /* Very dark slate */
+            border: 1px solid #334155;
+            border-left: 4px solid var(--accent-amber);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .gd-kw { color: #ff7b72; font-weight: bold; } 
+        .gd-func { color: #d2a8ff; font-weight: bold; } 
+        .gd-str { color: #a5d6ff; } 
+        .gd-num { color: #79c0ff; } 
+        .gd-comment { color: #8b949e; font-style: italic; } 
+        .gd-type { color: #58a6ff; } 
+        .gd-anno { color: #d2a8ff; } 
+
+        /* Nav & Sections */
+        .section-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .section-content.active { display: block; opacity: 1; animation: slideUp 0.4s ease-out forwards; }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-btn.active {
+            background-color: #1e3a8a; /* Dark blue tint */
+            border-right: 4px solid var(--accent-amber);
+            color: var(--accent-amber);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-amber); }
+
+        .demo-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background: #020617;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #334155;
+        }
+
+        /* Menu Focus Demo */
+        .demo-menu-btn {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            color: #64748b;
+            text-align: center;
+            padding: 0.5rem 2rem;
+            transition: all 0.1s;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            position: relative;
+        }
+        .demo-menu-btn.focused {
+            color: #f59e0b;
+            text-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+            transform: scale(1.1);
+        }
+        .demo-menu-btn.focused::before {
+            content: '▶';
+            position: absolute;
+            left: -1rem;
+            color: #f59e0b;
+        }
+
+        /* Pause Demo */
+        .pause-bg {
+            background: repeating-linear-gradient(45deg, #1e293b, #1e293b 20px, #0f172a 20px, #0f172a 40px);
+            animation: panBg 4s linear infinite;
+        }
+        @keyframes panBg {
+            0% { background-position: 0 0; }
+            100% { background-position: -56px 0; }
+        }
+        .pause-bg.paused {
+            animation-play-state: paused;
+        }
+        .bat-logo-spin {
+            animation: spin 2s linear infinite;
+        }
+        .bat-logo-spin.paused {
+            animation-play-state: paused;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .pause-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            backdrop-filter: blur(4px);
+        }
+        .pause-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen text-slate-200">
+
+    <header class="md:hidden flex items-center justify-between bg-slate-950 border-b border-slate-800 p-4 shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-server text-amber-500 text-xl"></i>
+            <h1 class="title-font font-bold text-lg leading-none">B&R <span class="text-amber-500">TOME 5</span></h1>
+        </div>
+        <button id="mobile-menu-btn" class="text-slate-300 hover:text-white p-2 focus:outline-none">
+            <i class="fa-solid fa-bars text-2xl"></i>
+        </button>
+    </header>
+
+    <nav id="sidebar" class="absolute md:relative w-full md:w-72 h-[calc(100vh-60px)] md:h-screen bg-slate-950 border-r border-slate-800 flex flex-col shrink-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out top-[60px] md:top-0 shadow-2xl">
+        
+        <div class="hidden md:block p-6 text-center border-b border-slate-800 relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 opacity-5">
+                <i class="fa-solid fa-desktop text-9xl text-amber-500"></i>
+            </div>
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-700 rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.3)] mb-3 relative z-10 border border-amber-400">
+                <i class="fa-solid fa-terminal text-3xl text-slate-900"></i>
+            </div>
+            <h1 class="title-font font-bold text-xl tracking-wide relative z-10 text-white">MENUS & SYSTÈMES</h1>
+            <p class="text-xs font-mono text-amber-400 mt-1 relative z-10">Godot 4.x - Tome 5</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4">
+            <div class="px-6 mb-4">
+                <div class="bg-amber-950/30 border border-amber-500/30 text-amber-300 text-xs p-3 rounded-lg flex gap-2">
+                    <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                    <p>Le jeu tourne parfaitement. Emballons-le dans une vraie structure de produit fini.</p>
+                </div>
+            </div>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">L'Interface Utilisateur</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('ui-layout')" id="nav-ui-layout" class="nav-btn active w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-layer-group w-5 text-center text-blue-400"></i> 1. Control Nodes & Ancrages
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('focus')" id="nav-focus" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-gamepad w-5 text-center text-green-400"></i> 2. Navigation Manette (Focus)
+                    </button>
+                </li>
+            </ul>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Systèmes de Base</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('pause')" id="nav-pause" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-pause w-5 text-center text-red-400"></i> 3. Menu Pause & Process Mode
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('save')" id="nav-save" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-floppy-disk w-5 text-center text-purple-400"></i> 4. Sauvegarde (ConfigFile)
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="flex-1 h-[calc(100vh-60px)] md:h-screen overflow-y-auto relative scroll-smooth bg-slate-900" id="main-content">
+        <div class="max-w-4xl mx-auto p-4 md:p-8 lg:p-12 pb-24">
+
+            <!-- SECTION 1: UI LAYOUT -->
+            <section id="ui-layout" class="section-content active">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-blue-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 1</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Dompter les Control Nodes</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Finis les boutons placés au pixel près qui cassent selon l'écran.</p>
+                </div>
+
+                <div class="bg-slate-800 rounded-xl p-5 md:p-6 mb-8 shadow-lg border border-slate-700">
+                    <h3 class="title-font text-xl text-white mb-4">Le Système d'Ancrage de Godot</h3>
+                    <p class="mb-4 text-slate-300 leading-relaxed">
+                        L'erreur classique des débutants est de placer un bouton sur l'écran et de glisser ses coordonnées (X, Y). Si la résolution change, le bouton est hors de l'écran. Dans Godot, <b>tout ce qui est UI doit hériter de <code>Control</code></b> (les icônes vertes), et on utilise les conteneurs (Containers) pour organiser l'espace.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-[#020617] p-5 rounded-xl border border-slate-700 shadow-inner">
+                        <h4 class="font-bold text-slate-300 mb-3 text-sm uppercase tracking-wide border-b border-slate-700 pb-2">Arbre Nœuds : Menu Principal</h4>
+                        <ul class="text-sm space-y-3 text-slate-300 font-mono">
+                            <li><i class="fa-solid fa-layer-group text-green-500"></i> MainMenu (Control)</li>
+                            <li class="pl-4 border-l border-slate-700 ml-2">
+                                <i class="fa-solid fa-image text-green-400"></i> TextureRect (Background)<br>
+                                <span class="text-xs text-slate-500 font-sans ml-5">Ancrage: Full Rect</span>
+                            </li>
+                            <li class="pl-4 border-l border-slate-700 ml-2">
+                                <i class="fa-solid fa-box text-blue-400"></i> MarginContainer<br>
+                                <span class="text-xs text-slate-500 font-sans ml-5">Ancrage: Full Rect. Marges: 40px</span>
+                            </li>
+                            <li class="pl-8 border-l border-slate-700 ml-2">
+                                <i class="fa-solid fa-bars text-purple-400"></i> VBoxContainer (Align: Bottom)
+                            </li>
+                            <li class="pl-12 border-l border-slate-700 ml-2"><i class="fa-solid fa-play text-green-300"></i> Button (Start)</li>
+                            <li class="pl-12 border-l border-slate-700 ml-2"><i class="fa-solid fa-gear text-green-300"></i> Button (Options)</li>
+                            <li class="pl-12 border-l border-slate-700 ml-2"><i class="fa-solid fa-power-off text-green-300"></i> Button (Quit)</li>
+                        </ul>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-800 p-4 rounded-xl border-l-4 border-blue-500 shadow-md">
+                            <h4 class="font-bold text-white text-sm mb-1">MarginContainer</h4>
+                            <p class="text-xs text-slate-300">Définit des marges de sécurité invisibles autour de l'écran pour éviter que les textes ne touchent les bords sur les téléviseurs (Safe Zone).</p>
+                        </div>
+                        <div class="bg-slate-800 p-4 rounded-xl border-l-4 border-purple-500 shadow-md">
+                            <h4 class="font-bold text-white text-sm mb-1">VBoxContainer</h4>
+                            <p class="text-xs text-slate-300">Empile automatiquement ses enfants (les boutons) verticalement. Plus besoin de calculer l'espacement Y entre chaque bouton !</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 2: GAMEPAD FOCUS -->
+            <section id="focus" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-green-500 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 2</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Navigation à la Manette (Focus)</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Parce qu'on ne joue pas à la Megadrive avec une souris.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Par défaut, les boutons Godot réagissent au clic de la souris. Pour naviguer à la manette (D-Pad), il faut utiliser le système de <b>Focus</b>. Godot calcule automatiquement quel bouton est en haut, en bas, à gauche ou à droite d'un autre (Focus Neighbors).
+                </p>
+
+                <div class="mb-8 p-6 bg-slate-950 border border-slate-700 rounded-xl relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 opacity-10"><i class="fa-solid fa-gamepad text-8xl text-white"></i></div>
+                    
+                    <div class="flex justify-between items-center mb-6 relative z-10">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation de Menu au D-Pad</h4>
+                        <div class="flex gap-2">
+                            <button onclick="moveFocus(-1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded shadow"><i class="fa-solid fa-arrow-up"></i></button>
+                            <button onclick="moveFocus(1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded shadow"><i class="fa-solid fa-arrow-down"></i></button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col items-center justify-center space-y-2 relative z-10" id="demo-menu-container">
+                        <div class="demo-menu-btn focused" data-index="0">Nouveau Jeu</div>
+                        <div class="demo-menu-btn" data-index="1">Options</div>
+                        <div class="demo-menu-btn" data-index="2">Quitter</div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-green-400 mb-4 border-t border-slate-700 pt-6">Le Code Indispensable (main_menu.gd)</h3>
+                <p class="text-sm text-slate-400 mb-4">Pour que la navigation clavier/manette fonctionne, un élément de l'UI <b>doit</b> avoir le focus dès l'ouverture de la scène.</p>
+
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># main_menu.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">Control</span>
+
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> start_button = $MarginContainer/VBoxContainer/StartButton
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> quit_button = $MarginContainer/VBoxContainer/QuitButton
+
+<span class="gd-keyword">func</span> <span class="gd-func">_ready</span>():
+    <span class="gd-comment"># CRUCIAL : Donne le focus au bouton "Start" au lancement</span>
+    start_button.grab_focus()
+    
+    <span class="gd-comment"># Connexion des signaux 'pressed' (qui réagissent aussi à la touche 'ui_accept' / Croix Manette)</span>
+    start_button.pressed.connect(_on_start_pressed)
+    quit_button.pressed.connect(get_tree().quit)
+
+<span class="gd-keyword">func</span> <span class="gd-func">_on_start_pressed</span>():
+    <span class="gd-comment"># Transition vers le niveau 1 (Voir Tome 4 pour le SceneManager)</span>
+    <span class="gd-type">SceneManager</span>.change_scene(<span class="gd-str">"res://levels/level_1.tscn"</span>)
+</code></pre>
+                </div>
+            </section>
+
+            <!-- SECTION 3: PAUSE SYSTEM -->
+            <section id="pause" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-red-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 3</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Gérer le Menu Pause</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Mettre le monde en pause, mais pas le menu.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Mettre un jeu en pause dans Godot est enfantin : <code>get_tree().paused = true</code>. Le problème, c'est que cela gèle absolument <b>tout</b>, y compris le menu de pause lui-même ! Vous ne pourriez plus cliquer sur "Reprendre". La solution réside dans le <b>Process Mode</b>.
+                </p>
+
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation Process Mode</h4>
+                        <button onclick="togglePauseDemo()" id="demo-pause-btn" class="bg-red-600 hover:bg-red-500 text-white px-4 py-1 rounded text-sm font-bold shadow-[0_0_10px_rgba(239,68,68,0.4)]">
+                            <i class="fa-solid fa-pause"></i> PAUSE
+                        </button>
+                    </div>
+                    
+                    <div class="demo-container pause-bg w-full relative" id="demo-pause-world">
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <i class="fa-solid fa-bat bat-logo-spin text-5xl text-amber-500" id="demo-pause-sprite"></i>
+                        </div>
+                        
+                        <div id="demo-pause-menu" class="pause-overlay">
+                            <div class="bg-slate-900 border-2 border-red-500 p-6 rounded-xl text-center shadow-2xl transform transition-transform scale-95" id="demo-pause-modal">
+                                <h3 class="title-font text-2xl text-white mb-4">JEU EN PAUSE</h3>
+                                <p class="text-xs font-mono text-green-400 mb-4 bg-slate-950 p-2 rounded">Process Mode: Always</p>
+                                <button onclick="togglePauseDemo()" class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded">Reprendre</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-red-400 mb-4 border-t border-slate-700 pt-6">Configuration de la Scène PauseMenu</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+                        <h4 class="font-bold text-white text-sm mb-3">1. Dans l'Inspecteur</h4>
+                        <p class="text-sm text-slate-300 mb-3">
+                            Sélectionnez le nœud racine de votre scène de Pause (ex: <code>CanvasLayer</code>). Allez dans l'inspecteur sous <b>Node > Process > Mode</b> et changez <code>Inherit</code> pour <code>Always</code>.
+                        </p>
+                        <p class="text-xs text-slate-400 italic">
+                            Cela indique à Godot : "Même si l'arbre principal est en pause, continue d'exécuter ce nœud et ses enfants."
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+                        <h4 class="font-bold text-white text-sm mb-3">2. Dans le Script (Input)</h4>
+                        <p class="text-sm text-slate-300 mb-3">
+                            L'action "ui_cancel" (Échap ou Start sur manette) doit déclencher la pause. 
+                        </p>
+                        <div class="code-block p-3">
+<pre style="line-height: 1.2; font-size: 0.75rem;"><span class="gd-keyword">func</span> <span class="gd-func">_input</span>(event):
+    <span class="gd-keyword">if</span> event.is_action_pressed(<span class="gd-str">"ui_cancel"</span>):
+        <span class="gd-keyword">var</span> is_paused = get_tree().paused
+        get_tree().paused = !is_paused
+        visible = !is_paused
+        <span class="gd-keyword">if</span> visible:
+            resume_btn.grab_focus()
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 4: SAVE SYSTEM -->
+            <section id="save" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-purple-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 4</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Sauvegarder les Options</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Persistance des données avec `ConfigFile`.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Si le joueur coupe la musique, il s'attend à ce qu'elle soit toujours coupée en relançant le jeu le lendemain. Pour sauvegarder des paramètres simples (Options, High Score, Touches assignées), Godot fournit une classe excellente : <code>ConfigFile</code>.
+                </p>
+
+                <div class="mb-8 p-6 bg-[#020617] border border-slate-700 rounded-xl font-mono text-sm shadow-inner">
+                    <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+                        <span class="text-slate-500">user://settings.cfg</span>
+                        <div class="flex gap-2">
+                            <button onclick="simSaveSetting('master_volume', '0.5')" class="bg-slate-800 hover:bg-slate-700 text-xs px-2 py-1 rounded text-slate-300">Vol 50%</button>
+                            <button onclick="simSaveSetting('crt_shader', 'true')" class="bg-slate-800 hover:bg-slate-700 text-xs px-2 py-1 rounded text-slate-300">CRT On</button>
+                        </div>
+                    </div>
+                    <pre id="demo-cfg-content" class="text-green-400">
+[Audio]
+master_volume=1.0
+
+[Video]
+crt_shader=false
+</pre>
+                </div>
+
+                <h3 class="title-font text-xl text-purple-400 mb-4 border-t border-slate-700 pt-6">L'Autoload SettingsManager.gd</h3>
+                <p class="text-sm text-slate-400 mb-4">Créez un script global (Autoload) pour charger les paramètres au démarrage du jeu et les sauvegarder quand ils changent.</p>
+
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># settings_manager.gd (Autoload)</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">Node</span>
+
+<span class="gd-keyword">const</span> SAVE_PATH = <span class="gd-str">"user://settings.cfg"</span>
+<span class="gd-keyword">var</span> config = <span class="gd-type">ConfigFile</span>.new()
+
+<span class="gd-comment"># Variables stockant l'état en mémoire</span>
+<span class="gd-keyword">var</span> master_volume: <span class="gd-type">float</span> = <span class="gd-num">1.0</span>
+<span class="gd-keyword">var</span> use_crt: <span class="gd-type">bool</span> = <span class="gd-keyword">true</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">_ready</span>():
+    load_settings()
+
+<span class="gd-keyword">func</span> <span class="gd-func">save_settings</span>():
+    <span class="gd-comment"># Enregistre les valeurs dans l'objet ConfigFile</span>
+    config.set_value(<span class="gd-str">"Audio"</span>, <span class="gd-str">"master_volume"</span>, master_volume)
+    config.set_value(<span class="gd-str">"Video"</span>, <span class="gd-str">"use_crt"</span>, use_crt)
+    
+    <span class="gd-comment"># Écrit le fichier physiquement sur le disque dur</span>
+    config.save(SAVE_PATH)
+
+<span class="gd-keyword">func</span> <span class="gd-func">load_settings</span>():
+    <span class="gd-keyword">var</span> err = config.load(SAVE_PATH)
+    <span class="gd-keyword">if</span> err != OK:
+        <span class="gd-keyword">return</span> <span class="gd-comment"># Le fichier n'existe pas encore (premier lancement)</span>
+        
+    <span class="gd-comment"># Lit les valeurs (avec une valeur par défaut en 3ème argument si introuvable)</span>
+    master_volume = config.get_value(<span class="gd-str">"Audio"</span>, <span class="gd-str">"master_volume"</span>, <span class="gd-num">1.0</span>)
+    use_crt = config.get_value(<span class="gd-str">"Video"</span>, <span class="gd-str">"use_crt"</span>, <span class="gd-keyword">true</span>)
+    
+    <span class="gd-comment"># Appliquer les paramètres (ex: changer le volume du bus Master)</span>
+    <span class="gd-keyword">var</span> bus_idx = <span class="gd-type">AudioServer</span>.get_bus_index(<span class="gd-str">"Master"</span>)
+    <span class="gd-type">AudioServer</span>.set_bus_volume_db(bus_idx, linear_to_db(master_volume))
+</code></pre>
+                </div>
+
+                <div class="bg-purple-900/20 border-l-4 border-purple-500 p-4 rounded-r text-sm text-slate-300">
+                    <i class="fa-solid fa-folder-open text-amber-400 mr-2"></i> <b>Où se trouve "user://" ?</b> 
+                    Sous Windows, Godot sauvegarde généralement dans <code>C:\Users\[Nom]\AppData\Roaming\Godot\app_userdata\[Nom du Projet]\</code>. Cela garantit que les sauvegardes survivent même si vous déplacez le dossier du jeu.
+                </div>
+
+                <div class="mt-12 text-center pb-8 border-t border-slate-800 pt-8 relative overflow-hidden rounded-xl">
+                    <div class="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-purple-900/10 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-slate-700 to-slate-900 rounded-full mb-6 shadow-[0_0_30px_rgba(245,158,11,0.2)] border border-slate-600">
+                            <i class="fa-solid fa-gamepad text-5xl text-amber-500"></i>
+                        </div>
+                        <h2 class="title-font text-3xl text-white mb-4">Le Produit est Fini !</h2>
+                        <p class="text-slate-300 mb-6 max-w-2xl mx-auto text-lg leading-relaxed">
+                            Vous savez maintenant concevoir des menus adaptatifs, navigables à la manette, gérer la pause du moteur physique et persister les choix du joueur. Ces briques systémiques sont indispensables pour publier votre jeu d'action Megadrive sur Steam ou Itch.io.
+                        </p>
+                    </div>
+                </div>
+
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // --- Navigation SPA ---
+        function navTo(sectionId) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            const section = document.getElementById(sectionId);
+            if(section) {
+                section.style.animation = 'none';
+                section.offsetHeight; 
+                section.style.animation = null; 
+                section.classList.add('active');
+            }
+            
+            const navBtn = document.getElementById('nav-' + sectionId);
+            if(navBtn) navBtn.classList.add('active');
+
+            document.getElementById('main-content').scrollTop = 0;
+
+            if(window.innerWidth < 768) toggleMobileMenu(false);
+        }
+
+        // --- Menu Mobile ---
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        let menuOpen = false;
+
+        function toggleMobileMenu(forceState = null) {
+            menuOpen = forceState !== null ? forceState : !menuOpen;
+            if(menuOpen) {
+                sidebar.classList.remove('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-xmark text-2xl"></i>';
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-bars text-2xl"></i>';
+            }
+        }
+        mobileMenuBtn.addEventListener('click', () => toggleMobileMenu());
+        window.addEventListener('resize', () => { if (window.innerWidth >= 768 && menuOpen) toggleMobileMenu(false); });
+
+        // --- Demo : Focus Menu ---
+        let currentFocus = 0;
+        const menuItems = document.querySelectorAll('.demo-menu-btn');
+        function moveFocus(dir) {
+            menuItems[currentFocus].classList.remove('focused');
+            currentFocus += dir;
+            if(currentFocus < 0) currentFocus = menuItems.length - 1;
+            if(currentFocus >= menuItems.length) currentFocus = 0;
+            menuItems[currentFocus].classList.add('focused');
+        }
+
+        // --- Demo : Pause ---
+        let isPaused = false;
+        function togglePauseDemo() {
+            isPaused = !isPaused;
+            const bg = document.getElementById('demo-pause-world');
+            const sprite = document.getElementById('demo-pause-sprite');
+            const overlay = document.getElementById('demo-pause-menu');
+            const modal = document.getElementById('demo-pause-modal');
+            
+            if(isPaused) {
+                bg.classList.add('paused');
+                sprite.classList.add('paused');
+                overlay.classList.add('active');
+                modal.classList.remove('scale-95');
+                modal.classList.add('scale-100');
+            } else {
+                bg.classList.remove('paused');
+                sprite.classList.remove('paused');
+                overlay.classList.remove('active');
+                modal.classList.remove('scale-100');
+                modal.classList.add('scale-95');
+            }
+        }
+
+        // --- Demo : ConfigFile ---
+        let cfgData = {
+            master_volume: "1.0",
+            crt_shader: "false"
+        };
+        function simSaveSetting(key, val) {
+            cfgData[key] = val;
+            updateCfgDisplay();
+        }
+        function updateCfgDisplay() {
+            const pre = document.getElementById('demo-cfg-content');
+            pre.innerText = `[Audio]
+master_volume=${cfgData.master_volume}
+
+[Video]
+crt_shader=${cfgData.crt_shader}`;
+            
+            // Flash effect to show write
+            pre.classList.remove('text-green-400');
+            pre.classList.add('text-white');
+            setTimeout(() => {
+                pre.classList.add('text-green-400');
+                pre.classList.remove('text-white');
+            }, 150);
+        }
+
+    </script>
+</body>
+</html>

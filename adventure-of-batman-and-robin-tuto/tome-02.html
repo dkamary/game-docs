@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot 4 Masterclass : B&R Megadrive - Tome 2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-main: #0f172a;
+            --bg-panel: #1e293b;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-yellow: #eab308;
+            --accent-red: #ef4444;
+            --accent-green: #10b981;
+            --accent-purple: #a855f7;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4, .title-font {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Syntax Highlighting Custom */
+        .code-block {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+        .gd-kw { color: #ff7b72; font-weight: bold; } 
+        .gd-func { color: #d2a8ff; font-weight: bold; } 
+        .gd-str { color: #a5d6ff; } 
+        .gd-num { color: #79c0ff; } 
+        .gd-comment { color: #8b949e; font-style: italic; } 
+        .gd-type { color: #58a6ff; } 
+        .gd-anno { color: #d2a8ff; } 
+
+        /* Nav & Sections */
+        .section-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .section-content.active { display: block; opacity: 1; animation: slideUp 0.4s ease-out forwards; }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-btn.active {
+            background-color: var(--bg-panel);
+            border-right: 4px solid var(--accent-purple);
+            color: var(--accent-purple);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-purple); }
+
+        /* Animations & Demos */
+        .demo-container {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background: #111827;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #334155;
+        }
+
+        /* Batarang Demo */
+        .bat-sprite {
+            position: absolute;
+            bottom: 30px;
+            left: 50px;
+            width: 40px;
+            height: 70px;
+            background: var(--accent-blue);
+            border-radius: 4px;
+        }
+        .batarang {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-yellow);
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            display: none;
+        }
+
+        /* Parallax Demo */
+        .parallax-layer {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 200%;
+            background-repeat: repeat-x;
+            will-change: transform;
+        }
+        .layer-sky { background: linear-gradient(to bottom, #0f172a, #1e3a8a); width: 100%; }
+        .layer-city-back {
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="250" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="100" width="30" height="150" fill="%231e293b"/><rect x="50" y="130" width="40" height="120" fill="%231e293b"/></svg>');
+            animation: scroll 20s linear infinite;
+        }
+        .layer-city-front {
+            background-image: url('data:image/svg+xml;utf8,<svg width="150" height="250" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="150" width="40" height="100" fill="%23334155"/><rect x="80" y="120" width="50" height="130" fill="%23334155"/></svg>');
+            animation: scroll 10s linear infinite;
+        }
+        .layer-ground {
+            background-image: url('data:image/svg+xml;utf8,<svg width="50" height="250" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="220" width="50" height="30" fill="%23475569"/></svg>');
+            animation: scroll 4s linear infinite;
+        }
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* Enemy AI Demo */
+        .enemy-sprite {
+            position: absolute;
+            bottom: 30px;
+            right: 50px;
+            width: 40px;
+            height: 70px;
+            background: var(--accent-purple);
+            border-radius: 4px;
+            transition: left 0.1s linear;
+        }
+        .vision-cone {
+            position: absolute;
+            top: 20px;
+            left: -150px;
+            width: 150px;
+            height: 30px;
+            background: linear-gradient(to right, rgba(239, 68, 68, 0), rgba(239, 68, 68, 0.3));
+            clip-path: polygon(0 0, 100% 30%, 100% 70%, 0 100%);
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen text-slate-200">
+
+    <!-- Mobile Header -->
+    <header class="md:hidden flex items-center justify-between bg-slate-900 border-b border-slate-800 p-4 shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-bat text-purple-500 text-xl"></i>
+            <h1 class="title-font font-bold text-lg leading-none">B&R <span class="text-purple-500">TOME 2</span></h1>
+        </div>
+        <button id="mobile-menu-btn" class="text-slate-300 hover:text-white p-2 focus:outline-none">
+            <i class="fa-solid fa-bars text-2xl"></i>
+        </button>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="absolute md:relative w-full md:w-72 h-[calc(100vh-60px)] md:h-screen bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out top-[60px] md:top-0">
+        
+        <div class="hidden md:block p-6 text-center border-b border-slate-800 relative overflow-hidden">
+            <div class="absolute inset-0 opacity-10 flex items-center justify-center pointer-events-none">
+                <i class="fa-solid fa-jedi text-9xl text-purple-500"></i>
+            </div>
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-800 rounded-xl shadow-lg mb-3 relative z-10">
+                <i class="fa-solid fa-meteor text-3xl text-white"></i>
+            </div>
+            <h1 class="title-font font-bold text-xl tracking-wide relative z-10">BATMAN & ROBIN</h1>
+            <p class="text-xs font-mono text-purple-400 mt-1 relative z-10">Godot 4.x - Tome 2</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4">
+            <div class="px-6 mb-4">
+                <div class="bg-blue-900/30 border border-blue-500/30 text-blue-300 text-xs p-3 rounded-lg flex gap-2">
+                    <i class="fa-solid fa-link mt-0.5"></i>
+                    <p>Fait suite au Tome 1. L'architecture Hitbox/Hurtbox est conservée à 100%.</p>
+                </div>
+            </div>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Arsenal & Ennemis</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('batarang')" id="nav-batarang" class="nav-btn active w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-compact-disc w-5 text-center text-yellow-500"></i> 1. Le Batarang
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('ai')" id="nav-ai" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-masks-theater w-5 text-center text-purple-400"></i> 2. Les Sbires (IA)
+                    </button>
+                </li>
+            </ul>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Le Monde</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('parallax')" id="nav-parallax" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-layer-group w-5 text-center text-blue-400"></i> 3. Parallax & TileMap
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('fx')" id="nav-fx" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-bomb w-5 text-center text-orange-400"></i> 4. Effets & Explosions
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 h-[calc(100vh-60px)] md:h-screen overflow-y-auto relative scroll-smooth bg-[#0b1120]" id="main-content">
+        <div class="max-w-4xl mx-auto p-4 md:p-8 lg:p-12 pb-24">
+
+            <!-- SECTION 1: BATARANG -->
+            <section id="batarang" class="section-content active">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-yellow-500 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 1</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Système Balistique</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Instanciation de projectiles et l'erreur de débutant à éviter.</p>
+                </div>
+
+                <div class="bg-slate-800 rounded-xl p-5 md:p-6 mb-8 shadow-xl border border-slate-700">
+                    <h3 class="title-font text-xl text-yellow-400 mb-4">L'Erreur Classique : Le Batarang Enfant</h3>
+                    <p class="mb-4 text-slate-300 leading-relaxed">
+                        L'erreur la plus commune sur Godot est de faire `add_child(batarang)` directement dans le script du `Player`. 
+                        <strong class="text-red-400">Pourquoi est-ce une erreur ?</strong> Parce que si le projectile est un enfant du joueur, ses coordonnées sont relatives au joueur. Si Batman recule, le projectile en l'air reculera avec lui ! Il faut ajouter le projectile à l'arbre <b>principal</b> (la scène courante).
+                    </p>
+                </div>
+
+                <!-- Demo Interactive Batarang -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation de Tir (Indépendant)</h4>
+                        <button onclick="fireBatarang()" class="bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-1 rounded text-sm font-bold shadow-lg">
+                            <i class="fa-solid fa-crosshairs mr-2"></i> Tirer
+                        </button>
+                    </div>
+                    <div class="demo-container">
+                        <div class="layer-sky"></div>
+                        <div class="bat-sprite flex items-center justify-center"><i class="fa-solid fa-mask text-white"></i></div>
+                        <div id="demo-batarang" class="batarang"></div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-white mb-4">1. La Scène Batarang.tscn</h3>
+                <p class="text-sm text-slate-400 mb-2">Le Batarang est simplement un <code>Area2D</code>. Grâce à notre architecture du Tome 1, il agit comme un <code>HitboxComponent</code> volant.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-[#0d1117] rounded-xl p-4 border border-[#30363d]">
+                        <h4 class="font-bold text-slate-400 text-xs mb-3 uppercase tracking-wider border-b border-slate-700 pb-2">Arbre de Nœuds (Batarang)</h4>
+                        <ul class="text-sm space-y-2 text-slate-300">
+                            <li><i class="fa-solid fa-meteor text-yellow-400"></i> Batarang (Area2D / HitboxComponent)</li>
+                            <li class="pl-4 border-l border-slate-700 ml-2"><i class="fa-solid fa-image text-green-400"></i> Sprite2D</li>
+                            <li class="pl-4 border-l border-slate-700 ml-2"><i class="fa-regular fa-square text-blue-400"></i> CollisionShape2D</li>
+                            <li class="pl-4 border-l border-slate-700 ml-2"><i class="fa-solid fa-stopwatch text-orange-400"></i> VisibleOnScreenNotifier2D</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                        <h4 class="font-bold text-slate-400 text-xs mb-3 uppercase tracking-wider border-b border-slate-700 pb-2">Le Noeud Secret : VisibleOnScreenNotifier2D</h4>
+                        <p class="text-sm text-slate-300">
+                            Si vous tirez 500 batarangs et qu'ils sortent de l'écran, ils continuent de consommer de la mémoire. Le <code>VisibleOnScreenNotifier2D</code> émet un signal <code>screen_exited</code>. Connectez-le pour détruire (<code>queue_free()</code>) le projectile dès qu'il sort de l'écran !
+                        </p>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-white mb-4">2. Script du Batarang (batarang.gd)</h3>
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># batarang.gd (Hérite de notre HitboxComponent du Tome 1 !)</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">HitboxComponent</span>
+
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> speed: <span class="gd-type">float</span> = <span class="gd-num">600.0</span>
+<span class="gd-keyword">var</span> direction: <span class="gd-type">Vector2</span> = <span class="gd-type">Vector2</span>.RIGHT
+
+<span class="gd-keyword">func</span> <span class="gd-func">_physics_process</span>(delta: <span class="gd-type">float</span>):
+    <span class="gd-comment"># Déplacement linéaire simple</span>
+    position += direction * speed * delta
+    <span class="gd-comment"># Rotation infinie pour l'animation (en radians)</span>
+    rotation += <span class="gd-num">15.0</span> * delta
+
+<span class="gd-comment"># Connecté via l'éditeur depuis le VisibleOnScreenNotifier2D</span>
+<span class="gd-keyword">func</span> <span class="gd-func">_on_visible_on_screen_notifier_2d_screen_exited</span>():
+    queue_free()
+
+<span class="gd-comment"># Connecté via l'éditeur depuis le signal area_entered de l'Area2D</span>
+<span class="gd-keyword">func</span> <span class="gd-func">_on_area_entered</span>(area: <span class="gd-type">Area2D</span>):
+    <span class="gd-comment"># Si on touche une Hurtbox ennemie (la logique de dégât est dans le Tome 1)</span>
+    <span class="gd-keyword">if</span> area <span class="gd-keyword">is</span> <span class="gd-type">HurtboxComponent</span>:
+        queue_free() <span class="gd-comment"># Le batarang se détruit après impact</span>
+</code></pre>
+                </div>
+
+                <h3 class="title-font text-xl text-white mb-4">3. Tirer depuis le Player (player.gd)</h3>
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># Dans player.gd</span>
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> batarang_scene: <span class="gd-type">PackedScene</span>
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> muzzle = $Muzzle <span class="gd-comment"># Un Node2D (Marker2D) placé au bout du bras de Batman</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">shoot_batarang</span>():
+    <span class="gd-keyword">if</span> batarang_scene:
+        <span class="gd-keyword">var</span> projectile = batarang_scene.instantiate()
+        
+        <span class="gd-comment"># IMPORTANT : On ajoute le projectile à la racine de la scène, pas au joueur !</span>
+        get_tree().current_scene.add_child(projectile)
+        
+        <span class="gd-comment"># On place le batarang au niveau du canon (muzzle)</span>
+        projectile.global_position = muzzle.global_position
+        
+        <span class="gd-comment"># On définit la direction basée sur l'orientation de Batman</span>
+        <span class="gd-keyword">if</span> $Sprite2D.flip_h:
+            projectile.direction = <span class="gd-type">Vector2</span>.LEFT
+        <span class="gd-keyword">else</span>:
+            projectile.direction = <span class="gd-type">Vector2</span>.RIGHT
+</code></pre>
+                </div>
+
+                <button onclick="navTo('ai')" class="w-full py-4 bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-500 hover:to-purple-700 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:-translate-y-1">
+                    Passer à l'Intelligence Artificielle <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </section>
+
+            <!-- SECTION 2: AI & ENEMIES -->
+            <section id="ai" class="section-content">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-purple-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 2</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Les Sbires du Joker</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Donner vie aux ennemis via une State Machine simplifiée.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Les clowns dans Batman & Robin ont un comportement précis : ils patrouillent ou attendent, puis dès que Batman entre dans leur champ de vision, ils foncent vers lui. S'ils le touchent, ils explosent de rire. Nous allons utiliser un <code>RayCast2D</code> pour la vision.
+                </p>
+
+                <!-- Demo Interactive AI -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation RayCast (Vision)</h4>
+                        <div class="flex gap-2">
+                            <button onclick="movePlayerLeft()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm shadow">
+                                <i class="fa-solid fa-arrow-left"></i> Joueur
+                            </button>
+                            <button onclick="movePlayerRight()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm shadow">
+                                Joueur <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="demo-container">
+                        <div class="layer-sky"></div>
+                        <div id="demo-player" class="bat-sprite flex items-center justify-center transition-all duration-300" style="left: 50px;"><i class="fa-solid fa-mask text-white"></i></div>
+                        <div id="demo-enemy" class="enemy-sprite flex items-center justify-center">
+                            <i class="fa-solid fa-masks-theater text-white"></i>
+                            <div id="demo-vision" class="vision-cone"></div>
+                        </div>
+                    </div>
+                    <p id="ai-status" class="text-xs text-center mt-2 text-slate-400 font-mono">Status: <span class="text-yellow-500">Idle (En attente)</span></p>
+                </div>
+
+                <h3 class="title-font text-xl text-white mb-4">Structure de l'Ennemi (Clown.tscn)</h3>
+                <p class="text-sm text-slate-400 mb-4">L'ennemi est aussi un <code>CharacterBody2D</code> (pour subir la gravité). Il possède un <code>HurtboxComponent</code> pour recevoir les Batarangs, et un <code>HitboxComponent</code> sur son corps pour blesser Batman s'il le touche.</p>
+                
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># clown_ai.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">CharacterBody2D</span>
+
+<span class="gd-keyword">const</span> SPEED = <span class="gd-num">120.0</span>
+<span class="gd-keyword">var</span> gravity = <span class="gd-type">ProjectSettings</span>.get_setting(<span class="gd-str">"physics/2d/default_gravity"</span>)
+<span class="gd-keyword">var</span> state = <span class="gd-str">"IDLE"</span> <span class="gd-comment"># États simples : IDLE, CHASE, HURT</span>
+
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> vision_cast = $RayCast2D <span class="gd-comment"># Pointeur vers l'avant (axe X)</span>
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> sprite = $Sprite2D
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> hurtbox = $HurtboxComponent
+
+<span class="gd-keyword">var</span> player_ref = <span class="gd-keyword">null</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">_ready</span>():
+    <span class="gd-comment"># On connecte le signal de notre composant Hurtbox créé au Tome 1 !</span>
+    hurtbox.on_damage_taken.connect(_on_damage_taken)
+
+<span class="gd-keyword">func</span> <span class="gd-func">_physics_process</span>(delta: <span class="gd-type">float</span>):
+    <span class="gd-keyword">if not</span> is_on_floor():
+        velocity.y += gravity * delta
+
+    <span class="gd-keyword">match</span> state:
+        <span class="gd-str">"IDLE"</span>:
+            velocity.x = <span class="gd-num">0</span>
+            <span class="gd-comment"># Vérifie si le Raycast touche un corps appartenant au joueur</span>
+            <span class="gd-keyword">if</span> vision_cast.is_colliding():
+                <span class="gd-keyword">var</span> collider = vision_cast.get_collider()
+                <span class="gd-keyword">if</span> collider.is_in_group(<span class="gd-str">"Player"</span>):
+                    player_ref = collider
+                    state = <span class="gd-str">"CHASE"</span>
+                    
+        <span class="gd-str">"CHASE"</span>:
+            <span class="gd-keyword">if</span> player_ref != <span class="gd-keyword">null</span>:
+                <span class="gd-comment"># Calcule la direction vers le joueur (1 ou -1)</span>
+                <span class="gd-keyword">var</span> direction = sign(player_ref.global_position.x - global_position.x)
+                velocity.x = direction * SPEED
+                
+                <span class="gd-comment"># Tourne le sprite et le Raycast en fonction de la direction</span>
+                sprite.flip_h = direction > <span class="gd-num">0</span>
+                vision_cast.target_position.x = abs(vision_cast.target_position.x) * direction
+                
+        <span class="gd-str">"HURT"</span>:
+            velocity.x = move_toward(velocity.x, <span class="gd-num">0</span>, SPEED * <span class="gd-num">0.1</span>) <span class="gd-comment"># Recul (Knockback)</span>
+
+    move_and_slide()
+
+<span class="gd-keyword">func</span> <span class="gd-func">_on_damage_taken</span>(damage_amount: <span class="gd-type">int</span>):
+    state = <span class="gd-str">"HURT"</span>
+    <span class="gd-comment"># Ajouter ici la logique de clignotement ou de mort...</span>
+</code></pre>
+                </div>
+
+                <div class="bg-purple-900/20 border-l-4 border-purple-500 p-4 rounded-r text-sm text-slate-300">
+                    <i class="fa-solid fa-lightbulb text-yellow-400 mr-2"></i> <b>Astuce Pro :</b> Le <code>RayCast2D</code> est très performant. Assurez-vous que son <i>Collision Mask</i> ne cible QUE la couche du Joueur, pour éviter que l'ennemi ne repère les murs ou d'autres ennemis à la place de Batman.
+                </div>
+            </section>
+
+            <!-- SECTION 3: PARALLAX & TILEMAP -->
+            <section id="parallax" class="section-content">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-blue-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 3</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Créer Gotham City</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Profondeur de champ Megadrive et le nouveau TileMapLayer (Godot 4.3).</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    L'esthétique de Batman & Robin repose sur son "Parallax Scrolling" : des couches d'arrière-plan qui défilent à des vitesses différentes pour simuler la 3D. Godot gère cela nativement.
+                </p>
+
+                <!-- Demo Interactive Parallax -->
+                <div class="mb-8">
+                    <h4 class="font-bold text-slate-300 text-sm mb-2">Aperçu du Rendu (3 couches)</h4>
+                    <div class="demo-container">
+                        <div class="parallax-layer layer-sky"></div>
+                        <div class="parallax-layer layer-city-back"></div>
+                        <div class="parallax-layer layer-city-front"></div>
+                        <div class="parallax-layer layer-ground"></div>
+                        <div class="bat-sprite absolute bottom-[30px] left-1/2 -translate-x-1/2 flex items-center justify-center animate-pulse"><i class="fa-solid fa-person-running text-white"></i></div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-yellow-400 mb-4">Structure du Noeud ParallaxBackground</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-[#0d1117] rounded-xl p-4 border border-[#30363d]">
+                        <ul class="text-sm space-y-3 text-slate-300">
+                            <li><i class="fa-solid fa-images text-blue-400"></i> ParallaxBackground</li>
+                            <li class="pl-4 border-l border-slate-700 ml-2">
+                                <i class="fa-solid fa-layer-group text-purple-400"></i> ParallaxLayer (Ciel)<br>
+                                <span class="text-xs text-slate-500 ml-5">Motion Scale: x=0.0, y=0.1</span>
+                            </li>
+                            <li class="pl-4 border-l border-slate-700 ml-2">
+                                <i class="fa-solid fa-layer-group text-purple-400"></i> ParallaxLayer (Ville Lointaine)<br>
+                                <span class="text-xs text-slate-500 ml-5">Motion Scale: x=0.3, y=0.5</span>
+                            </li>
+                            <li class="pl-4 border-l border-slate-700 ml-2">
+                                <i class="fa-solid fa-layer-group text-purple-400"></i> ParallaxLayer (Immeubles Proches)<br>
+                                <span class="text-xs text-slate-500 ml-5">Motion Scale: x=0.7, y=0.8</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                            <h4 class="font-bold text-white text-sm mb-2"><i class="fa-solid fa-arrows-left-right text-yellow-500"></i> Le Secret du Mirroring</h4>
+                            <p class="text-xs text-slate-300">
+                                Pour que la ville boucle infiniment, sélectionnez un <code>ParallaxLayer</code>. Dans l'inspecteur, sous <b>Motion > Mirroring</b>, entrez la largeur exacte de votre texture (ex: 320 ou 640).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-white mb-4 border-t border-slate-700 pt-6">Nouveauté Godot 4.3+ : TileMapLayer</h3>
+                <p class="text-sm text-slate-300 mb-4">
+                    Fini l'ancien nœud <code>TileMap</code> géant qui gérait tout. Godot 4.3 introduit <code>TileMapLayer</code>. C'est plus propre et plus modulaire. Vous mettez un <code>TileMapLayer</code> pour le décor de fond, un autre pour les plateformes (avec collisions), etc.
+                </p>
+
+                <div class="bg-blue-900/20 border-l-4 border-blue-500 p-4 rounded-r text-sm text-slate-300">
+                    <p class="mb-2"><strong>Comment ajouter des collisions au sol ?</strong></p>
+                    <ol class="list-decimal list-inside space-y-1">
+                        <li>Dans le panneau du bas (TileSet), sélectionnez vos tuiles de sol.</li>
+                        <li>Allez dans l'onglet <strong>Paint</strong>.</li>
+                        <li>Choisissez <strong>Physics Layer 0</strong>.</li>
+                        <li>Dessinez un rectangle sur votre tuile. <em>Magie : Batman ne passera plus à travers le sol !</em></li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- SECTION 4: FX & EXPLOSIONS -->
+            <section id="fx" class="section-content">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-orange-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 4</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le "Juice" : FX & Audio</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Ce qui transforme un prototype en jeu fini.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Sur Megadrive, les explosions sont généralement de simples Sprite Sheets (feuilles de sprites) jouées rapidement, parfois accompagnées de particules simples. Nous allons utiliser un <code>AnimatedSprite2D</code> instancié dynamiquement au point d'impact.
+                </p>
+
+                <h3 class="title-font text-xl text-yellow-400 mb-4">Créer une Explosion Automatisée</h3>
+                <p class="text-sm text-slate-400 mb-4">Créez une scène `Explosion.tscn` avec comme racine un `AnimatedSprite2D`. Chargez-y vos frames d'explosion. Le but est qu'elle se détruise toute seule une fois l'animation terminée.</p>
+
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># explosion.gd (Attaché à l'AnimatedSprite2D)</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">AnimatedSprite2D</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">_ready</span>():
+    <span class="gd-comment"># Connecte le signal "animation_finished" à queue_free</span>
+    animation_finished.connect(queue_free)
+    
+    <span class="gd-comment"># Lance l'animation par défaut</span>
+    play(<span class="gd-str">"default"</span>)
+
+<span class="gd-comment"># Optionnel : Ajouter un AudioStreamPlayer enfant et le jouer ici</span>
+<span class="gd-comment"># $AudioStreamPlayer.play()</span>
+</code></pre>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-slate-800 p-5 rounded-xl border-l-4 border-orange-500 shadow-md">
+                        <h4 class="font-bold text-white text-lg mb-2">Audio Autoload (Singleton)</h4>
+                        <p class="text-sm text-slate-300 mb-2">
+                            Pour la musique de Jesper Kyd, ne la mettez pas dans la scène du Niveau ! Si vous rechargez le niveau quand Batman meurt, la musique va se couper et recommencer.
+                        </p>
+                        <p class="text-sm text-slate-300 mt-2 font-bold text-orange-400">
+                            Projet > Paramètres > Autoload.
+                        </p>
+                        <p class="text-sm text-slate-300">
+                            Ajoutez une scène contenant un `AudioStreamPlayer`. Elle survivra aux changements de niveau !
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-12 text-center pb-8 border-t border-slate-700 pt-8">
+                    <div class="inline-flex items-center justify-center w-20 h-20 bg-yellow-500 rounded-full mb-6 shadow-[0_0_30px_rgba(234,179,8,0.5)]">
+                        <i class="fa-solid fa-trophy text-4xl text-slate-900"></i>
+                    </div>
+                    <h2 class="title-font text-3xl text-white mb-4">Architecture Complète !</h2>
+                    <p class="text-slate-300 mb-6 max-w-2xl mx-auto">
+                        Félicitations. En combinant le Tome 1 (Mouvements, Hitbox/Hurtbox, State Machine) et le Tome 2 (Projectiles indépendants, IA d'ennemis, Parallax et FX), vous possédez un moteur 2D complet sous Godot 4.3 capable de reproduire n'importe quel Run & Gun 16-bits !
+                    </p>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // --- Navigation SPA ---
+        function navTo(sectionId) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            const section = document.getElementById(sectionId);
+            if(section) {
+                section.style.animation = 'none';
+                section.offsetHeight; 
+                section.style.animation = null; 
+                section.classList.add('active');
+            }
+            
+            const navBtn = document.getElementById('nav-' + sectionId);
+            if(navBtn) navBtn.classList.add('active');
+
+            document.getElementById('main-content').scrollTop = 0;
+
+            if(window.innerWidth < 768) toggleMobileMenu(false);
+        }
+
+        // --- Menu Mobile ---
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        let menuOpen = false;
+
+        function toggleMobileMenu(forceState = null) {
+            menuOpen = forceState !== null ? forceState : !menuOpen;
+            if(menuOpen) {
+                sidebar.classList.remove('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-xmark text-2xl"></i>';
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-bars text-2xl"></i>';
+            }
+        }
+        mobileMenuBtn.addEventListener('click', () => toggleMobileMenu());
+        window.addEventListener('resize', () => { if (window.innerWidth >= 768 && menuOpen) toggleMobileMenu(false); });
+
+        // --- Demo : Batarang Tir ---
+        let isFiring = false;
+        function fireBatarang() {
+            if(isFiring) return;
+            isFiring = true;
+            
+            const batarang = document.getElementById('demo-batarang');
+            batarang.style.display = 'block';
+            batarang.style.left = '90px';
+            batarang.style.bottom = '50px';
+            batarang.style.transform = 'rotate(0deg)';
+            
+            let pos = 90;
+            let rot = 0;
+            
+            const anim = setInterval(() => {
+                pos += 10;
+                rot += 45;
+                batarang.style.left = pos + 'px';
+                batarang.style.transform = `rotate(${rot}deg)`;
+                
+                if(pos > window.innerWidth || pos > 800) {
+                    clearInterval(anim);
+                    batarang.style.display = 'none';
+                    isFiring = false;
+                }
+            }, 20);
+        }
+
+        // --- Demo : Enemy AI Raycast ---
+        let playerX = 50;
+        let enemyX = 300; // Position approximative à droite
+        
+        function updateAIDemo() {
+            const player = document.getElementById('demo-player');
+            const status = document.getElementById('ai-status');
+            const vision = document.getElementById('demo-vision');
+            
+            player.style.left = playerX + 'px';
+            
+            // Logique du Raycast (le cone fait 150px vers la gauche de l'ennemi)
+            // Donc si le joueur est entre (enemyX - 150) et enemyX
+            // Note: C'est une simulation visuelle simplifiée pour le HTML
+            const enemyScreenLeft = document.getElementById('demo-enemy').offsetLeft;
+            
+            if(playerX > (enemyScreenLeft - 150) && playerX < enemyScreenLeft) {
+                vision.style.background = 'linear-gradient(to right, rgba(239, 68, 68, 0), rgba(239, 68, 68, 0.8))';
+                status.innerHTML = 'Status: <span class="text-red-500 font-bold">CHASE (Joueur détecté !)</span>';
+                
+                // L'ennemi bouge vers le joueur
+                document.getElementById('demo-enemy').style.left = (enemyScreenLeft - 20) + 'px';
+            } else {
+                vision.style.background = 'linear-gradient(to right, rgba(239, 68, 68, 0), rgba(239, 68, 68, 0.3))';
+                status.innerHTML = 'Status: <span class="text-yellow-500">Idle (En attente)</span>';
+            }
+        }
+
+        function movePlayerRight() {
+            playerX = Math.min(playerX + 30, 400); // Limite droite
+            updateAIDemo();
+        }
+        function movePlayerLeft() {
+            playerX = Math.max(playerX - 30, 10); // Limite gauche
+            updateAIDemo();
+        }
+
+        // Reset AI si on change d'onglet
+        document.getElementById('nav-ai').addEventListener('click', () => {
+            playerX = 50;
+            document.getElementById('demo-enemy').style.left = '';
+            updateAIDemo();
+        });
+
+    </script>
+</body>
+</html>

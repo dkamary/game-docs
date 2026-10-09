@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot 4 Masterclass : B&R Megadrive - Tome 6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-main: #020617; /* Very dark slate */
+            --bg-panel: #0f172a;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --bat-blue: #3b82f6;
+            --robin-red: #ef4444;
+            --robin-yellow: #eab308;
+            --robin-green: #22c55e;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4, .title-font {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        .code-block {
+            background-color: #000000;
+            border: 1px solid #1e293b;
+            border-left: 4px solid var(--robin-red);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        .gd-kw { color: #ff7b72; font-weight: bold; } 
+        .gd-func { color: #d2a8ff; font-weight: bold; } 
+        .gd-str { color: #a5d6ff; } 
+        .gd-num { color: #79c0ff; } 
+        .gd-comment { color: #8b949e; font-style: italic; } 
+        .gd-type { color: #58a6ff; } 
+        .gd-anno { color: #d2a8ff; } 
+
+        /* Nav & Sections */
+        .section-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .section-content.active { display: block; opacity: 1; animation: slideUp 0.4s ease-out forwards; }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-btn.active {
+            background-color: #450a0a; /* Dark red tint */
+            border-right: 4px solid var(--robin-red);
+            color: var(--robin-red);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--robin-red); }
+
+        .demo-container {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background: #0f172a;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #1e293b;
+        }
+
+        /* Co-op Camera Demo */
+        .cam-arena {
+            background-image: radial-gradient(circle at 10px 10px, #1e293b 2px, transparent 0);
+            background-size: 40px 40px;
+            width: 300%;
+            height: 300%;
+            position: absolute;
+            top: -100%; left: -100%;
+            transition: transform 0.1s linear;
+        }
+        .cam-player {
+            position: absolute;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: white;
+            transition: all 0.1s linear;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .cam-p1 { background: var(--bat-blue); z-index: 10; border: 2px solid #60a5fa; }
+        .cam-p2 { background: var(--robin-red); z-index: 10; border: 2px solid #f87171; }
+        
+        .cam-lens {
+            position: absolute;
+            border: 2px dashed rgba(255,255,255,0.4);
+            background: rgba(255,255,255,0.05);
+            inset: 30px;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cam-crosshair {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.8);
+            transition: all 0.1s linear;
+        }
+
+        /* Mode 7 Demo */
+        .mode7-container {
+            perspective: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+        .mode7-floor {
+            width: 300%;
+            height: 300%;
+            background: repeating-conic-gradient(from 0deg, #4c0519 0deg 15deg, #0f172a 15deg 30deg);
+            background-size: 100px 100px;
+            transform: rotateX(75deg) translateZ(-50px);
+            animation: mode7spin 15s linear infinite;
+        }
+        @keyframes mode7spin {
+            100% { transform: rotateX(75deg) translateZ(-50px) rotateZ(360deg); }
+        }
+        .mode7-sprite {
+            position: absolute;
+            bottom: 20px;
+            font-size: 4rem;
+            filter: drop-shadow(0 20px 10px rgba(0,0,0,0.8));
+            animation: bounce 0.5s alternate infinite ease-in-out;
+        }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen text-slate-200">
+
+    <!-- Mobile Header -->
+    <header class="md:hidden flex items-center justify-between bg-slate-950 border-b border-slate-800 p-4 shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-user-ninja text-red-500 text-xl"></i>
+            <h1 class="title-font font-bold text-lg leading-none">B&R <span class="text-red-500">TOME 6</span></h1>
+        </div>
+        <button id="mobile-menu-btn" class="text-slate-300 hover:text-white p-2 focus:outline-none">
+            <i class="fa-solid fa-bars text-2xl"></i>
+        </button>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="absolute md:relative w-full md:w-72 h-[calc(100vh-60px)] md:h-screen bg-slate-950 border-r border-slate-800 flex flex-col shrink-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out top-[60px] md:top-0 shadow-2xl">
+        
+        <div class="hidden md:block p-6 text-center border-b border-slate-800 relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 opacity-5">
+                <i class="fa-solid fa-user-group text-9xl text-red-500"></i>
+            </div>
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-red-600 to-red-900 rounded-xl shadow-[0_0_20px_rgba(239,68,68,0.3)] mb-3 relative z-10 border border-red-400">
+                <i class="fa-solid fa-handshake-angle text-3xl text-white"></i>
+            </div>
+            <h1 class="title-font font-bold text-xl tracking-wide relative z-10 text-white">CO-OP & 3D</h1>
+            <p class="text-xs font-mono text-red-400 mt-1 relative z-10">Godot 4.x - Tome 6</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4">
+            <div class="px-6 mb-4">
+                <div class="bg-red-950/30 border border-red-500/30 text-red-300 text-xs p-3 rounded-lg flex gap-2">
+                    <i class="fa-solid fa-bolt mt-0.5"></i>
+                    <p>Le jeu est complet. Ajoutons Robin pour la Co-op locale et les effets visuels Megadrive !</p>
+                </div>
+            </div>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Multijoueur Local</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('inputs')" id="nav-inputs" class="nav-btn active w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-gamepad w-5 text-center text-blue-400"></i> 1. Inputs Dynamiques
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('camera')" id="nav-camera" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-video w-5 text-center text-yellow-400"></i> 2. Caméra Partagée
+                    </button>
+                </li>
+            </ul>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Arcade & Visuels</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('mode7')" id="nav-mode7" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-cube w-5 text-center text-green-400"></i> 3. Effets Pseudo-3D (Mode 7)
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('score')" id="nav-score" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-trophy w-5 text-center text-purple-400"></i> 4. Combos & High Score
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 h-[calc(100vh-60px)] md:h-screen overflow-y-auto relative scroll-smooth bg-slate-900" id="main-content">
+        <div class="max-w-4xl mx-auto p-4 md:p-8 lg:p-12 pb-24">
+
+            <!-- SECTION 1: INPUTS DYNAMIQUES -->
+            <section id="inputs" class="section-content active">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-blue-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 1</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Multijoueur : "Player 1 & 2"</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Un seul script pour les gouverner tous.</p>
+                </div>
+
+                <div class="bg-slate-800 rounded-xl p-5 md:p-6 mb-8 shadow-lg border border-slate-700">
+                    <h3 class="title-font text-xl text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-skull-crossbones text-red-500"></i> L'Erreur à éviter
+                    </h3>
+                    <p class="mb-4 text-slate-300 leading-relaxed">
+                        L'erreur classique pour ajouter Robin est de copier la scène <code>player.tscn</code>, de la renommer <code>player2.tscn</code> et de dupliquer tous les scripts. C'est une abomination en termes de maintenance (si vous corrigez un bug pour Batman, vous devez le refaire pour Robin).<br>
+                        La solution : <b>L'Interpolation de chaîne de caractères dans les Inputs !</b>
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div>
+                        <h4 class="font-bold text-slate-300 text-sm mb-3">1. Map des Inputs</h4>
+                        <p class="text-xs text-slate-400 mb-2">Dans <i>Projet > Paramètres du projet > Contrôles</i>, vous devez structurer vos actions de cette manière :</p>
+                        <ul class="space-y-2 bg-slate-950 p-4 rounded-lg font-mono text-sm border border-slate-700">
+                            <li><span class="text-blue-400">p1_move_left</span> <span class="text-slate-500">(Q / Joy-Con 1)</span></li>
+                            <li><span class="text-blue-400">p1_jump</span> <span class="text-slate-500">(Espace)</span></li>
+                            <li class="border-t border-slate-800 pt-2"><span class="text-red-400">p2_move_left</span> <span class="text-slate-500">(Flèche Gauche)</span></li>
+                            <li><span class="text-red-400">p2_jump</span> <span class="text-slate-500">(Entrée)</span></li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 class="font-bold text-slate-300 text-sm mb-3">2. L'Adaptation (player.gd)</h4>
+                        <div class="code-block">
+<pre><code><span class="gd-comment"># player.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">CharacterBody2D</span>
+
+<span class="gd-comment"># 1 = Batman (Manette 1), 2 = Robin (Manette 2)</span>
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> player_id: <span class="gd-type">int</span> = <span class="gd-num">1</span> 
+
+<span class="gd-keyword">func</span> <span class="gd-func">_physics_process</span>(delta):
+    <span class="gd-comment"># Construit le nom de l'action dynamiquement avec %s</span>
+    <span class="gd-keyword">var</span> left = <span class="gd-str">"p%s_move_left"</span> % player_id
+    <span class="gd-keyword">var</span> right = <span class="gd-str">"p%s_move_right"</span> % player_id
+    <span class="gd-keyword">var</span> jump = <span class="gd-str">"p%s_jump"</span> % player_id
+    
+    <span class="gd-comment"># Utilisation de l'action calculée</span>
+    <span class="gd-keyword">if</span> <span class="gd-type">Input</span>.is_action_just_pressed(jump):
+        velocity.y = <span class="gd-num">-400</span>
+        
+    <span class="gd-keyword">var</span> dir = <span class="gd-type">Input</span>.get_axis(left, right)
+    velocity.x = dir * <span class="gd-num">150.0</span>
+</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 2: SHARED CAMERA -->
+            <section id="camera" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-yellow-500 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 2</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">La Caméra Partagée</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Garder les deux héros à l'écran coûte que coûte.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Si Batman part à droite et Robin à gauche, une <code>Camera2D</code> classique attachée à Batman va sortir Robin de l'écran. 
+                    Nous devons détacher la caméra des joueurs, la placer à la racine de la scène, et utiliser les mathématiques pour cibler **le point central entre les deux joueurs**.
+                </p>
+
+                <div class="mb-8 p-4 bg-slate-950 border border-slate-700 rounded-xl relative overflow-hidden">
+                    <div class="flex justify-between items-center mb-4 relative z-10">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation Caméra Multi (Midpoint)</h4>
+                        <div class="flex gap-2">
+                            <button onclick="moveCamPlayers()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-sm text-white shadow"><i class="fa-solid fa-arrows-left-right"></i> Éloigner/Rapprocher</button>
+                        </div>
+                    </div>
+                    
+                    <div class="demo-container cam-arena" id="cam-arena">
+                        <!-- Camera frame representation -->
+                        <div class="cam-lens" id="cam-lens">
+                            <span class="text-xs text-slate-400 absolute top-2">Vue Caméra</span>
+                            <div class="cam-crosshair" id="cam-crosshair"></div>
+                        </div>
+                        
+                        <!-- Players -->
+                        <div class="cam-player cam-p1" id="cam-p1" style="left: 40%; top: 50%; transform: translate(-50%, -50%);"><i class="fa-solid fa-bat"></i></div>
+                        <div class="cam-player cam-p2" id="cam-p2" style="left: 60%; top: 50%; transform: translate(-50%, -50%);">R</div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-yellow-400 mb-4 border-t border-slate-700 pt-6">Le Script CoopCamera.gd</h3>
+                <p class="text-sm text-slate-400 mb-4">Ce script se place sur un nœud <code>Camera2D</code> autonome. Il cherche tous les nœuds dans le groupe "Players", additionne leurs positions et divise par le nombre de joueurs.</p>
+
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># coop_camera.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">Camera2D</span>
+
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> max_zoom: <span class="gd-type">float</span> = <span class="gd-num">1.5</span>
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> min_zoom: <span class="gd-type">float</span> = <span class="gd-num">0.8</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">_process</span>(delta):
+    <span class="gd-comment"># Récupère le tableau de tous les joueurs (Batman, Robin)</span>
+    <span class="gd-keyword">var</span> players = get_tree().get_nodes_in_group(<span class="gd-str">"Players"</span>)
+    <span class="gd-keyword">if</span> players.size() == <span class="gd-num">0</span>:
+        <span class="gd-keyword">return</span>
+        
+    <span class="gd-comment"># 1. Calculer le point central (Barycentre)</span>
+    <span class="gd-keyword">var</span> center_pos = <span class="gd-type">Vector2</span>.ZERO
+    <span class="gd-keyword">for</span> p <span class="gd-keyword">in</span> players:
+        center_pos += p.global_position
+    center_pos /= players.size()
+    
+    <span class="gd-comment"># Lerp pour un mouvement de caméra doux</span>
+    global_position = global_position.lerp(center_pos, <span class="gd-num">5.0</span> * delta)
+    
+    <span class="gd-comment"># 2. Calculer l'écart maximal (Distance entre les joueurs)</span>
+    <span class="gd-keyword">if</span> players.size() > <span class="gd-num">1</span>:
+        <span class="gd-keyword">var</span> distance = players[<span class="gd-num">0</span>].global_position.distance_to(players[<span class="gd-num">1</span>].global_position)
+        
+        <span class="gd-comment"># Ajuster le zoom : Plus ils s'éloignent, plus on dézoome (chiffre petit)</span>
+        <span class="gd-comment"># (Basé sur la taille de l'écran, ex: 320px)</span>
+        <span class="gd-keyword">var</span> target_zoom = clamp(<span class="gd-num">320.0</span> / (distance + <span class="gd-num">50</span>), min_zoom, max_zoom)
+        zoom = zoom.lerp(<span class="gd-type">Vector2</span>(target_zoom, target_zoom), <span class="gd-num">2.0</span> * delta)
+</code></pre>
+                </div>
+            </section>
+
+            <!-- SECTION 3: MODE 7 / PSEUDO 3D -->
+            <section id="mode7" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-green-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 3</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Pseudo-3D & Mode 7</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Tordre l'espace-temps comme sur Super Nintendo/Megadrive.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Le niveau du Chapelier Fou est célèbre pour ses effets de distorsion du sol, simulant un plan 3D rotatif. Sur Megadrive, c'était de la programmation Raster brute. Sur Godot 4, nous avons les Shaders de perspective, mais la méthode la plus rapide et propre est de <b>mélanger 2D et 3D</b> !
+                </p>
+
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation Mode 7 (CSS 3D Transforms)</h4>
+                    </div>
+                    <div class="demo-container mode7-container overflow-hidden rounded-xl border border-slate-600 shadow-2xl relative">
+                        <div class="mode7-floor"></div>
+                        <!-- Player Sprite standing on the 3D plane -->
+                        <div class="mode7-sprite">🦇</div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-green-400 mb-4 border-t border-slate-700 pt-6">L'Astuce Godot 4 : Le SubViewport</h3>
+                <p class="text-sm text-slate-400 mb-4">Plutôt que d'écrire un Shader mathématique complexe pour tordre un `Sprite2D`, Godot nous permet d'afficher une scène 2D à l'intérieur d'un monde 3D, puis de filmer ce monde 3D.</p>
+
+                <div class="bg-[#020617] rounded-xl p-6 border border-slate-700 shadow-inner mb-6">
+                    <ol class="list-decimal list-inside space-y-4 text-slate-300 font-mono text-sm">
+                        <li>Créez un <span class="text-blue-400 font-bold">SubViewportContainer</span> (Taille : 320x224).</li>
+                        <li>Ajoutez-lui un <span class="text-green-400 font-bold">SubViewport</span> en enfant.</li>
+                        <li>Dans ce SubViewport, créez une scène <span class="text-purple-400 font-bold">Node3D</span> !</li>
+                        <li>Ajoutez une <span class="text-yellow-400 font-bold">Camera3D</span> (Angle X: -45°, reculée vers le haut).</li>
+                        <li>Ajoutez un <span class="text-red-400 font-bold">MeshInstance3D</span> (Type : Plane).</li>
+                        <li>Sur le matériau du Plane, mettez votre texture de sol, activez <i>Unshaded</i>, et faites tourner le Plane en code (<code>rotation.y += delta</code>).</li>
+                        <li class="border-t border-slate-800 pt-2 text-white"><b>Résultat :</b> Le SubViewport 2D affichera votre sol rotatif parfait en arrière-plan de votre jeu 2D !</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- SECTION 4: SCORE & LEADERBOARD -->
+            <section id="score" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-purple-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 4</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Score Arcade & Combos</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Donner un sens à l'action frénétique.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Un Run & Gun ne serait rien sans le score. Mais pour encourager le beau jeu, nous allons implémenter un multiplicateur de combos qui retombe à zéro si le joueur ne tape rien pendant 3 secondes.
+                </p>
+
+                <h3 class="title-font text-xl text-purple-400 mb-4">Le ScoreManager (Autoload)</h3>
+                
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># score_manager.gd (Autoload)</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">Node</span>
+
+<span class="gd-keyword">signal</span> score_updated(new_score)
+<span class="gd-keyword">signal</span> combo_updated(new_combo)
+
+<span class="gd-keyword">var</span> score: <span class="gd-type">int</span> = <span class="gd-num">0</span>
+<span class="gd-keyword">var</span> combo_multiplier: <span class="gd-type">int</span> = <span class="gd-num">1</span>
+
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> combo_timer = <span class="gd-type">Timer</span>.new()
+
+<span class="gd-keyword">func</span> <span class="gd-func">_ready</span>():
+    add_child(combo_timer)
+    combo_timer.wait_time = <span class="gd-num">3.0</span> <span class="gd-comment"># 3 secondes pour enchaîner</span>
+    combo_timer.one_shot = <span class="gd-keyword">true</span>
+    combo_timer.timeout.connect(reset_combo)
+
+<span class="gd-keyword">func</span> <span class="gd-func">add_points</span>(base_points: <span class="gd-type">int</span>):
+    score += base_points * combo_multiplier
+    combo_multiplier += <span class="gd-num">1</span>
+    
+    score_updated.emit(score)
+    combo_updated.emit(combo_multiplier)
+    
+    <span class="gd-comment"># Relance le timer (remet à zéro le décompte des 3 sec)</span>
+    combo_timer.start()
+
+<span class="gd-keyword">func</span> <span class="gd-func">reset_combo</span>():
+    combo_multiplier = <span class="gd-num">1</span>
+    combo_updated.emit(combo_multiplier)
+</code></pre>
+                </div>
+
+                <div class="mt-12 text-center pb-8 border-t border-slate-800 pt-8 relative overflow-hidden rounded-xl">
+                    <div class="absolute inset-0 bg-gradient-to-b from-red-900/10 to-blue-900/10 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="inline-flex gap-2 items-center justify-center mb-6">
+                            <div class="w-20 h-20 bg-blue-600 rounded-full shadow-[0_0_30px_rgba(37,99,235,0.4)] border-4 border-slate-900 flex items-center justify-center">
+                                <i class="fa-solid fa-bat text-4xl text-white"></i>
+                            </div>
+                            <div class="w-20 h-20 bg-red-600 rounded-full shadow-[0_0_30px_rgba(239,68,68,0.4)] border-4 border-slate-900 flex items-center justify-center">
+                                <span class="text-4xl font-bold font-serif text-yellow-400">R</span>
+                            </div>
+                        </div>
+                        
+                        <h2 class="title-font text-3xl text-white mb-4">Le Duo Dynamique est Prêt !</h2>
+                        <p class="text-slate-300 mb-6 max-w-2xl mx-auto text-lg leading-relaxed">
+                            Vous savez désormais gérer plusieurs manettes sur un seul script, créer une caméra de combat intelligente, utiliser la 3D pour bluffer le joueur en 2D, et maintenir l'adrénaline avec un système de score. Vous avez officiellement recréé l'esprit de The Adventures of Batman & Robin sur Godot 4 !
+                        </p>
+                    </div>
+                </div>
+
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // --- Navigation SPA ---
+        function navTo(sectionId) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            const section = document.getElementById(sectionId);
+            if(section) {
+                section.style.animation = 'none';
+                section.offsetHeight; 
+                section.style.animation = null; 
+                section.classList.add('active');
+            }
+            
+            const navBtn = document.getElementById('nav-' + sectionId);
+            if(navBtn) navBtn.classList.add('active');
+
+            document.getElementById('main-content').scrollTop = 0;
+
+            if(window.innerWidth < 768) toggleMobileMenu(false);
+        }
+
+        // --- Menu Mobile ---
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        let menuOpen = false;
+
+        function toggleMobileMenu(forceState = null) {
+            menuOpen = forceState !== null ? forceState : !menuOpen;
+            if(menuOpen) {
+                sidebar.classList.remove('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-xmark text-2xl"></i>';
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-bars text-2xl"></i>';
+            }
+        }
+        mobileMenuBtn.addEventListener('click', () => toggleMobileMenu());
+        window.addEventListener('resize', () => { if (window.innerWidth >= 768 && menuOpen) toggleMobileMenu(false); });
+
+        // --- Demo : Coop Camera ---
+        let spread = false;
+        function moveCamPlayers() {
+            spread = !spread;
+            const p1 = document.getElementById('cam-p1');
+            const p2 = document.getElementById('cam-p2');
+            const arena = document.getElementById('cam-arena');
+            const crosshair = document.getElementById('cam-crosshair');
+            
+            if(spread) {
+                // S'éloignent : la caméra (arena) doit dézoomer
+                p1.style.left = '20%';
+                p2.style.left = '80%';
+                arena.style.transform = 'scale(0.6)';
+                crosshair.style.transform = 'scale(1.5)';
+            } else {
+                // Se rapprochent : la caméra zoome
+                p1.style.left = '45%';
+                p2.style.left = '55%';
+                arena.style.transform = 'scale(1)';
+                crosshair.style.transform = 'scale(1)';
+            }
+        }
+
+    </script>
+</body>
+</html>

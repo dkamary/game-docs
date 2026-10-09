@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot 4 Masterclass : B&R Megadrive - Tome 4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-main: #09090b; /* Zinc 950 - Very dark for contrast */
+            --bg-panel: #18181b; /* Zinc 900 */
+            --text-main: #e4e4e7;
+            --text-muted: #a1a1aa;
+            --accent-cyan: #06b6d4; /* For retro VFX */
+            --accent-magenta: #d946ef; /* For retro VFX */
+            --accent-yellow: #eab308;
+            --accent-green: #22c55e;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4, .title-font {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Syntax Highlighting Custom */
+        .code-block {
+            background-color: #000000;
+            border: 1px solid #27272a;
+            border-left: 4px solid var(--accent-cyan);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        .gd-kw { color: #ff7b72; font-weight: bold; } 
+        .gd-func { color: #d2a8ff; font-weight: bold; } 
+        .gd-str { color: #a5d6ff; } 
+        .gd-num { color: #79c0ff; } 
+        .gd-comment { color: #8b949e; font-style: italic; } 
+        .gd-type { color: #58a6ff; } 
+        .gd-anno { color: #d2a8ff; } 
+
+        /* Nav & Sections */
+        .section-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .section-content.active { display: block; opacity: 1; animation: slideUp 0.4s ease-out forwards; }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-btn.active {
+            background-color: #164e63; /* Cyan tint */
+            border-right: 4px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-cyan); }
+
+        /* Demos */
+        .demo-container {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background: #18181b;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #27272a;
+        }
+
+        /* CRT Shader Demo */
+        .crt-bg {
+            position: absolute;
+            inset: 0;
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="%231e3a8a"/><rect x="20" y="20" width="60" height="60" fill="%23facc15"/><circle cx="50" cy="50" r="20" fill="%23000"/></svg>');
+            background-size: cover;
+            background-position: center;
+        }
+        
+        .crt-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+        .crt-overlay.active { opacity: 1; }
+
+        .crt-scanline {
+            width: 100%;
+            height: 10px;
+            background: rgba(255,255,255,0.1);
+            position: absolute;
+            top: -10px;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .crt-overlay.active .crt-scanline {
+            opacity: 1;
+            animation: scanline 6s linear infinite;
+        }
+        @keyframes scanline {
+            0% { top: -10%; }
+            100% { top: 110%; }
+        }
+
+        /* Object Pooling Demo */
+        .pool-arena {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #09090b;
+        }
+        .pool-inventory {
+            position: absolute;
+            top: 10px; right: 10px;
+            border: 2px dashed #3f3f46;
+            padding: 10px;
+            border-radius: 8px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            background: rgba(0,0,0,0.5);
+        }
+        .pool-item {
+            width: 15px; height: 15px;
+            background: var(--accent-yellow);
+            border-radius: 50%;
+            opacity: 0.2;
+            transition: opacity 0.1s;
+        }
+        .pool-item.ready { opacity: 1; }
+        
+        .live-projectile {
+            position: absolute;
+            width: 15px; height: 15px;
+            background: var(--accent-yellow);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-yellow);
+        }
+
+        /* Transition Demo */
+        .transition-screen {
+            position: absolute;
+            inset: 0;
+            background: #000;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
+            letter-spacing: 0.1em;
+        }
+        .fade-in-out {
+            animation: fadeSequence 3s ease-in-out;
+        }
+        @keyframes fadeSequence {
+            0% { opacity: 0; }
+            30% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen text-slate-200">
+
+    <!-- Mobile Header -->
+    <header class="md:hidden flex items-center justify-between bg-zinc-950 border-b border-zinc-800 p-4 shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-gem text-cyan-400 text-xl"></i>
+            <h1 class="title-font font-bold text-lg leading-none">B&R <span class="text-cyan-400">TOME 4</span></h1>
+        </div>
+        <button id="mobile-menu-btn" class="text-zinc-300 hover:text-white p-2 focus:outline-none">
+            <i class="fa-solid fa-bars text-2xl"></i>
+        </button>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="absolute md:relative w-full md:w-72 h-[calc(100vh-60px)] md:h-screen bg-zinc-950 border-r border-zinc-800 flex flex-col shrink-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out top-[60px] md:top-0 shadow-2xl">
+        
+        <div class="hidden md:block p-6 text-center border-b border-zinc-800 relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 opacity-5">
+                <i class="fa-solid fa-microchip text-9xl text-cyan-500"></i>
+            </div>
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-800 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.3)] mb-3 relative z-10 border border-cyan-400">
+                <i class="fa-solid fa-wand-magic-sparkles text-3xl text-zinc-950"></i>
+            </div>
+            <h1 class="title-font font-bold text-xl tracking-wide relative z-10 text-white">POLISSAGE & FX</h1>
+            <p class="text-xs font-mono text-cyan-400 mt-1 relative z-10">Godot 4.x - Tome 4</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4">
+            <div class="px-6 mb-4">
+                <div class="bg-cyan-950/30 border border-cyan-500/30 text-cyan-300 text-xs p-3 rounded-lg flex gap-2">
+                    <i class="fa-solid fa-star mt-0.5"></i>
+                    <p>Le jeu est fonctionnel. Transformons-le en produit fini et professionnel.</p>
+                </div>
+            </div>
+
+            <p class="px-6 text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Visuel & Perf</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('shaders')" id="nav-shaders" class="nav-btn active w-full text-left px-6 py-3 text-sm hover:bg-zinc-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-tv w-5 text-center text-magenta-400"></i> 1. Shaders Rétro (CRT)
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('pooling')" id="nav-pooling" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-zinc-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-recycle w-5 text-center text-green-400"></i> 2. Object Pooling
+                    </button>
+                </li>
+            </ul>
+
+            <p class="px-6 text-xs font-bold text-zinc-500 uppercase tracking-widest mt-6 mb-2">Audio & Flow</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('audio')" id="nav-audio" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-zinc-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-sliders w-5 text-center text-yellow-400"></i> 3. Mixage Audio (Ducking)
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('flow')" id="nav-flow" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-zinc-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-clapperboard w-5 text-center text-blue-400"></i> 4. Transitions de Scènes
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 h-[calc(100vh-60px)] md:h-screen overflow-y-auto relative scroll-smooth bg-zinc-900" id="main-content">
+        <div class="max-w-4xl mx-auto p-4 md:p-8 lg:p-12 pb-24">
+
+            <!-- SECTION 1: SHADERS (CRT) -->
+            <section id="shaders" class="section-content active">
+                <div class="mb-8 border-b border-zinc-800 pb-4">
+                    <span class="text-magenta-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 1</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">L'Esthétique 16-Bits (Shaders)</h2>
+                    <p class="text-zinc-400 mt-2 text-lg">Émuler les écrans cathodiques avec les Shaders Godot.</p>
+                </div>
+
+                <div class="bg-zinc-800 rounded-xl p-5 md:p-6 mb-8 shadow-lg border border-zinc-700">
+                    <h3 class="title-font text-xl text-white mb-4">Le Pixel Art n'était pas "carré"</h3>
+                    <p class="mb-4 text-zinc-300 leading-relaxed">
+                        Le pixel art de la Megadrive a été dessiné pour être affiché sur des écrans CRT (à tube cathodique). Ces écrans "bavaient", mélangeaient les couleurs et avaient des lignes de balayage (scanlines). Un jeu rétro affiché sur un écran LCD 4K moderne parait souvent "trop net".
+                    </p>
+                </div>
+
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-zinc-300 text-sm">Simulation Filtre CRT (CSS)</h4>
+                        <button onclick="toggleCRT()" class="bg-magenta-600 hover:bg-magenta-500 text-white px-4 py-1 rounded text-sm font-bold shadow-[0_0_10px_rgba(217,70,239,0.5)] transition-all">
+                            <i class="fa-solid fa-power-off"></i> Toggle Shader
+                        </button>
+                    </div>
+                    <div class="demo-container">
+                        <div class="crt-bg"></div>
+                        <div id="demo-crt-overlay" class="crt-overlay">
+                            <div class="crt-scanline"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-cyan-400 mb-4 border-t border-zinc-700 pt-6">Implémentation Godot (CanvasLayer)</h3>
+                <p class="text-sm text-zinc-400 mb-4">Pour appliquer un effet sur tout l'écran, créez un <code>CanvasLayer</code> avec un <code>ColorRect</code> qui recouvre tout l'écran. Dans la propriété Material du ColorRect, créez un nouveau <code>ShaderMaterial</code>.</p>
+                
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment">// crt_effect.gdshader</span>
+<span class="gd-keyword">shader_type</span> canvas_item;
+
+<span class="gd-comment">// Récupère l'image rendue en dessous de ce noeud</span>
+<span class="gd-keyword">uniform sampler2D</span> screen_texture : hint_screen_texture, repeat_disable, filter_nearest;
+
+<span class="gd-keyword">uniform float</span> scanline_intensity : hint_range(<span class="gd-num">0.0</span>, <span class="gd-num">1.0</span>) = <span class="gd-num">0.2</span>;
+<span class="gd-keyword">uniform float</span> color_bleeding : hint_range(<span class="gd-num">0.0</span>, <span class="gd-num">5.0</span>) = <span class="gd-num">1.2</span>; <span class="gd-comment">// Aberration chromatique</span>
+
+<span class="gd-keyword">void</span> <span class="gd-func">fragment</span>() {
+    <span class="gd-keyword">vec2</span> uv = SCREEN_UV;
+    
+    <span class="gd-comment">// 1. Aberration Chromatique (Décalage du Rouge et Bleu)</span>
+    <span class="gd-keyword">float</span> r = texture(screen_texture, uv + <span class="gd-keyword">vec2</span>(color_bleeding * SCREEN_PIXEL_SIZE.x, <span class="gd-num">0.0</span>)).r;
+    <span class="gd-keyword">float</span> g = texture(screen_texture, uv).g;
+    <span class="gd-keyword">float</span> b = texture(screen_texture, uv - <span class="gd-keyword">vec2</span>(color_bleeding * SCREEN_PIXEL_SIZE.x, <span class="gd-num">0.0</span>)).b;
+    
+    <span class="gd-keyword">vec3</span> color = <span class="gd-keyword">vec3</span>(r, g, b);
+    
+    <span class="gd-comment">// 2. Scanlines (Lignes sombres horizontales basées sur les UV Y)</span>
+    <span class="gd-comment">// Multiplie par la résolution verticale (ex: 224 pour la Megadrive)</span>
+    <span class="gd-keyword">float</span> scanline = sin(uv.y * <span class="gd-num">224.0</span> * <span class="gd-num">3.14159</span>); 
+    <span class="gd-keyword">if</span> (scanline > <span class="gd-num">0.0</span>) {
+        color -= scanline_intensity;
+    }
+    
+    COLOR = <span class="gd-keyword">vec4</span>(color, <span class="gd-num">1.0</span>);
+}
+</code></pre>
+                </div>
+            </section>
+
+            <!-- SECTION 2: OBJECT POOLING -->
+            <section id="pooling" class="section-content">
+                <div class="mb-8 border-b border-zinc-800 pb-4">
+                    <span class="text-green-500 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 2</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Performance : Object Pooling</h2>
+                    <p class="text-zinc-400 mt-2 text-lg">Arrêtez de créer et détruire, commencez à recycler.</p>
+                </div>
+
+                <p class="text-zinc-300 mb-6 leading-relaxed">
+                    Dans Godot, <code>instantiate()</code> (Créer) et <code>queue_free()</code> (Détruire) coûtent cher en mémoire. Si Batman tire 10 batarangs par seconde, le Garbage Collector (nettoyeur de mémoire) va provoquer des micro-saccades (stutters).<br>
+                    La solution des pros : créer 20 batarangs au lancement du niveau, les cacher, et les réutiliser en boucle.
+                </p>
+
+                <div class="mb-8 p-4 bg-zinc-950 border border-zinc-700 rounded-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-zinc-300 text-sm">Simulation de Pool</h4>
+                        <button onclick="firePooledProjectile()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-1 rounded text-sm font-bold shadow-lg">
+                            <i class="fa-solid fa-meteor"></i> Tirer (Recycler)
+                        </button>
+                    </div>
+                    
+                    <div class="demo-container pool-arena" id="pool-arena">
+                        <div class="pool-inventory" id="pool-inventory">
+                            <!-- Items générés en JS -->
+                        </div>
+                        <div class="absolute bottom-[20px] left-[20px] text-4xl">🦇</div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-green-400 mb-4 border-t border-zinc-700 pt-6">Le Script ProjectilePool.gd (Autoload)</h3>
+                <p class="text-sm text-zinc-400 mb-4">Ce script doit être un Singleton (Autoload) ou placé au sommet de votre scène principale. Il gère un tableau (Array) de Batarangs "endormis".</p>
+
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># projectile_pool.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">Node</span>
+
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> projectile_scene: <span class="gd-type">PackedScene</span>
+<span class="gd-keyword">var</span> pool: <span class="gd-type">Array</span> = []
+<span class="gd-keyword">const</span> POOL_SIZE = <span class="gd-num">20</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">_ready</span>():
+    <span class="gd-comment"># 1. Instancier tout au début du jeu (chargement)</span>
+    <span class="gd-keyword">for</span> i <span class="gd-keyword">in</span> POOL_SIZE:
+        <span class="gd-keyword">var</span> proj = projectile_scene.instantiate()
+        proj.hide() <span class="gd-comment"># Invisible</span>
+        proj.set_process(<span class="gd-keyword">false</span>) <span class="gd-comment"># Désactive la physique</span>
+        proj.set_physics_process(<span class="gd-keyword">false</span>)
+        
+        <span class="gd-comment"># IMPORTANT: On connecte un signal perso "died" au lieu d'utiliser queue_free</span>
+        proj.died.connect(_on_projectile_died.bind(proj))
+        
+        add_child(proj) <span class="gd-comment"># Reste dans l'arbre</span>
+        pool.append(proj)
+
+<span class="gd-keyword">func</span> <span class="gd-func">get_projectile</span>() -> <span class="gd-type">Node2D</span>:
+    <span class="gd-keyword">if</span> pool.size() > <span class="gd-num">0</span>:
+        <span class="gd-keyword">var</span> proj = pool.pop_back() <span class="gd-comment"># Retire du tableau des objets dispo</span>
+        proj.show()
+        proj.set_process(<span class="gd-keyword">true</span>)
+        proj.set_physics_process(<span class="gd-keyword">true</span>)
+        <span class="gd-keyword">return</span> proj
+    <span class="gd-keyword">return null</span> <span class="gd-comment"># Plus de munitions dans le pool !</span>
+
+<span class="gd-comment"># Quand le batarang touche un mur ou sort de l'écran, il appelle proj.died.emit() </span>
+<span class="gd-comment"># AU LIEU de queue_free(). On le remet dans le pool.</span>
+<span class="gd-keyword">func</span> <span class="gd-func">_on_projectile_died</span>(proj):
+    proj.hide()
+    proj.set_process(<span class="gd-keyword">false</span>)
+    proj.set_physics_process(<span class="gd-keyword">false</span>)
+    pool.append(proj) <span class="gd-comment"># Retourne dans l'inventaire invisible</span>
+</code></pre>
+                </div>
+            </section>
+
+            <!-- SECTION 3: AUDIO DUCKING -->
+            <section id="audio" class="section-content">
+                <div class="mb-8 border-b border-zinc-800 pb-4">
+                    <span class="text-yellow-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 3</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Mixage Audio : Le Secret du Ducking</h2>
+                    <p class="text-zinc-400 mt-2 text-lg">Faire de la place pour les explosions sans couper la musique.</p>
+                </div>
+
+                <p class="text-zinc-300 mb-6 leading-relaxed">
+                    Avez-vous remarqué comment, dans les jeux d'action modernes, la musique de fond baisse légèrement de volume juste au moment d'une grosse explosion pour laisser la place au son, puis remonte ? C'est ce qu'on appelle le <b>Sidechain Ducking</b> ou <b>Audio Ducking</b>. Godot 4 gère cela nativement via les Bus Audio.
+                </p>
+
+                <div class="bg-zinc-800 p-6 rounded-xl border border-zinc-700 mb-8">
+                    <h3 class="title-font text-xl text-yellow-400 mb-4">Configuration dans l'Éditeur Godot</h3>
+                    
+                    <ol class="list-decimal list-inside space-y-4 text-zinc-300">
+                        <li>
+                            Ouvrez le panneau <b>Audio</b> en bas de l'éditeur Godot.
+                        </li>
+                        <li>
+                            Créez deux nouveaux Bus en plus du bus <i>Master</i> : nommez-les <b>Music</b> et <b>SFX</b> (Sound Effects).
+                        </li>
+                        <li>
+                            Sur le bus <b>Music</b>, ajoutez un effet <b>Compressor</b>.
+                        </li>
+                        <li>
+                            Dans les paramètres de cet effet Compressor, activez <b>Sidechain</b> et sélectionnez le bus <b>SFX</b>.
+                        </li>
+                    </ol>
+
+                    <div class="mt-6 p-4 bg-yellow-900/20 border-l-4 border-yellow-500 rounded-r text-sm">
+                        <i class="fa-solid fa-magic text-yellow-400 mr-2"></i> 
+                        <b>Que se passe-t-il ?</b> Chaque fois qu'un son joue sur le bus SFX (ex: <code>$AudioStreamPlayer.bus = "SFX"</code> pour l'explosion), le compresseur du bus Music va "écraser" le volume de la musique proportionnellement à l'intensité de l'explosion. C'est automatique et ça donne un mixage digne d'un studio !
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- SECTION 4: SCENE TRANSITIONS -->
+            <section id="flow" class="section-content">
+                <div class="mb-8 border-b border-zinc-800 pb-4">
+                    <span class="text-blue-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 4</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Game Flow (Transitions)</h2>
+                    <p class="text-zinc-400 mt-2 text-lg">Passer du Niveau 1 au Menu sans coupure brutale.</p>
+                </div>
+
+                <p class="text-zinc-300 mb-6 leading-relaxed">
+                    Faire <code>get_tree().change_scene_to_file("res://menu.tscn")</code> coupe l'écran d'un coup. Un jeu pro utilise un gestionnaire de scène avec un fondu au noir (Fade in / Fade out).
+                </p>
+
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-zinc-300 text-sm">Simulation de Changement de Scène</h4>
+                        <button onclick="triggerTransition()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1 rounded text-sm font-bold shadow-lg">
+                            <i class="fa-solid fa-forward-step"></i> Changer de Scène
+                        </button>
+                    </div>
+                    <div class="demo-container relative">
+                        <div id="demo-scene-text" class="absolute inset-0 flex items-center justify-center text-4xl title-font font-bold text-white bg-zinc-800">
+                            NIVEAU 1
+                        </div>
+                        <div id="demo-transition-canvas" class="transition-screen">
+                            CHARGEMENT...
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-blue-400 mb-4 border-t border-zinc-700 pt-6">Le SceneManager (Autoload)</h3>
+                <p class="text-sm text-zinc-400 mb-4">Créez une scène <code>SceneManager.tscn</code> avec un <code>CanvasLayer</code>, un <code>ColorRect</code> noir couvrant tout l'écran (opacité 0), un <code>AnimationPlayer</code> (qui anime l'opacité du noir) et ajoutez cette scène dans les Autoloads du projet.</p>
+
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># scene_manager.gd (Autoload)</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">CanvasLayer</span>
+
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> anim = $AnimationPlayer
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> color_rect = $ColorRect
+
+<span class="gd-comment"># Fonction globale appelable de partout : SceneManager.change_scene("res://boss.tscn")</span>
+<span class="gd-keyword">func</span> <span class="gd-func">change_scene</span>(target_path: <span class="gd-type">String</span>):
+    <span class="gd-comment"># 1. Bloquer les inputs du joueur pendant la transition</span>
+    get_tree().get_root().set_disable_input(<span class="gd-keyword">true</span>)
+    
+    <span class="gd-comment"># 2. Jouer l'animation de Fondu au Noir (opacité 0 à 1)</span>
+    anim.play(<span class="gd-str">"fade_to_black"</span>)
+    <span class="gd-keyword">await</span> anim.animation_finished
+    
+    <span class="gd-comment"># 3. Changer la scène (Pendant que l'écran est noir)</span>
+    get_tree().change_scene_to_file(target_path)
+    
+    <span class="gd-comment"># 4. Jouer l'animation d'ouverture (opacité 1 à 0)</span>
+    anim.play(<span class="gd-str">"fade_to_normal"</span>)
+    <span class="gd-keyword">await</span> anim.animation_finished
+    
+    <span class="gd-comment"># 5. Rendre le contrôle au joueur</span>
+    get_tree().get_root().set_disable_input(<span class="gd-keyword">false</span>)
+</code></pre>
+                </div>
+
+                <div class="mt-12 text-center pb-8 border-t border-zinc-800 pt-8 relative overflow-hidden rounded-xl">
+                    <div class="absolute inset-0 bg-gradient-to-b from-cyan-900/10 to-magenta-900/10 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-zinc-100 to-zinc-400 rounded-full mb-6 shadow-[0_0_40px_rgba(255,255,255,0.2)] border-4 border-zinc-900">
+                            <i class="fa-solid fa-flag-checkered text-5xl text-zinc-900"></i>
+                        </div>
+                        <h2 class="title-font text-3xl text-white mb-4">Félicitations, Développeur !</h2>
+                        <p class="text-zinc-300 mb-6 max-w-2xl mx-auto text-lg leading-relaxed">
+                            Fondations, Level Design, Spawners, Boss, Shaders, Optimisation et Mixage Audio. Vous avez parcouru la totalité du pipeline de production d'un jeu 2D d'action sur Godot 4.3. Le code est propre, performant et modulaire.
+                        </p>
+                        <p class="text-cyan-400 font-bold uppercase tracking-widest text-sm">Godot 4 n'a plus de secrets pour vous.</p>
+                    </div>
+                </div>
+
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // --- Navigation SPA ---
+        function navTo(sectionId) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            const section = document.getElementById(sectionId);
+            if(section) {
+                section.style.animation = 'none';
+                section.offsetHeight; 
+                section.style.animation = null; 
+                section.classList.add('active');
+            }
+            
+            const navBtn = document.getElementById('nav-' + sectionId);
+            if(navBtn) navBtn.classList.add('active');
+
+            document.getElementById('main-content').scrollTop = 0;
+
+            if(window.innerWidth < 768) toggleMobileMenu(false);
+        }
+
+        // --- Menu Mobile ---
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        let menuOpen = false;
+
+        function toggleMobileMenu(forceState = null) {
+            menuOpen = forceState !== null ? forceState : !menuOpen;
+            if(menuOpen) {
+                sidebar.classList.remove('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-xmark text-2xl"></i>';
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-bars text-2xl"></i>';
+            }
+        }
+        mobileMenuBtn.addEventListener('click', () => toggleMobileMenu());
+        window.addEventListener('resize', () => { if (window.innerWidth >= 768 && menuOpen) toggleMobileMenu(false); });
+
+        // --- Demo : CRT Shader ---
+        function toggleCRT() {
+            const overlay = document.getElementById('demo-crt-overlay');
+            overlay.classList.toggle('active');
+        }
+
+        // --- Demo : Object Pooling ---
+        let poolCount = 10;
+        const inventory = document.getElementById('pool-inventory');
+        const arena = document.getElementById('pool-arena');
+        
+        // Initial setup
+        for(let i=0; i<10; i++) {
+            const item = document.createElement('div');
+            item.className = 'pool-item ready';
+            inventory.appendChild(item);
+        }
+
+        function firePooledProjectile() {
+            const items = document.querySelectorAll('.pool-item.ready');
+            if(items.length === 0) return; // Pool empty
+            
+            // Pop from pool visually
+            const p = items[items.length - 1];
+            p.classList.remove('ready');
+            
+            // Create live projectile
+            const proj = document.createElement('div');
+            proj.className = 'live-projectile';
+            proj.style.bottom = '30px';
+            proj.style.left = '60px';
+            arena.appendChild(proj);
+            
+            // Animate
+            let pos = 60;
+            const anim = setInterval(() => {
+                pos += 15;
+                proj.style.left = pos + 'px';
+                
+                if(pos > arena.offsetWidth) {
+                    clearInterval(anim);
+                    proj.remove();
+                    // Push back to pool visually
+                    p.classList.add('ready');
+                }
+            }, 30);
+        }
+
+        // --- Demo : Transitions ---
+        let isLevel1 = true;
+        function triggerTransition() {
+            const canvas = document.getElementById('demo-transition-canvas');
+            const text = document.getElementById('demo-scene-text');
+            
+            // Remove animation to restart it
+            canvas.classList.remove('fade-in-out');
+            void canvas.offsetWidth;
+            
+            canvas.classList.add('fade-in-out');
+            
+            // Mid-animation, swap scene content
+            setTimeout(() => {
+                isLevel1 = !isLevel1;
+                if(isLevel1) {
+                    text.innerText = 'NIVEAU 1';
+                    text.classList.remove('text-magenta-500');
+                } else {
+                    text.innerText = 'BOSS FIGHT';
+                    text.classList.add('text-magenta-500');
+                }
+            }, 1500); // Trigger at peak blackness
+        }
+
+    </script>
+</body>
+</html>

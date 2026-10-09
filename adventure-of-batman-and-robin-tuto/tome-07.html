@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot 4 Masterclass : B&R Megadrive - Tome 7</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-main: #050505; /* Near black */
+            --bg-panel: #111111;
+            --text-main: #e5e5e5;
+            --text-muted: #888888;
+            --bat-orange: #f97316;
+            --bat-cyan: #06b6d4;
+            --bat-teal: #14b8a6;
+            --bat-gray: #4b5563;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4, .title-font {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        .code-block {
+            background-color: #000000;
+            border: 1px solid #333333;
+            border-left: 4px solid var(--bat-orange);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);
+        }
+        .gd-kw { color: #ff7b72; font-weight: bold; } 
+        .gd-func { color: #d2a8ff; font-weight: bold; } 
+        .gd-str { color: #a5d6ff; } 
+        .gd-num { color: #79c0ff; } 
+        .gd-comment { color: #8b949e; font-style: italic; } 
+        .gd-type { color: #58a6ff; } 
+        .gd-anno { color: #d2a8ff; } 
+
+        /* Nav & Sections */
+        .section-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .section-content.active { display: block; opacity: 1; animation: slideUp 0.4s ease-out forwards; }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-btn.active {
+            background-color: #2a1104; /* Dark orange tint */
+            border-right: 4px solid var(--bat-orange);
+            color: var(--bat-orange);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: #333333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--bat-orange); }
+
+        .demo-container {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background: #111;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #333;
+        }
+
+        /* Platform Demo */
+        .platform {
+            position: absolute;
+            width: 80px; height: 15px;
+            background: #4b5563;
+            border-top: 3px solid #9ca3af;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .plat-anim {
+            animation: movePlat 4s ease-in-out infinite alternate;
+        }
+        @keyframes movePlat {
+            0% { transform: translateX(20px); }
+            100% { transform: translateX(200px); }
+        }
+        .bat-plat {
+            position: absolute;
+            width: 25px; height: 40px;
+            background: #3b82f6;
+            border-radius: 4px;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Particle Demo */
+        .particle {
+            position: absolute;
+            width: 4px; height: 4px;
+            background: #facc15;
+            border-radius: 50%;
+            box-shadow: 0 0 5px #f59e0b;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen text-slate-200">
+
+    <header class="md:hidden flex items-center justify-between bg-[#0a0a0a] border-b border-[#222] p-4 shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-rocket text-orange-500 text-xl"></i>
+            <h1 class="title-font font-bold text-lg leading-none">B&R <span class="text-orange-500">TOME 7</span></h1>
+        </div>
+        <button id="mobile-menu-btn" class="text-slate-300 hover:text-white p-2 focus:outline-none">
+            <i class="fa-solid fa-bars text-2xl"></i>
+        </button>
+    </header>
+
+    <nav id="sidebar" class="absolute md:relative w-full md:w-72 h-[calc(100vh-60px)] md:h-screen bg-[#0a0a0a] border-r border-[#222] flex flex-col shrink-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out top-[60px] md:top-0 shadow-2xl">
+        
+        <div class="hidden md:block p-6 text-center border-b border-[#222] relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 opacity-5">
+                <i class="fa-solid fa-fire-flame-curved text-9xl text-orange-500"></i>
+            </div>
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-red-800 rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.3)] mb-3 relative z-10 border border-orange-400">
+                <i class="fa-solid fa-rocket text-3xl text-white"></i>
+            </div>
+            <h1 class="title-font font-bold text-xl tracking-wide relative z-10 text-white">LE STAGE FINAL</h1>
+            <p class="text-xs font-mono text-orange-400 mt-1 relative z-10">Godot 4.x - Tome 7</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4">
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mécaniques Avancées</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('platforms')" id="nav-platforms" class="nav-btn active w-full text-left px-6 py-3 text-sm hover:bg-[#1a1a1a] transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-elevator w-5 text-center text-teal-400"></i> 1. Plateformes Mobiles
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('shmup')" id="nav-shmup" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-[#1a1a1a] transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-jet-fighter w-5 text-center text-cyan-400"></i> 2. Mode Shoot 'em Up
+                    </button>
+                </li>
+            </ul>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Technique & Déploiement</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('particles')" id="nav-particles" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-[#1a1a1a] transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-sparkles w-5 text-center text-yellow-400"></i> 3. GPU Particles 2D
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('export')" id="nav-export" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-[#1a1a1a] transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-box-open w-5 text-center text-purple-400"></i> 4. Export & Splashscreen
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="flex-1 h-[calc(100vh-60px)] md:h-screen overflow-y-auto relative scroll-smooth bg-[#111]" id="main-content">
+        <div class="max-w-4xl mx-auto p-4 md:p-8 lg:p-12 pb-24">
+
+            <!-- SECTION 1: MOVING PLATFORMS -->
+            <section id="platforms" class="section-content active">
+                <div class="mb-8 border-b border-[#333] pb-4">
+                    <span class="text-teal-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 1</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Plateformes Mobiles & One-Way</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Le secret d'un Level Design dynamique sans bugs physiques.</p>
+                </div>
+
+                <div class="bg-[#000] rounded-xl p-5 md:p-6 mb-8 border border-[#333]">
+                    <h3 class="title-font text-xl text-white mb-4">AnimatableBody2D</h3>
+                    <p class="mb-4 text-slate-300 leading-relaxed">
+                        Dans les anciennes versions de Godot, faire bouger une plateforme (KinematicBody2D) posait souvent des problèmes de friction avec le joueur. Godot 4 introduit le <code>AnimatableBody2D</code>, spécialement conçu pour les ascenseurs et les plateformes mouvantes. 
+                        <b>Le moteur physique gère automatiquement le fait de "porter" le joueur (CharacterBody2D) qui se trouve dessus.</b>
+                    </p>
+                </div>
+
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation AnimatableBody2D</h4>
+                    </div>
+                    <div class="demo-container bg-[#050505] relative">
+                        <div class="absolute inset-0 bg-[url('data:image/svg+xml;utf8,<svg width=\'40\' height=\'40\' xmlns=\'http://www.w3.org/2000/svg\'><rect width=\'40\' height=\'40\' fill=\'none\' stroke=\'%23222\'/></svg>')]"></div>
+                        
+                        <div class="platform plat-anim" style="top: 150px;">
+                            <div class="bat-plat flex items-center justify-center"><i class="fa-solid fa-mask text-white text-xs"></i></div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-teal-400 mb-4 border-t border-[#333] pt-6">La Recette Parfaite : Path2D + AnimationPlayer</h3>
+                <p class="text-sm text-slate-400 mb-4">Plutôt que de coder les allers-retours dans un script, la méthode professionnelle utilise des courbes visuelles.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-[#1a1a1a] rounded-xl p-5 border border-[#333]">
+                        <h4 class="font-bold text-slate-400 text-xs mb-3 uppercase tracking-wider border-b border-[#333] pb-2">Arbre de la Plateforme</h4>
+                        <ul class="text-sm space-y-3 text-slate-300 font-mono">
+                            <li><i class="fa-solid fa-bezier-curve text-pink-400"></i> Path2D (Tracez la route ici)</li>
+                            <li class="pl-4 border-l border-[#444] ml-2">
+                                <i class="fa-solid fa-car-side text-teal-400"></i> PathFollow2D
+                            </li>
+                            <li class="pl-8 border-l border-[#444] ml-2">
+                                <i class="fa-solid fa-cubes text-blue-400"></i> AnimatableBody2D
+                            </li>
+                            <li class="pl-12 border-l border-[#444] ml-2">
+                                <i class="fa-solid fa-image text-green-400"></i> Sprite2D
+                            </li>
+                            <li class="pl-12 border-l border-[#444] ml-2">
+                                <i class="fa-regular fa-square text-blue-300"></i> CollisionShape2D
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="bg-[#1a1a1a] p-5 rounded-xl border-l-4 border-teal-500 shadow-md">
+                        <h4 class="font-bold text-white text-sm mb-2">Comment l'animer ?</h4>
+                        <p class="text-sm text-slate-300 mb-3">
+                            Ajoutez un <code>AnimationPlayer</code>. Dans l'animation, créez une piste (Track) ciblant la propriété <code>progress_ratio</code> du <b>PathFollow2D</b>. 
+                        </p>
+                        <p class="text-sm text-slate-300">
+                            Keyframe 1: Valeur 0.0<br>
+                            Keyframe 2: Valeur 1.0<br>
+                            Réglez l'animation sur Ping-Pong (Aller-retour). <b>Zéro ligne de code !</b>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-blue-900/20 border-l-4 border-blue-500 p-4 rounded-r text-sm text-slate-300">
+                    <i class="fa-solid fa-arrow-up text-teal-400 mr-2"></i> <b>Plateformes Traversables (One-Way) :</b> Pour pouvoir sauter par en dessous et atterrir dessus, sélectionnez le <code>CollisionShape2D</code> de la plateforme, et dans l'inspecteur, activez simplement <code>One Way Collision = On</code>.
+                </div>
+            </section>
+
+            <!-- SECTION 2: SHMUP MODE -->
+            <section id="shmup" class="section-content">
+                <div class="mb-8 border-b border-[#333] pb-4">
+                    <span class="text-cyan-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 2</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Changement de Genre : Shoot 'em Up</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Quand Batman s'envole en Jetpack.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Le niveau aérien transforme totalement le jeu. Batman ne subit plus la gravité classique et peut se déplacer librement sur les axes X et Y (Haut, Bas, Gauche, Droite). Nous devons adapter la State Machine (Tome 1) en ajoutant un <code>FlyingState</code>.
+                </p>
+
+                <h3 class="title-font text-xl text-cyan-400 mb-4">Le Script du FlyingState.gd</h3>
+                
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># flying_state.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">State</span>
+
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> player: <span class="gd-type">CharacterBody2D</span>
+<span class="gd-keyword">const</span> FLY_SPEED = <span class="gd-num">200.0</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">enter</span>():
+    <span class="gd-comment"># Active l'animation du Jetpack</span>
+    player.get_node(<span class="gd-str">"AnimationPlayer"</span>).play(<span class="gd-str">"jetpack_idle"</span>)
+    
+<span class="gd-keyword">func</span> <span class="gd-func">physics_update</span>(delta: <span class="gd-type">float</span>):
+    <span class="gd-comment"># 1. On annule la gravité !</span>
+    <span class="gd-comment"># Le script principal applique la gravité. Nous l'écrasons ici.</span>
+    
+    <span class="gd-comment"># 2. Déplacement multidirectionnel (Input.get_vector)</span>
+    <span class="gd-comment"># Normalise automatiquement le mouvement en diagonale (évite d'aller plus vite)</span>
+    <span class="gd-keyword">var</span> input_dir = <span class="gd-type">Input</span>.get_vector(
+        <span class="gd-str">"ui_left"</span>, <span class="gd-str">"ui_right"</span>, 
+        <span class="gd-str">"ui_up"</span>, <span class="gd-str">"ui_down"</span>
+    )
+    
+    <span class="gd-comment"># Application directe de la vélocité 2D</span>
+    player.velocity = input_dir * FLY_SPEED
+    
+    <span class="gd-comment"># 3. Limiter le joueur aux bords de l'écran (Clamp)</span>
+    <span class="gd-keyword">var</span> cam = get_viewport().get_camera_2d()
+    <span class="gd-keyword">if</span> cam:
+        <span class="gd-keyword">var</span> screen_size = get_viewport_rect().size
+        <span class="gd-keyword">var</span> cam_pos = cam.global_position
+        
+        <span class="gd-keyword">var</span> min_x = cam_pos.x - (screen_size.x / <span class="gd-num">2</span>)
+        <span class="gd-keyword">var</span> max_x = cam_pos.x + (screen_size.x / <span class="gd-num">2</span>)
+        <span class="gd-keyword">var</span> min_y = cam_pos.y - (screen_size.y / <span class="gd-num">2</span>)
+        <span class="gd-keyword">var</span> max_y = cam_pos.y + (screen_size.y / <span class="gd-num">2</span>)
+        
+        player.global_position.x = clamp(player.global_position.x, min_x, max_x)
+        player.global_position.y = clamp(player.global_position.y, min_y, max_y)
+</code></pre>
+                </div>
+            </section>
+
+            <!-- SECTION 3: PARTICLES -->
+            <section id="particles" class="section-content">
+                <div class="mb-8 border-b border-[#333] pb-4">
+                    <span class="text-yellow-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 3</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Chaos Visuel : GPUParticles2D</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Pousser des milliers de particules via la carte graphique.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Le jeu original était reconnu pour repousser les limites de la puce Motorola 68000 de la Megadrive avec ses explosions remplies d'étincelles. Sur Godot 4, nous utilisons <code>GPUParticles2D</code> pour exécuter ces calculs sur la carte graphique, nous permettant d'afficher des dizaines de milliers d'étincelles sans aucun lag.
+                </p>
+
+                <div class="mb-8 p-4 bg-[#0a0a0a] border border-[#222] rounded-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation Étincelles</h4>
+                        <button onclick="spawnParticles()" class="bg-yellow-600 hover:bg-yellow-500 text-[#111] px-4 py-1 rounded text-sm font-bold shadow-[0_0_15px_rgba(250,204,21,0.4)]">
+                            <i class="fa-solid fa-burst"></i> Explosion
+                        </button>
+                    </div>
+                    <div class="demo-container bg-[#050505] relative overflow-hidden" id="particle-arena">
+                        <!-- Particules JS ici -->
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-yellow-400 mb-4 border-t border-[#333] pt-6">Configuration du ProcessMaterial</h3>
+                
+                <div class="bg-[#1a1a1a] rounded-xl p-5 border border-[#333] mb-8">
+                    <p class="text-sm text-slate-300 mb-4">Dans l'inspecteur du nœud <code>GPUParticles2D</code>, créez un nouveau <code>ParticleProcessMaterial</code>. C'est ici que réside toute la magie physique des particules :</p>
+                    
+                    <ul class="space-y-4 text-sm text-slate-300">
+                        <li>
+                            <b class="text-white">Direction & Spread :</b> Mettez <i>Spread</i> à 180° pour une explosion circulaire.
+                        </li>
+                        <li>
+                            <b class="text-white">Initial Velocity :</b> Mettez une valeur élevée (ex: 300) avec une <i>Velocity Random</i> de 0.8 pour que les étincelles soient propulsées à des vitesses différentes.
+                        </li>
+                        <li>
+                            <b class="text-white">Gravity :</b> Mettez Y à 980. Les étincelles exploseront puis retomberont naturellement.
+                        </li>
+                        <li>
+                            <b class="text-white">Color Ramp (Dégradé) :</b> Créez un <i>GradientTexture1D</i>. Commencez par du Blanc, passez au Jaune, puis au Rouge, et terminez par du Noir avec un Alpha à 0 (pour qu'elles disparaissent en douceur).
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- SECTION 4: EXPORT -->
+            <section id="export" class="section-content">
+                <div class="mb-8 border-b border-[#333] pb-4">
+                    <span class="text-purple-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 4</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Déploiement : De l'Éditeur au Joueur</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Compiler le chef-d'œuvre et soigner la présentation.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Le jeu est terminé. Il faut maintenant en faire un exécutable (<code>.exe</code>) ou une version Web (HTML5) pour le partager.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-[#1a1a1a] p-5 rounded-xl border border-[#333]">
+                        <h4 class="font-bold text-white text-lg mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-image text-purple-400"></i> Le Splash Screen
+                        </h4>
+                        <p class="text-sm text-slate-300 mb-3">
+                            Ne laissez pas le logo Godot par défaut grisâtre au lancement ! Allez dans <i>Projet > Paramètres du projet > Application > Écran de démarrage</i>.
+                        </p>
+                        <ul class="text-xs text-slate-400 space-y-1 ml-4 list-disc">
+                            <li>Image : Sélectionnez votre propre logo de studio.</li>
+                            <li>Background Color : Noir complet (#000000).</li>
+                            <li>Utiliser un filtre : Off (pour le Pixel Art).</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-[#1a1a1a] p-5 rounded-xl border border-[#333]">
+                        <h4 class="font-bold text-white text-lg mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-box-archive text-green-400"></i> Exportation
+                        </h4>
+                        <p class="text-sm text-slate-300 mb-3">
+                            Allez dans <i>Projet > Exporter</i>. Vous devrez d'abord télécharger les <b>Export Templates</b> (Modèles d'exportation) de Godot (via le bouton en haut du menu).
+                        </p>
+                        <ul class="text-xs text-slate-400 space-y-1 ml-4 list-disc">
+                            <li>Ajoutez un profil <i>Windows Desktop</i>.</li>
+                            <li>Dans <i>Icon</i>, mettez votre fichier .ico (obligatoire sous Windows pour avoir l'icône sur le bureau).</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="mt-12 text-center pb-8 border-t border-[#333] pt-8 relative overflow-hidden rounded-xl">
+                    <div class="absolute inset-0 bg-gradient-to-b from-orange-900/20 to-purple-900/20 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-[#111] to-[#333] rounded-full mb-6 shadow-[0_0_50px_rgba(249,115,22,0.3)] border-2 border-orange-500">
+                            <i class="fa-solid fa-medal text-5xl text-orange-400"></i>
+                        </div>
+                        <h2 class="title-font text-3xl text-white mb-4">La Masterclass est Achevée !</h2>
+                        <p class="text-slate-300 mb-6 max-w-2xl mx-auto text-lg leading-relaxed">
+                            De la conception de la physique au rendu pseudo-3D, en passant par l'optimisation des objets et les plateformes mobiles, vous avez exploré toutes les facettes du développement 2D de très haut niveau sur Godot 4.
+                        </p>
+                        <p class="text-white font-bold uppercase tracking-widest text-sm bg-orange-600 inline-block px-6 py-2 rounded-full">
+                            Vous êtes prêt à créer votre propre classique.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // --- Navigation SPA ---
+        function navTo(sectionId) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            const section = document.getElementById(sectionId);
+            if(section) {
+                section.style.animation = 'none';
+                section.offsetHeight; 
+                section.style.animation = null; 
+                section.classList.add('active');
+            }
+            
+            const navBtn = document.getElementById('nav-' + sectionId);
+            if(navBtn) navBtn.classList.add('active');
+
+            document.getElementById('main-content').scrollTop = 0;
+
+            if(window.innerWidth < 768) toggleMobileMenu(false);
+        }
+
+        // --- Menu Mobile ---
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        let menuOpen = false;
+
+        function toggleMobileMenu(forceState = null) {
+            menuOpen = forceState !== null ? forceState : !menuOpen;
+            if(menuOpen) {
+                sidebar.classList.remove('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-xmark text-2xl"></i>';
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-bars text-2xl"></i>';
+            }
+        }
+        mobileMenuBtn.addEventListener('click', () => toggleMobileMenu());
+        window.addEventListener('resize', () => { if (window.innerWidth >= 768 && menuOpen) toggleMobileMenu(false); });
+
+        // --- Demo : Particles ---
+        function spawnParticles() {
+            const arena = document.getElementById('particle-arena');
+            const centerX = arena.offsetWidth / 2;
+            const centerY = arena.offsetHeight / 2;
+            
+            const numParticles = 40;
+            
+            for(let i=0; i<numParticles; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                
+                // Start center
+                p.style.left = centerX + 'px';
+                p.style.top = centerY + 'px';
+                
+                arena.appendChild(p);
+                
+                // Random velocities
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 5 + Math.random() * 15;
+                let vx = Math.cos(angle) * speed;
+                let vy = Math.sin(angle) * speed - 10; // -10 for initial upward burst
+                
+                let x = centerX;
+                let y = centerY;
+                
+                // Physics animation
+                const anim = setInterval(() => {
+                    vy += 0.8; // Gravity
+                    x += vx;
+                    y += vy;
+                    
+                    p.style.left = x + 'px';
+                    p.style.top = y + 'px';
+                    
+                    // Fade out color change
+                    if(vy > 5) p.style.background = '#ef4444'; // Red when falling
+                    
+                    if(y > arena.offsetHeight + 10) {
+                        clearInterval(anim);
+                        if(p.parentNode) p.remove();
+                    }
+                }, 20);
+            }
+        }
+    </script>
+</body>
+</html>

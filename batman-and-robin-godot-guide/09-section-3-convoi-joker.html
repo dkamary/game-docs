@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 · Section 3 : convoi &amp; montgolfière du Joker — Batman &amp; Robin × Godot</title>
+<meta name="description" content="Section 3 : le convoi de camions en mouvement, les ballons-mines, puis le boss final du niveau 1, la montgolfière du Joker qui approche et s'éloigne par mise à l'échelle.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Tome 09</div>
+  <h1>Section 3 : convoi &amp; montgolfière du Joker</h1>
+  <p class="lead">Une rue qui file à toute vitesse, des camions qui se rapprochent et s'écartent, des ballons-mines, puis le Joker dans sa montgolfière à nacelle-sourire, qui fond sur Batman depuis le fond de l'écran.</p>
+  <div class="meta"><span class="pill">Plateformes mobiles</span><span class="pill">Illusion de vitesse</span><span class="pill">Pseudo-3D par l'échelle</span><span class="pill">Fin de niveau</span></div>
+</section>
+
+<div class="shots">
+  <figure class="shot"><img src="img/s13-convoy.jpg" alt="Convoi"><figcaption>Le convoi. <a class="tc" href="#">10:46</a></figcaption></figure>
+  <figure class="shot"><img src="img/joker-close.jpg" alt="Joker au plus près"><figcaption>La montgolfière au plus près. <a class="tc" href="#">13:23</a></figcaption></figure>
+  <figure class="shot"><img src="img/joker-ko.jpg" alt="Joker KO"><figcaption>Fin du niveau 1. <a class="tc" href="#">14:33</a></figcaption></figure>
+</div>
+
+<h2 id="convoi">Le convoi : la vitesse sans bouger</h2>
+<div class="callout concept"><span class="tag">Concept : le référentiel</span><p>Faire réellement rouler des camions à 200 km/h en suivant le joueur compliquerait tout : caméra, ennemis, projectiles. On inverse le point de vue : <strong>le convoi est immobile</strong> dans le monde, et c'est <strong>la rue qui défile</strong> derrière lui (<code>Parallax2D.autoscroll</code>). Le joueur ne voit aucune différence ; le code, lui, reste celui d'un niveau normal. Sur Mega Drive, c'est exactement pareil : le « mouvement » n'est qu'une valeur de défilement du plan de fond.</p></div>
+<pre class="tree">S3Convoy (Node2D, section.gd)            next_scene = res://screens/level_end.tscn
+├── Street (Parallax2D)                    autoscroll = (-300, 0) · repeat_size = largeur · vitrines, réverbères
+├── Road (Parallax2D)                      autoscroll = (-420, 0) · marquages au sol, plus rapides (plus proches)
+├── World
+│   ├── Convoy (Node2D)
+│   │   ├── Truck1 (convoy_vehicle.tscn)    plateau chargé de caisses
+│   │   ├── Van1 (convoy_vehicle.tscn)      fourgon violet
+│   │   ├── Flatbed1 …                      plateau nu, voiture de police, etc.
+│   ├── Gift (Breakable)                    paquet géant → spawn_enemy = clown
+│   ├── KillZone (Area2D)                   sous la chaussée : tomber du convoi
+│   ├── ArenaBalloons (WaveArena)           vagues de BalloonMine, origine « below »
+│   └── BossArena → JokerBalloon (sur le dernier plateau)
+├── EnemyBullets (Pool) · Player · Camera · HUD</pre>
+
+<h3 id="vehicule">Le véhicule : une plateforme mobile</h3>
+<div class="callout video"><span class="tag">Observé dans la vidéo</span><p>Les écarts entre véhicules varient légèrement (<a class="tc" href="#">10:50</a>–<a class="tc" href="#">11:00</a>), les roues tournent, la séquence plateau → fourgon → plateau nu → voiture de police se répète (<a class="tc" href="#">11:44</a>–<a class="tc" href="#">12:03</a>).</p></div>
+<pre class="tree">ConvoyVehicle (AnimatableBody2D, convoy_vehicle.gd)   couche 2 « plateformes »
+├── Body (Sprite2D)                      cabine + plateau
+├── Cargo (CollisionShape2D …)           plateau (one-way) et caisses empilées (pleines)
+└── Wheels (Node2D)
+    ├── Wheel1 (Sprite2D) …</pre>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/s3/convoy_vehicle.gd">
+class_name ConvoyVehicle
+extends AnimatableBody2D
+## Véhicule du convoi. Il dérive un peu en avant et en arrière pour ouvrir et fermer les écarts.
+## AnimatableBody2D + sync_to_physics : Batman posé dessus est emporté proprement.
+
+@export var drift_amplitude := 12.0   ## px
+@export var drift_period := 5.0       ## s
+@export var wheel_speed := 14.0       ## rad/s
+var _origin := Vector2.ZERO
+var _t := 0.0
+@onready var wheels: Node2D = $Wheels
+
+
+func _ready() -> void:
+	sync_to_physics = true
+	_origin = position
+	_t = randf() * drift_period
+
+
+func _physics_process(delta: float) -> void:
+	_t += delta
+	position = _origin + Vector2(sin(_t * TAU / drift_period) * drift_amplitude, 0.0)
+	for w in wheels.get_children():
+		(w as Node2D).rotation += wheel_speed * delta
+</script>
+<div class="callout concept"><span class="tag">Concept : pourquoi <code>AnimatableBody2D</code></span><p>C'est le corps physique prévu pour les plateformes déplacées par script ou par animation. Avec <code>sync_to_physics</code>, son déplacement est calculé au même rythme que la physique. Un <code>CharacterBody2D</code> posé dessus reçoit automatiquement sa vitesse (<em>platform velocity</em>) : Batman avance avec le camion sans une ligne de code. C'est l'apport le plus utile du tome 7 de l'ancienne doc B.</p></div>
+
+<h3 id="chute">Tomber du convoi</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/s3/kill_zone.gd">
+extends Area2D
+## Sous la chaussée (masque 3) : tomber entre deux véhicules coûte une vie.
+
+func _ready() -> void:
+	body_entered.connect(_on_body_entered)
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if body is Player:
+		# Health directement : la chute tue même pendant le clignotement d'invincibilité.
+		# respawn() (tome 03) fera ensuite retomber Batman depuis le haut de l'écran.
+		(body as Player).health.damage(999)
+</script>
+<div class="callout warn"><span class="tag">Hypothèse</span><p>La vidéo ne montre aucune chute. On suppose qu'elle est mortelle, comme dans la plupart des run &amp; gun. Si tu préfères être indulgent, replace plutôt Batman sur le véhicule le plus proche avec un peu de dégâts.</p></div>
+
+<h3 id="ballons">Les vagues de ballons-mines</h3>
+<p>Une <code>WaveArena</code> dont les vagues ne contiennent que <code>balloon_mine.tscn</code>, avec <code>origins = ["below", "right"]</code>, <code>max_alive</code> = 8, <code>spawn_interval</code> = 0,4 et un quota de 14 à 18. Les mines montent en oscillant ; Batman doit tirer en diagonale haute et à la verticale, ou les éviter. Une bonne occasion de placer un crâne (<a class="tc" href="#">12:24</a>).</p>
+
+<h2 id="joker">Le boss : la montgolfière du Joker</h2>
+<div class="callout video"><span class="tag">Observé dans la vidéo</span>
+<ul>
+  <li>Chaque « passage » : entrée par un bord, <strong>petite et haute</strong> ; <strong>grossit en descendant</strong> vers le plateau ; traverse ; sort par l'autre bord, puis quelques secondes d'écran vide (<a class="tc" href="#">13:59</a>–<a class="tc" href="#">14:04</a>).</li>
+  <li>Certains passages sont <strong>géants</strong> (enveloppe sur la moitié de l'écran, <a class="tc" href="#">13:22</a>), d'autres restent moyens.</li>
+  <li>Grappes de petites bombes noires lâchées en ligne ou en colonne, qui rebondissent.</li>
+  <li>Flash <strong>pastel</strong> de tout le ballon quand il est touché.</li>
+  <li>La vitalité baisse surtout quand le ballon est grand, donc proche.</li>
+</ul></div>
+<div class="callout fix"><span class="tag">Correction des docs existantes</span><p>Ce n'est ni un dirigeable en rotation pseudo-Mode 7, ni un « ballon de parade » à Jack-in-the-box, dentiers et gaz hilarant (doc A), ni un dirigeable à laser (doc B). C'est une <strong>montgolfière</strong> dont l'effet principal est le <strong>changement de taille</strong> : on simule l'approche dans la profondeur.</p></div>
+<div class="callout concept"><span class="tag">Concept : la profondeur par l'échelle</span><p>Un seul paramètre, la <strong>taille apparente</strong>, raconte toute la 3D : petit = loin, grand = près. On le pilote par une courbe en cloche, <code>sin(u × π)</code>, qui monte de 0 à 1 puis redescend pendant le passage. La même valeur commande la taille, la hauteur (le ballon descend en approchant) et la vulnérabilité : on ne peut le toucher que lorsqu'il est assez proche. Comme sur Mega Drive, la taille est arrondie à des <strong>paliers</strong> (<code>Fx.snap_scale</code>, tome 06).</p></div>
+<pre class="tree">JokerBalloon (Node2D, joker_balloon.gd)   score_value = 10000 · origine = centre du plateau
+├── Health                                 max_health = 120 (À CALIBRER)
+├── Visual (Node2D)                        matériau hit_flash ; enfants en « use_parent_material »
+│   ├── Envelope (Sprite2D)                enveloppe rouge, orange et verte
+│   ├── Basket (Sprite2D)                  nacelle-sourire + Joker
+│   ├── Hurtbox                            couche 6 · health = ../../Health · sur la nacelle
+│   │   └── CollisionShape2D
+│   └── DropPoint (Marker2D)               sous la nacelle
+├── JokerFigure (Sprite2D, caché)          le Joker éjecté
+└── HitFlash                               target = Visual · amount = 0.55</pre>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/joker_balloon/joker_balloon.gd">
+class_name JokerBalloon
+extends Boss
+## Boss final du niveau 1 (vidéo 13:04–14:36).
+## Cycle : attente hors écran -> passage (approche puis éloignement) -> attente…
+
+enum S { WAIT, PASS }
+
+@export var bomb_scene: PackedScene                  ## bomb.tscn : bounces = 1
+@export var pass_duration := Vector2(5.0, 7.0)
+@export var wait_time := Vector2(1.5, 4.0)
+@export var high_y := -150.0                         ## relatif au plateau (y = 0)
+@export var low_y := -70.0                           ## nacelle à hauteur de tir au plus près
+@export var half_width := 230.0                      ## départ et arrivée hors écran
+@export var sizes := PackedFloat32Array([0.35, 0.5, 0.65, 0.8, 1.0, 1.2, 1.4, 1.6])
+@export var vulnerable_scale := 0.8
+@export var drop_interval := 1.1
+@export var ko_texture: Texture2D
+
+var _s := S.WAIT
+var _t := 0.0
+var _dur := 2.0
+var _side := 1.0
+var _near := 1.0
+var _drop := 0.0
+
+@onready var visual: Node2D = $Visual
+@onready var hurtbox: Hurtbox = $Visual/Hurtbox
+@onready var drop_point: Marker2D = $Visual/DropPoint
+@onready var joker_figure: Sprite2D = $JokerFigure
+
+
+func _ready() -> void:
+	super._ready()
+	visual.hide()
+	joker_figure.hide()
+	hurtbox.monitorable = false
+
+
+func start() -> void:
+	super.start()
+	_go_wait(1.0)
+
+
+func _physics_process(delta: float) -> void:
+	if not active:
+		return
+	_t += delta
+	match _s:
+		S.WAIT:
+			if _t >= _dur:
+				_go_pass()
+		S.PASS:
+			var u := clampf(_t / _dur, 0.0, 1.0)
+			var bump := sin(u * PI)                    # 0 -> 1 -> 0 : approche puis éloignement
+			var sc := Fx.snap_scale(lerpf(sizes[0], _near, bump), sizes)
+			visual.scale = Vector2(sc, sc)
+			visual.position = Vector2(lerpf(-_side * half_width, _side * half_width, u), lerpf(high_y, low_y, bump))
+			hurtbox.monitorable = sc >= vulnerable_scale   # ce qui est loin ne se touche pas
+			_drop -= delta
+			if _drop <= 0.0 and sc >= 0.6:
+				_drop = drop_interval
+				_drop_cluster()
+			if u >= 1.0:
+				_go_wait(randf_range(wait_time.x, wait_time.y))
+
+
+func _go_wait(duration: float) -> void:
+	_s = S.WAIT
+	_t = 0.0
+	_dur = duration
+	visual.hide()
+	hurtbox.monitorable = false
+
+
+func _go_pass() -> void:
+	_s = S.PASS
+	_t = 0.0
+	_dur = randf_range(pass_duration.x, pass_duration.y)
+	_side = -_side                                       # alterne les côtés d'entrée
+	_near = sizes[sizes.size() - 1] if randf() < 0.5 else 1.0   # passage géant ou moyen
+	_drop = 0.8
+	visual.show()
+
+
+func _drop_cluster() -> void:
+	if bomb_scene == null:
+		return
+	var column := randf() < 0.4
+	for i in 5:
+		var b := bomb_scene.instantiate() as Bomb
+		b.global_position = drop_point.global_position
+		if column:
+			b.velocity = Vector2(0.0, 20.0 + i * 28.0)     # colonne : chutes étagées
+		else:
+			b.velocity = Vector2((i - 2) * 32.0, -40.0)    # ligne : éventail
+		get_parent().add_child(b)
+
+
+func die_sequence() -> void:
+	hurtbox.set_deferred("monitorable", false)
+	visual.show()
+	# Le ballon se fige en haut, au centre…
+	var tw := create_tween()
+	tw.tween_property(visual, "position", Vector2(0.0, high_y + 30.0), 0.6)
+	tw.parallel().tween_property(visual, "scale", Vector2.ONE, 0.6)
+	await tw.finished
+	# …et l'enveloppe se couvre d'explosions (vidéo 14:24–14:29).
+	await explode_area(Rect2(-60.0, high_y - 30.0, 120.0, 100.0), 30, 0.12)
+	visual.hide()
+	# Le Joker est éjecté puis retombe, assommé, sur le plateau (vidéo 14:30–14:31).
+	joker_figure.position = visual.position + Vector2(0.0, 30.0)
+	joker_figure.show()
+	var tw2 := create_tween()
+	tw2.tween_property(joker_figure, "position:y", joker_figure.position.y - 40.0, 0.35) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw2.tween_property(joker_figure, "position", Vector2(30.0, -8.0), 0.6) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw2.finished
+	if ko_texture:
+		joker_figure.texture = ko_texture
+</script>
+<div class="callout warn"><span class="tag">Ce qui n'est pas dans cette partie de la vidéo</span><p>D'autres descriptions du jeu évoquent une montgolfière qui <strong>rebondit au sol</strong> et <strong>charge à l'horizontale</strong>. Ces attaques n'apparaissent pas de 13:04 à 14:36. Si tu les vois dans un émulateur, ajoute un état <code>CHARGE</code> : échelle fixée à 1, <code>y = low_y</code>, traversée rapide (1,5 s) et Hurtbox active. C'est un bon exercice pour vérifier que tu maîtrises la machine à états.</p></div>
+
+<h3 id="arene-joker">L'arène du Joker</h3>
+<ul>
+  <li>Le dernier véhicule est un plateau nu (<code>drift_amplitude</code> = 0) : un sol stable et dégagé (<a class="tc" href="#">13:00</a>).</li>
+  <li>La <code>BossArena</code> fige la caméra au centre du plateau ; la rue continue de défiler derrière grâce à l'<code>autoscroll</code>.</li>
+  <li><code>JokerBalloon</code> est placé à la surface du plateau, au centre : toutes ses coordonnées (<code>high_y</code>, <code>low_y</code>) sont relatives à ce point.</li>
+  <li>Score : +10 000 (<a class="tc" href="#">14:30</a>). <code>next_scene</code> pointe vers l'écran de fin de niveau (Batmobile, tome 10).</li>
+</ul>
+
+<div class="callout goal"><span class="tag">Objectif de l'étape</span>
+<ul class="check">
+  <li>La rue défile en continu ; Batman saute de camion en camion, emporté par leur mouvement ; les écarts varient.</li>
+  <li>Des ballons-mines montent du bas en oscillant ; un paquet géant libère un sbire.</li>
+  <li>La montgolfière entre petite et haute, grossit par paliers en descendant, lâche des grappes de bombes, ressort ; elle n'est vulnérable que lorsqu'elle est grande.</li>
+  <li>Chaque coup déclenche un flash pastel. À 00 : explosions en chaîne, Joker éjecté et assommé, pose de victoire, +10 000.</li>
+</ul></div>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>

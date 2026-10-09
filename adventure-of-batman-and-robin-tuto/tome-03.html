@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot 4 Masterclass : B&R Megadrive - Tome 3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-main: #020617; /* Slate 950 */
+            --bg-panel: #0f172a; /* Slate 900 */
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent-joker-green: #22c55e;
+            --accent-joker-purple: #9333ea;
+            --accent-bat-yellow: #eab308;
+            --accent-bat-blue: #3b82f6;
+            --accent-red: #ef4444;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4, .title-font {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Syntax Highlighting Custom */
+        .code-block {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            border-left: 4px solid var(--accent-joker-green);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        .gd-kw { color: #ff7b72; font-weight: bold; } 
+        .gd-func { color: #d2a8ff; font-weight: bold; } 
+        .gd-str { color: #a5d6ff; } 
+        .gd-num { color: #79c0ff; } 
+        .gd-comment { color: #8b949e; font-style: italic; } 
+        .gd-type { color: #58a6ff; } 
+        .gd-anno { color: #d2a8ff; } 
+
+        /* Nav & Sections */
+        .section-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .section-content.active { display: block; opacity: 1; animation: slideUp 0.4s ease-out forwards; }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-btn.active {
+            background-color: #1e1b4b; /* Deep purple */
+            border-right: 4px solid var(--accent-joker-green);
+            color: var(--accent-joker-green);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-joker-purple); }
+
+        /* Demos */
+        .demo-container {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background: #0f172a;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #1e293b;
+        }
+
+        /* Spawner Demo */
+        .spawn-indicator {
+            position: absolute;
+            width: 10px;
+            height: 100%;
+            background: rgba(239, 68, 68, 0.2);
+            top: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-left: 2px dashed #ef4444;
+        }
+        .spawn-left { left: 0; }
+        .spawn-right { right: 0; border-left: none; border-right: 2px dashed #ef4444; }
+        
+        .enemy-icon {
+            position: absolute;
+            width: 30px;
+            height: 40px;
+            background: var(--accent-joker-purple);
+            border-radius: 4px;
+            bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s linear;
+        }
+
+        /* Camera Shake Demo */
+        .shake-container {
+            transition: transform 0.05s ease-in-out;
+        }
+        @keyframes camShake {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-8px, 5px) rotate(-1deg); }
+            40% { transform: translate(5px, -8px) rotate(1deg); }
+            60% { transform: translate(-5px, 8px) rotate(0deg); }
+            80% { transform: translate(8px, -5px) rotate(-1deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .shaking { animation: camShake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+
+        /* HUD Demo */
+        .hud-bar {
+            width: 150px;
+            height: 15px;
+            background: #333;
+            border: 2px solid #fff;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hud-fill {
+            height: 100%;
+            background: var(--accent-bat-yellow);
+            width: 100%;
+            transition: width 0.2s ease-out;
+        }
+
+        /* Boss Demo */
+        .boss-blimp {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 60px;
+            background: linear-gradient(to bottom, #9333ea, #581c87);
+            border-radius: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translate(-50%, 0); }
+            50% { transform: translate(-50%, 15px); }
+        }
+        .boss-bomb {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: var(--accent-red);
+            border-radius: 50%;
+        }
+
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen text-slate-200">
+
+    <!-- Mobile Header -->
+    <header class="md:hidden flex items-center justify-between bg-slate-950 border-b border-slate-800 p-4 shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-joker text-green-500 text-xl"></i>
+            <h1 class="title-font font-bold text-lg leading-none">B&R <span class="text-green-500">TOME 3</span></h1>
+        </div>
+        <button id="mobile-menu-btn" class="text-slate-300 hover:text-white p-2 focus:outline-none">
+            <i class="fa-solid fa-bars text-2xl"></i>
+        </button>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="absolute md:relative w-full md:w-72 h-[calc(100vh-60px)] md:h-screen bg-slate-950 border-r border-slate-800 flex flex-col shrink-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out top-[60px] md:top-0 shadow-2xl">
+        
+        <div class="hidden md:block p-6 text-center border-b border-slate-800 relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 opacity-10">
+                <i class="fa-solid fa-face-laugh-squint text-9xl text-green-500"></i>
+            </div>
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-green-800 rounded-xl shadow-lg mb-3 relative z-10 border border-green-400">
+                <i class="fa-solid fa-bomb text-3xl text-slate-900"></i>
+            </div>
+            <h1 class="title-font font-bold text-xl tracking-wide relative z-10 text-white">GAME FEEL & BOSS</h1>
+            <p class="text-xs font-mono text-green-400 mt-1 relative z-10">Godot 4.x - Tome 3</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4">
+            <div class="px-6 mb-4">
+                <div class="bg-purple-900/30 border border-purple-500/30 text-purple-300 text-xs p-3 rounded-lg flex gap-2">
+                    <i class="fa-solid fa-info-circle mt-0.5"></i>
+                    <p>Fondations (T1) et Monde (T2) acquis. Il est temps de créer la boucle de jeu !</p>
+                </div>
+            </div>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Le Déroulement</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('spawner')" id="nav-spawner" class="nav-btn active w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-truck-ramp-box w-5 text-center text-blue-400"></i> 1. Wave Spawner
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('hud')" id="nav-hud" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-heart-pulse w-5 text-center text-red-400"></i> 2. HUD & Signaux
+                    </button>
+                </li>
+            </ul>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Polissage & Fin</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('gamefeel')" id="nav-gamefeel" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-video w-5 text-center text-yellow-400"></i> 3. Le "Game Feel"
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('boss')" id="nav-boss" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-skull w-5 text-center text-green-400"></i> 4. Boss : Joker's Blimp
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 h-[calc(100vh-60px)] md:h-screen overflow-y-auto relative scroll-smooth bg-slate-900" id="main-content">
+        <div class="max-w-4xl mx-auto p-4 md:p-8 lg:p-12 pb-24">
+
+            <!-- SECTION 1: SPAWNER -->
+            <section id="spawner" class="section-content active">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-blue-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 1</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Système de Vagues (Spawner)</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Générer le chaos en dehors de l'écran.</p>
+                </div>
+
+                <div class="bg-slate-800 rounded-xl p-5 md:p-6 mb-8 shadow-lg border border-slate-700">
+                    <h3 class="title-font text-xl text-white mb-4">L'Illusion du Run & Gun</h3>
+                    <p class="mb-4 text-slate-300 leading-relaxed">
+                        Dans <i>Batman & Robin</i>, le niveau 1 n'est pas rempli de 500 clowns pré-placés. Au lieu de cela, un système "surveille" la caméra et génère des ennemis <b>juste à l'extérieur des bords de l'écran</b>. Cela garantit une action constante sans surcharger la mémoire.
+                    </p>
+                </div>
+
+                <!-- Demo Interactive Spawner -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation de Zone d'Apparition (Caméra)</h4>
+                        <button onclick="spawnDemoEnemy()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1 rounded text-sm font-bold shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Spawner un Clown
+                        </button>
+                    </div>
+                    <div class="demo-container bg-[#020617] relative" id="spawn-arena">
+                        <div class="spawn-indicator spawn-left"><span class="text-[8px] text-red-500 transform -rotate-90">HORS ECRAN</span></div>
+                        <div class="spawn-indicator spawn-right"><span class="text-[8px] text-red-500 transform -rotate-90">HORS ECRAN</span></div>
+                        
+                        <div class="absolute bottom-[20px] left-1/2 -translate-x-1/2 w-[40px] h-[60px] bg-blue-500 rounded flex items-center justify-center">
+                            <i class="fa-solid fa-mask text-white"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-yellow-400 mb-4">Implémentation (EnemySpawner.gd)</h3>
+                <p class="text-sm text-slate-400 mb-4">Créez un simple nœud <code>Node2D</code> appelé <b>EnemySpawner</b>, attachez-lui un <code>Timer</code> (Node enfant) réglé sur "Autostart". Placez ce Spawner en enfant de votre Camera2D (pour qu'il suive l'écran) ou calculez les bords de la caméra.</p>
+                
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># enemy_spawner.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">Node2D</span>
+
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> enemy_scene: <span class="gd-type">PackedScene</span>
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> camera = get_viewport().get_camera_2d() <span class="gd-comment"># Récupère la caméra active</span>
+
+<span class="gd-comment"># Fonction appelée par le signal 'timeout' du Timer enfant</span>
+<span class="gd-keyword">func</span> <span class="gd-func">_on_spawn_timer_timeout</span>():
+    <span class="gd-keyword">if</span> enemy_scene == <span class="gd-keyword">null or</span> camera == <span class="gd-keyword">null</span>:
+        <span class="gd-keyword">return</span>
+        
+    <span class="gd-comment"># 1. Instancier l'ennemi (Notre clown du Tome 2)</span>
+    <span class="gd-keyword">var</span> enemy = enemy_scene.instantiate()
+    
+    <span class="gd-comment"># 2. Déterminer de quel côté il spawn (Gauche ou Droite aléatoirement)</span>
+    <span class="gd-keyword">var</span> spawn_left = randi() % <span class="gd-num">2</span> == <span class="gd-num">0</span>
+    
+    <span class="gd-comment"># 3. Calculer la position (Bord de l'écran + marge)</span>
+    <span class="gd-keyword">var</span> screen_width = get_viewport_rect().size.x
+    <span class="gd-keyword">var</span> margin = <span class="gd-num">40</span> <span class="gd-comment"># Spawn 40 pixels en dehors de l'écran</span>
+    
+    <span class="gd-keyword">var</span> spawn_x = <span class="gd-num">0</span>
+    <span class="gd-keyword">if</span> spawn_left:
+        spawn_x = camera.global_position.x - (screen_width / <span class="gd-num">2</span>) - margin
+    <span class="gd-keyword">else</span>:
+        spawn_x = camera.global_position.x + (screen_width / <span class="gd-num">2</span>) + margin
+        
+    <span class="gd-comment"># Positionnement final. Note : on suppose que la scène a un sol défini.</span>
+    <span class="gd-comment"># Pour les ennemis volants, randomize() le 'y' ici.</span>
+    enemy.global_position = <span class="gd-type">Vector2</span>(spawn_x, camera.global_position.y - <span class="gd-num">50</span>)
+    
+    <span class="gd-comment"># L'ajouter à la scène principale, PAS au spawner !</span>
+    get_tree().current_scene.add_child(enemy)
+</code></pre>
+                </div>
+
+                <div class="bg-blue-900/20 border-l-4 border-blue-500 p-4 rounded-r text-sm text-slate-300">
+                    <i class="fa-solid fa-lightbulb text-yellow-400 mr-2"></i> <b>Object Pooling (Avancé) :</b> Dans un jeu professionnel fini, au lieu de faire <code>instantiate()</code> et <code>queue_free()</code> sans arrêt (ce qui crée de petits lags), on crée un "Pool" de 20 ennemis au début du jeu, et on les déplace et les réactive hors écran. C'est l'Object Pooling.
+                </div>
+            </section>
+
+            <!-- SECTION 2: HUD & SIGNALS -->
+            <section id="hud" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-red-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 2</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">L'Interface (HUD) & Signaux</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Le Pattern Observer : Comment décupler proprement l'UI du Joueur.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    L'erreur classique est de dire au joueur de mettre à jour l'UI : <code>HUD.update_life(health)</code>. C'est mauvais car cela couple fortement le joueur à l'interface. Si vous supprimez le HUD pour un menu pause, le jeu plante. La solution ? <b>Les Signaux Godot (Pattern Observer)</b>.
+                </p>
+
+                <!-- Demo Interactive HUD -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation de Signal : <code>health_changed</code></h4>
+                        <button onclick="takeDamageDemo()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-1 rounded text-sm font-bold shadow-lg">
+                            <i class="fa-solid fa-burst"></i> Prendre un coup
+                        </button>
+                    </div>
+                    <div class="bg-[#1e293b] p-6 rounded border border-[#334155] flex items-center gap-4">
+                        <i class="fa-solid fa-heart text-red-500 text-xl"></i>
+                        <div class="hud-bar">
+                            <div id="demo-health-fill" class="hud-fill"></div>
+                        </div>
+                        <span id="demo-health-text" class="text-white font-mono text-sm ml-4">100%</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div>
+                        <h3 class="title-font text-xl text-yellow-400 mb-3">1. Le Joueur Émetteur (Player.gd)</h3>
+                        <p class="text-sm text-slate-400 mb-2">Le joueur ne connaît pas le HUD. Il se contente de crier "J'AI PERDU DE LA VIE !".</p>
+                        <div class="code-block">
+<pre><code><span class="gd-comment"># player.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">CharacterBody2D</span>
+
+<span class="gd-comment"># Définition du signal personnalisé</span>
+<span class="gd-keyword">signal</span> health_changed(new_health: <span class="gd-type">int</span>)
+
+<span class="gd-keyword">var</span> health: <span class="gd-type">int</span> = <span class="gd-num">100</span>
+
+<span class="gd-comment"># Fonction appelée par la Hurtbox (Tome 1)</span>
+<span class="gd-keyword">func</span> <span class="gd-func">take_damage</span>(amount: <span class="gd-type">int</span>):
+    health -= amount
+    <span class="gd-comment"># On émet le signal avec la nouvelle valeur</span>
+    health_changed.emit(health)
+</code></pre>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="title-font text-xl text-green-400 mb-3">2. L'UI Écouteuse (HUD.gd)</h3>
+                        <p class="text-sm text-slate-400 mb-2">L'interface est placée dans un <code>CanvasLayer</code>. C'est elle qui connecte le signal.</p>
+                        <div class="code-block">
+<pre><code><span class="gd-comment"># hud.gd (Attaché au CanvasLayer)</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">CanvasLayer</span>
+
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> life_bar = $ProgressBar
+
+<span class="gd-keyword">func</span> <span class="gd-func">_ready</span>():
+    <span class="gd-comment"># Récupère le joueur dans la scène</span>
+    <span class="gd-keyword">var</span> player = get_tree().get_first_node_in_group(<span class="gd-str">"Player"</span>)
+    <span class="gd-keyword">if</span> player:
+        <span class="gd-comment"># Le HUD connecte le signal à sa propre fonction</span>
+        player.health_changed.connect(update_life_bar)
+
+<span class="gd-keyword">func</span> <span class="gd-func">update_life_bar</span>(new_value: <span class="gd-type">int</span>):
+    <span class="gd-comment"># On peut ajouter un Tween ici pour une animation fluide !</span>
+    life_bar.value = new_value
+</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-4 rounded-xl border-l-4 border-slate-500 text-sm text-slate-300">
+                    <strong>Le CanvasLayer :</strong> N'oubliez jamais que toute l'UI (Boutons, Score, Vie) doit être enfant d'un nœud <code>CanvasLayer</code>. Cela permet à l'UI de rester collée à l'écran indépendamment de la <code>Camera2D</code> qui suit Batman.
+                </div>
+            </section>
+
+            <!-- SECTION 3: GAME FEEL -->
+            <section id="gamefeel" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-yellow-400 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 3</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Secret de la Megadrive : Game Feel</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Hit Stop & Camera Shake.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Ce qui rend le jeu original si spectaculaire, ce sont les impacts. Quand un batarang touche, le jeu ne se contente pas de baisser la vie de l'ennemi. Il fait trembler l'écran (<b>Camera Shake</b>) et fige très brièvement le temps (<b>Hit Stop</b>).
+                </p>
+
+                <!-- Demo Interactive Game Feel -->
+                <div class="mb-8 p-6 bg-slate-900 border border-slate-700 rounded-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-slate-300 text-sm">Simulation Camera Shake</h4>
+                        <button onclick="triggerShakeDemo()" class="bg-yellow-600 hover:bg-yellow-500 text-slate-900 px-6 py-2 rounded font-bold shadow-lg shadow-yellow-600/20 active:scale-95 transition">
+                            <i class="fa-solid fa-bomb mr-2"></i> EXPLOSION
+                        </button>
+                    </div>
+                    
+                    <div id="demo-shake-viewport" class="shake-container relative w-full h-40 bg-[url('data:image/svg+xml;utf8,<svg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'><rect width=\'100\' height=\'100\' fill=\'%230f172a\'/><rect x=\'20\' y=\'20\' width=\'60\' height=\'60\' fill=\'%231e293b\'/></svg>')] rounded overflow-hidden border border-slate-600">
+                        <!-- Batman sprite in center -->
+                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl">
+                            🦇
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-yellow-400 mb-4 border-t border-slate-700 pt-6">L'Algorithme de Tremblement (Camera2D)</h3>
+                <p class="text-sm text-slate-400 mb-4">Plutôt que de faire un tremblement aléatoire brut (qui rend malade), on utilise une variable "Trauma" qui diminue avec le temps. Ajoutez ce script à votre <code>Camera2D</code>.</p>
+
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># camera_shake.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">Camera2D</span>
+
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> decay: <span class="gd-type">float</span> = <span class="gd-num">0.8</span> <span class="gd-comment"># Vitesse de disparition du tremblement</span>
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> max_offset: <span class="gd-type">Vector2</span> = <span class="gd-type">Vector2</span>(<span class="gd-num">100</span>, <span class="gd-num">75</span>) <span class="gd-comment"># Intensité max</span>
+
+<span class="gd-keyword">var</span> trauma: <span class="gd-type">float</span> = <span class="gd-num">0.0</span> <span class="gd-comment"># De 0 à 1</span>
+<span class="gd-keyword">var</span> trauma_power: <span class="gd-type">int</span> = <span class="gd-num">2</span> <span class="gd-comment"># Carré du trauma pour plus d'impact au début</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">_process</span>(delta):
+    <span class="gd-keyword">if</span> trauma > <span class="gd-num">0</span>:
+        trauma = max(trauma - decay * delta, <span class="gd-num">0</span>)
+        shake()
+    <span class="gd-keyword">else</span>:
+        offset = <span class="gd-type">Vector2</span>.ZERO <span class="gd-comment"># Retour à la normale</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">shake</span>():
+    <span class="gd-keyword">var</span> amount = pow(trauma, trauma_power)
+    <span class="gd-comment"># Génère un offset aléatoire entre -1 et 1, multiplié par l'intensité</span>
+    offset.x = max_offset.x * amount * randf_range(<span class="gd-num">-1</span>, <span class="gd-num">1</span>)
+    offset.y = max_offset.y * amount * randf_range(<span class="gd-num">-1</span>, <span class="gd-num">1</span>)
+
+<span class="gd-comment"># Fonction à appeler de l'extérieur (ex: quand un ennemi meurt)</span>
+<span class="gd-keyword">func</span> <span class="gd-func">add_trauma</span>(amount: <span class="gd-type">float</span>):
+    trauma = min(trauma + amount, <span class="gd-num">1.0</span>)
+</code></pre>
+                </div>
+
+                <div class="bg-green-900/20 border-l-4 border-green-500 p-4 rounded-r text-sm text-slate-300">
+                    <i class="fa-solid fa-pause text-yellow-400 mr-2"></i> <b>Hit Stop Rapide :</b> Dans Godot 4, le Hit Stop (figer le jeu 50ms pour donner du poids à un coup) se fait très simplement : <code>Engine.time_scale = 0.0</code>. Lancez un Timer de 0.05s qui fait <code>Engine.time_scale = 1.0</code> à son timeout. Effet garanti !
+                </div>
+            </section>
+
+            <!-- SECTION 4: BOSS -->
+            <section id="boss" class="section-content">
+                <div class="mb-8 border-b border-slate-800 pb-4">
+                    <span class="text-green-500 font-bold text-sm tracking-wider uppercase mb-1 block">Chapitre 4</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Boss du Niveau 1</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Le Dirigeable du Joker (State Machine Avancée).</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    À la fin du niveau, le scrolling s'arrête. Le dirigeable du Joker apparaît en haut de l'écran. Un Boss classique suit des "Phases" (Patterns). Nous réutilisons le concept de State Machine du Tome 1, mais pour l'I.A.
+                </p>
+
+                <!-- Demo Interactive Boss -->
+                <div class="mb-8">
+                    <div class="demo-container bg-[#111827] relative overflow-hidden" id="boss-arena">
+                        <div class="absolute inset-0 bg-[url('data:image/svg+xml;utf8,<svg width=\'20\' height=\'20\' xmlns=\'http://www.w3.org/2000/svg\'><circle cx=\'2\' cy=\'2\' r=\'1\' fill=\'%23334155\'/></svg>')] opacity-50"></div>
+                        
+                        <!-- Boss -->
+                        <div class="boss-blimp shadow-[0_0_20px_rgba(147,51,234,0.6)]">
+                            <i class="fa-solid fa-face-laugh-squint text-white text-2xl"></i>
+                        </div>
+                        
+                        <!-- Player -->
+                        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 text-2xl" id="boss-demo-player">🦇</div>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-green-400 mb-4">Logique des Phases (Code Structure)</h3>
+                
+                <div class="code-block mb-8">
+<pre><code><span class="gd-comment"># boss_joker.gd (CharacterBody2D)</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">CharacterBody2D</span>
+
+<span class="gd-keyword">enum</span> Phase { ENTRANCE, BOMB_DROP, LASER, DEAD }
+<span class="gd-keyword">var</span> current_phase = Phase.ENTRANCE
+<span class="gd-keyword">var</span> health = <span class="gd-num">50</span>
+
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> anim_player = $AnimationPlayer
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> timer = $PhaseTimer
+
+<span class="gd-keyword">func</span> <span class="gd-func">_process</span>(delta):
+    <span class="gd-keyword">match</span> current_phase:
+        Phase.ENTRANCE:
+            <span class="gd-comment"># Descend lentement dans l'écran</span>
+            velocity.y = <span class="gd-num">50</span>
+            <span class="gd-keyword">if</span> position.y > <span class="gd-num">100</span>:
+                velocity.y = <span class="gd-num">0</span>
+                change_phase(Phase.BOMB_DROP)
+                
+        Phase.BOMB_DROP:
+            <span class="gd-comment"># Flotte de gauche à droite en suivant le joueur (avec un délai)</span>
+            <span class="gd-comment"># Les bombes sont gérées par le Timer</span>
+            float_around(delta)
+            
+        Phase.LASER:
+            <span class="gd-comment"># S'arrête, charge un tir, tire !</span>
+            <span class="gd-keyword">pass</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">change_phase</span>(new_phase):
+    current_phase = new_phase
+    <span class="gd-keyword">if</span> new_phase == Phase.BOMB_DROP:
+        timer.start(<span class="gd-num">1.5</span>) <span class="gd-comment"># Lâche une bombe toutes les 1.5s</span>
+        
+<span class="gd-comment"># ... Code des bombes similaire aux Batarangs (Tome 2) mais vers le bas ...</span>
+</code></pre>
+                </div>
+
+                <div class="mt-12 text-center pb-8 border-t border-slate-700 pt-8 relative overflow-hidden rounded-xl">
+                    <div class="absolute inset-0 bg-gradient-to-b from-green-900/20 to-purple-900/20 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full mb-6 shadow-[0_0_40px_rgba(234,179,8,0.4)] border-4 border-slate-900">
+                            <i class="fa-solid fa-gamepad text-5xl text-slate-900"></i>
+                        </div>
+                        <h2 class="title-font text-3xl text-white mb-4">Vous Avez le Moteur Complet !</h2>
+                        <p class="text-slate-300 mb-6 max-w-2xl mx-auto text-lg leading-relaxed">
+                            Mouvement précis, architecture composant (Hitbox), I.A., Scrolling Parallax, Spawners dynamiques, HUD découplé par Signaux, et Game Feel... Vous possédez désormais tous les concepts professionnels pour terminer le niveau 1 et reproduire l'intégralité du chef-d'œuvre de la Megadrive sur Godot 4.3.
+                        </p>
+                        <p class="text-yellow-400 font-bold uppercase tracking-widest text-sm">À vous de jouer !</p>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // --- Navigation SPA ---
+        function navTo(sectionId) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            const section = document.getElementById(sectionId);
+            if(section) {
+                section.style.animation = 'none';
+                section.offsetHeight; 
+                section.style.animation = null; 
+                section.classList.add('active');
+            }
+            
+            const navBtn = document.getElementById('nav-' + sectionId);
+            if(navBtn) navBtn.classList.add('active');
+
+            document.getElementById('main-content').scrollTop = 0;
+
+            if(window.innerWidth < 768) toggleMobileMenu(false);
+        }
+
+        // --- Menu Mobile ---
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        let menuOpen = false;
+
+        function toggleMobileMenu(forceState = null) {
+            menuOpen = forceState !== null ? forceState : !menuOpen;
+            if(menuOpen) {
+                sidebar.classList.remove('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-xmark text-2xl"></i>';
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-bars text-2xl"></i>';
+            }
+        }
+        mobileMenuBtn.addEventListener('click', () => toggleMobileMenu());
+        window.addEventListener('resize', () => { if (window.innerWidth >= 768 && menuOpen) toggleMobileMenu(false); });
+
+        // --- Demo : Spawner ---
+        const arena = document.getElementById('spawn-arena');
+        function spawnDemoEnemy() {
+            const isLeft = Math.random() > 0.5;
+            const enemy = document.createElement('div');
+            enemy.className = 'enemy-icon';
+            enemy.innerHTML = '<i class="fa-solid fa-masks-theater text-white text-xs"></i>';
+            
+            // Start off-screen
+            enemy.style.left = isLeft ? '-40px' : 'calc(100% + 10px)';
+            arena.appendChild(enemy);
+            
+            // Animate moving towards center
+            setTimeout(() => {
+                enemy.style.transition = 'left 3s linear';
+                enemy.style.left = isLeft ? '100px' : 'calc(100% - 130px)';
+                
+                // Cleanup
+                setTimeout(() => {
+                    if(enemy.parentNode) enemy.remove();
+                }, 3000);
+            }, 50);
+        }
+
+        // --- Demo : HUD ---
+        let health = 100;
+        function takeDamageDemo() {
+            health -= 20;
+            if(health < 0) health = 100; // Reset
+            
+            const fill = document.getElementById('demo-health-fill');
+            const text = document.getElementById('demo-health-text');
+            
+            fill.style.width = health + '%';
+            text.innerText = health + '%';
+            
+            if(health <= 20) fill.style.background = '#ef4444'; // Red
+            else if(health <= 50) fill.style.background = '#f97316'; // Orange
+            else fill.style.background = 'var(--accent-bat-yellow)';
+        }
+
+        // --- Demo : Camera Shake ---
+        function triggerShakeDemo() {
+            const viewport = document.getElementById('demo-shake-viewport');
+            viewport.classList.remove('shaking');
+            void viewport.offsetWidth; // Trigger reflow to restart animation
+            viewport.classList.add('shaking');
+            
+            // Add flash overlay temporarily
+            const flash = document.createElement('div');
+            flash.className = 'absolute inset-0 bg-white opacity-80 z-50 transition-opacity duration-300';
+            viewport.appendChild(flash);
+            
+            setTimeout(() => {
+                flash.style.opacity = '0';
+                setTimeout(() => flash.remove(), 300);
+            }, 50);
+        }
+
+        // --- Demo : Boss Logic ---
+        const bossArena = document.getElementById('boss-arena');
+        setInterval(() => {
+            if(document.getElementById('boss').classList.contains('active')) {
+                // Drop a bomb
+                const bomb = document.createElement('div');
+                bomb.className = 'boss-bomb';
+                
+                // Get Boss current X
+                const blimp = document.querySelector('.boss-blimp');
+                const blimpRect = blimp.getBoundingClientRect();
+                const arenaRect = bossArena.getBoundingClientRect();
+                const relativeX = blimpRect.left - arenaRect.left + (blimpRect.width / 2);
+                
+                bomb.style.left = relativeX + 'px';
+                bomb.style.top = '60px'; // Just below blimp
+                
+                bossArena.appendChild(bomb);
+                
+                // Fall animation
+                let dropY = 60;
+                const dropAnim = setInterval(() => {
+                    dropY += 5;
+                    bomb.style.top = dropY + 'px';
+                    if(dropY > 250) {
+                        clearInterval(dropAnim);
+                        if(bomb.parentNode) bomb.remove();
+                    }
+                }, 30);
+            }
+        }, 1500);
+
+    </script>
+</body>
+</html>

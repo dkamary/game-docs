@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 · Batman : contrôleur &amp; caméra — Batman &amp; Robin × Godot</title>
+<meta name="description" content="Le contrôleur de Batman en machine à états : course, saut variable, tir 8 directions, attaque contextuelle, suspension au balcon, dégâts, mort, victoire, et la caméra lissée.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Tome 03</div>
+  <h1>Batman : contrôleur &amp; caméra</h1>
+  <p class="lead">Un personnage de run &amp; gun : démarrage et arrêt secs, contrôle total en l'air, tir dans 8 directions, attaque contextuelle, accroche sous le balcon. Puis une caméra qui anticipe, comme celle mesurée dans la vidéo.</p>
+  <div class="meta"><span class="pill">Machine à états</span><span class="pill">Physique arcade</span><span class="pill">Invincibilité temporaire</span><span class="pill">Caméra lissée</span></div>
+</section>
+
+<h2 id="cahier">Le cahier des charges (d'après la vidéo)</h2>
+<div class="callout video"><span class="tag">Observé dans la vidéo</span>
+<ul>
+  <li>Course à ~1,95 px/image, sans inertie visible (tome 01, mesures).</li>
+  <li>Tir dans 8 directions, y compris en courant et en sautant ; diagonale haute vers le balcon (<a class="tc" href="#">3:30</a>), verticale contre la montgolfière (<a class="tc" href="#">13:20</a>).</li>
+  <li>Attaque contextuelle : poings et pieds au contact, projectile sinon (même bouton, selon le manuel).</li>
+  <li>Attaque aérienne tournoyante (<a class="tc" href="#">2:06</a>, <a class="tc" href="#">6:04</a>), position accroupie (<a class="tc" href="#">5:07</a>).</li>
+  <li>Suspendu sous le rebord du balcon (<a class="tc" href="#">3:30</a>).</li>
+  <li>Clignotement d'invincibilité après un coup, pose de victoire immobile (<a class="tc" href="#">6:20</a>).</li>
+</ul></div>
+<div class="callout fix"><span class="tag">Correction des docs existantes</span><p>Pas de glissade (doc A) : elle n'apparaît jamais. Le double saut de la doc B n'est pas observé non plus, donc il n'est pas implémenté ici. En revanche, la visée 8 directions et l'accroche au balcon, absentes des deux docs, sont indispensables au niveau 1.</p></div>
+
+<h2 id="etats">Le graphe d'états</h2>
+<pre class="tree">                ┌──────── saut ────────┐
+   ┌─────┐  ◄──►  ┌─────┐                ▼
+   │ Idle│ croix  │ Run │ ── plus de sol ─►┌─────┐ ── haut + rebord ──►┌──────┐
+   └──┬──┘        └──┬──┘                  │ Air │ ◄──── bas + saut ───│ Hang │
+  bas │   attaque au │contact              └──┬──┘                     └──┬───┘
+      ▼              ▼                       sol│                 saut ──┘ (grimpe → Idle)
+  ┌────────┐     ┌───────┐                      ▼
+  │ Crouch │     │ Melee │ ──fin──► Idle     Idle / Run
+
+  Depuis n'importe quel état :  coup reçu ─► Hurt ─► Idle/Air
+                                empoigné  ─► Grabbed ─► Air
+                                vie à 0   ─► Dead
+                                boss vaincu ─► Victory</pre>
+<div class="callout concept"><span class="tag">Concept : ce qui est un état et ce qui n'en est pas un</span><p>Le <strong>tir</strong> n'est pas un état : Batman tire en courant, en sautant ou suspendu. C'est une <strong>capacité</strong>, que les états autorisés appellent (<code>try_attack()</code>). La <strong>mêlée au sol</strong>, elle, est un état : Batman s'arrête pour frapper. Cette distinction évite de multiplier les états (« courir-en-tirant », « sauter-en-tirant »…).</p></div>
+
+<h2 id="scene">La scène <code>player.tscn</code></h2>
+<pre class="tree">Player (CharacterBody2D)        player.gd · couche 3 « corps_joueur » · masque 1+2 (monde, plateformes)
+├── Sprite (AnimatedSprite2D)   origine aux pieds : offset y = -24 environ
+├── Body (CollisionShape2D)     rectangle 14×36, position (0, -18)
+├── Health (Health)             max_health = 8 (À CALIBRER : segments de l'anneau)
+├── Hurtbox (Hurtbox)           couche 5 · masque aucun · health = ../Health
+│   └── CollisionShape2D        rectangle 12×32, position (0, -18)
+├── MeleeHitbox (Hitbox)        couche aucune · masque 6 · damage = 2 · knockback (140, -60)
+│   └── CollisionShape2D        rectangle 22×20, position (16, -22)
+├── MeleeSense (Area2D)         couche aucune · masque 6 : « un ennemi est-il à portée de poing ? »
+│   └── CollisionShape2D        rectangle 26×34, position (16, -18)
+├── HandProbe (Area2D)          couche aucune · masque 8 « rebords »
+│   └── CollisionShape2D        rectangle 10×4, position (0, -42) : au-dessus de la tête
+├── WeaponSystem (WeaponSystem) tome 04
+└── StateMachine (StateMachine) initial_state = Idle
+    ├── Idle    ├── Run     ├── Crouch   ├── Air     ├── Hang
+    ├── Melee   ├── Hurt    ├── Grabbed  ├── Dead    └── Victory</pre>
+<p>Ajoute le joueur au groupe <code>player</code> (onglet Nœud → Groupes) : les ennemis le trouveront avec <code>get_tree().get_first_node_in_group("player")</code>.</p>
+<div class="callout md"><span class="tag">Sprites</span><p>Les planches de <code>../batman-and-robin/spritesheets/</code> ne sont pas des grilles régulières. Dans l'éditeur <strong>SpriteFrames</strong>, utilise « Ajouter des images depuis une feuille de sprites » quand une rangée est régulière ; sinon crée des <code>AtlasTexture</code> avec la région de chaque image. Le code ci-dessous ne plante pas si une animation manque : il garde simplement l'animation en cours. Tu peux donc avancer avec un rectangle de couleur.</p></div>
+
+<h2 id="player-gd">Le script principal : données et verbes communs</h2>
+<p><code>player.gd</code> ne décide de rien : il stocke les réglages et offre des « verbes » (courir, sauter, tirer, encaisser) que les états utilisent.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/player.gd">
+class_name Player
+extends CharacterBody2D
+## Batman ou Robin. Les décisions sont prises par les états (StateMachine) ;
+## ce script porte les réglages et les actions communes.
+
+signal died   ## émis quand l'animation de mort est terminée
+
+@export var hero: HeroData
+
+@export_group("Déplacement")
+@export var run_speed := 117.0        ## px/s, mesuré : ~1,95 px/image
+@export var jump_velocity := -330.0   ## px/s, À CALIBRER (sommet ≈ 60 px avec gravity = 900)
+@export var gravity := 900.0
+@export var max_fall_speed := 330.0
+@export_range(0.0, 1.0) var jump_cut := 0.45  ## saut variable : part de vitesse gardée au relâchement, À CALIBRER
+@export var coyote_time := 0.06       ## tolérance moderne ; 0 = comportement strict
+@export var jump_buffer := 0.10
+
+@export_group("Combat")
+@export var invincibility_time := 1.5
+@export var hurt_time := 0.35
+
+## Fiches des héros, dans l'ordre de l'enum Game.Hero (BATMAN, ROBIN).
+const HERO_FILES := ["res://player/batman.tres", "res://player/robin.tres"]
+
+## Position du canon selon la visée (droite = +x). Clé : (|x| > 0, signe de y).
+const MUZZLES := {
+	Vector2i(1, 0): Vector2(14, -24),
+	Vector2i(1, -1): Vector2(12, -36),
+	Vector2i(0, -1): Vector2(2, -44),
+	Vector2i(1, 1): Vector2(12, -12),
+	Vector2i(0, 1): Vector2(0, -6),
+}
+
+var facing := 1
+var aim := Vector2.RIGHT
+var camera: CameraRig
+var _coyote := 0.0
+var _buffer := 0.0
+var _invincible_left := 0.0
+var _shoot_pose := 0.0
+var _drop_left := 0.0
+
+@onready var sprite: AnimatedSprite2D = $Sprite
+@onready var health: Health = $Health
+@onready var hurtbox: Hurtbox = $Hurtbox
+@onready var melee_hitbox: Hitbox = $MeleeHitbox
+@onready var melee_sense: Area2D = $MeleeSense
+@onready var hand_probe: Area2D = $HandProbe
+@onready var fsm: StateMachine = $StateMachine
+## Non typé : le WeaponSystem n'arrive qu'au tome 04. Sans lui, Batman ne tire pas.
+@onready var weapons: Node = get_node_or_null("WeaponSystem")
+
+
+func _ready() -> void:
+	if hero == null:
+		hero = load(HERO_FILES[Game.hero]) as HeroData   # choix de l'écran PLAYER SELECT
+	if hero:
+		sprite.sprite_frames = hero.frames
+		run_speed = hero.run_speed
+		jump_velocity = hero.jump_velocity
+	melee_hitbox.monitoring = false
+	hurtbox.hurt.connect(_on_hurt)
+	health.died.connect(_on_died)
+
+
+func _physics_process(delta: float) -> void:
+	_coyote = coyote_time if is_on_floor() else maxf(_coyote - delta, 0.0)
+	if Input.is_action_just_pressed("jump"):
+		_buffer = jump_buffer
+	else:
+		_buffer = maxf(_buffer - delta, 0.0)
+	_shoot_pose = maxf(_shoot_pose - delta, 0.0)
+	_tick_invincibility(delta)
+	if _drop_left > 0.0:
+		_drop_left -= delta
+		if _drop_left <= 0.0:
+			set_collision_mask_value(2, true)
+
+	fsm.physics_update(delta)   # l'état courant règle velocity
+	move_and_slide()
+	if camera:
+		camera.clamp_to_view(self)
+
+
+# --- Déplacement -------------------------------------------------------------
+
+func apply_gravity(delta: float) -> void:
+	velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
+
+
+func read_move_x() -> float:
+	return Input.get_axis("move_left", "move_right")
+
+
+func run(dir_x: float) -> void:
+	# Démarrage et arrêt secs : pas d'accélération, comme dans le jeu original.
+	velocity.x = signf(dir_x) * run_speed
+	if dir_x != 0.0:
+		set_facing(int(signf(dir_x)))
+
+
+func set_facing(dir: int) -> void:
+	if dir == 0 or dir == facing:
+		return
+	facing = dir
+	sprite.flip_h = facing < 0
+	melee_hitbox.scale.x = facing
+	melee_sense.scale.x = facing
+	melee_hitbox.facing = facing
+
+
+func wants_jump() -> bool:
+	return _buffer > 0.0
+
+
+func can_jump() -> bool:
+	return is_on_floor() or _coyote > 0.0
+
+
+func consume_jump() -> void:
+	_buffer = 0.0
+	_coyote = 0.0
+
+
+func jump() -> void:
+	velocity.y = jump_velocity
+	consume_jump()
+
+
+func drop_through_platform() -> void:
+	## Bas + saut sur le balcon : on ignore la couche « plateformes » un instant.
+	set_collision_mask_value(2, false)
+	position.y += 2.0
+	_drop_left = 0.25
+
+
+func find_ledge() -> float:
+	## Renvoie la hauteur du rebord touché par les mains, ou NAN.
+	for area in hand_probe.get_overlapping_areas():
+		return area.global_position.y
+	return NAN
+
+
+# --- Combat ------------------------------------------------------------------
+
+func compute_aim(crouching := false) -> Vector2:
+	var x := signf(read_move_x())
+	var y := signf(Input.get_axis("move_up", "move_down"))
+	if crouching or (is_on_floor() and y > 0.0):
+		y = 0.0   # au sol, « bas » veut dire s'accroupir, pas viser ses pieds
+	if x == 0.0 and y == 0.0:
+		x = facing
+	aim = Vector2(x, y).normalized()
+	return aim
+
+
+func enemy_in_reach() -> bool:
+	return melee_sense.has_overlapping_areas()
+
+
+## Bouton d'attaque. Renvoie &"melee" si l'état doit jouer un coup au contact.
+func try_attack(crouching := false, allow_up := true) -> StringName:
+	if not Input.is_action_pressed("attack"):
+		return &""
+	compute_aim(crouching)
+	if not allow_up and aim.y < 0.0:
+		aim = Vector2(facing, 0.0)
+	if Input.is_action_just_pressed("attack") and enemy_in_reach() and aim.y == 0.0:
+		return &"melee"
+	if weapons and weapons.try_fire(muzzle_position(crouching), aim):
+		_shoot_pose = 0.15
+	return &""
+
+
+func muzzle_position(crouching := false) -> Vector2:
+	var key := Vector2i(1 if absf(aim.x) > 0.1 else 0, int(signf(aim.y)))
+	var offset: Vector2 = MUZZLES.get(key, MUZZLES[Vector2i(1, 0)])
+	if crouching:
+		offset.y += 12.0
+	offset.x *= facing
+	return global_position + offset
+
+
+func melee_on() -> void:
+	melee_hitbox.reset_hits()
+	melee_hitbox.set_deferred("monitoring", true)
+
+
+func melee_off() -> void:
+	melee_hitbox.set_deferred("monitoring", false)
+
+
+func start_invincibility(duration: float) -> void:
+	_invincible_left = duration
+	hurtbox.invincible = true
+
+
+func _tick_invincibility(delta: float) -> void:
+	if _invincible_left <= 0.0:
+		return
+	_invincible_left -= delta
+	# Clignotement « une image sur deux », typique de la Mega Drive.
+	sprite.visible = int(_invincible_left * 30.0) % 2 == 0
+	if _invincible_left <= 0.0:
+		hurtbox.invincible = false
+		sprite.visible = true
+
+
+func _on_hurt(hitbox: Hitbox) -> void:
+	if health.is_dead():
+		return
+	velocity = hitbox.get_knockback()
+	start_invincibility(invincibility_time)
+	fsm.force(&"Hurt")
+
+
+func _on_died() -> void:
+	fsm.force(&"Dead")
+
+
+func respawn() -> void:
+	## Réapparition : Batman retombe du haut de l'écran, comme dans les run & gun d'arcade.
+	health.reset()
+	sprite.visible = true
+	if camera:
+		var view := camera.view_rect()
+		global_position = Vector2(view.position.x + view.size.x * 0.35, view.position.y + 24.0)
+	velocity = Vector2.ZERO
+	start_invincibility(2.5)
+	fsm.force(&"Air")
+
+
+func celebrate() -> void:
+	fsm.force(&"Victory")
+
+
+# --- Animation ---------------------------------------------------------------
+
+## Joue l'animation « base », ou sa variante de tir (« run_shoot_diag_up »…) si elle existe.
+func play_anim(base: StringName) -> void:
+	if sprite.sprite_frames == null:
+		return
+	var anim := base
+	if _shoot_pose > 0.0:
+		var shoot := StringName("%s_shoot_%s" % [base, _aim_suffix()])
+		if sprite.sprite_frames.has_animation(shoot):
+			anim = shoot
+	if sprite.sprite_frames.has_animation(anim) and sprite.animation != anim:
+		sprite.play(anim)
+
+
+func _aim_suffix() -> String:
+	if aim.y < -0.1:
+		return "up" if absf(aim.x) < 0.1 else "diag_up"
+	if aim.y > 0.1:
+		return "down" if absf(aim.x) < 0.1 else "diag_down"
+	return "fwd"
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/hero_data.gd">
+class_name HeroData
+extends Resource
+## Différences entre Batman et Robin. Crée batman.tres et robin.tres avec l'inspecteur.
+
+@export var display_name := "Batman"
+@export var frames: SpriteFrames
+@export var portrait: Texture2D
+@export var run_speed := 117.0
+@export var jump_velocity := -330.0
+</script>
+<div class="callout warn"><span class="tag">Batman ou Robin</span><p>La vidéo ne montre que Batman. Les deux héros reçoivent donc les mêmes valeurs par défaut ; seules les animations changent. Si tu mesures une différence dans un émulateur, il suffit de modifier <code>robin.tres</code>.</p></div>
+
+<h2 id="etats-code">Les états, un par un</h2>
+<p>Chaque fichier va dans <code>res://player/states/</code> et s'attache au nœud enfant de <code>StateMachine</code> du même nom. Tous récupèrent Batman via <code>owner</code>.</p>
+
+<h3 id="idle-run">Idle et Run</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/idle.gd">
+extends State
+
+@onready var p: Player = owner
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	p.velocity.x = 0.0
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	if not p.is_on_floor():
+		transition_to(&"Air")
+		return
+	if Input.is_action_pressed("move_down"):
+		transition_to(&"Crouch")
+		return
+	if p.wants_jump() and p.can_jump():
+		p.jump()
+		transition_to(&"Air")
+		return
+	if p.try_attack() == &"melee":
+		transition_to(&"Melee")
+		return
+	if p.read_move_x() != 0.0:
+		transition_to(&"Run")
+		return
+	p.velocity.x = 0.0
+	p.play_anim(&"idle")
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/run.gd">
+extends State
+
+@onready var p: Player = owner
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	if not p.is_on_floor():
+		transition_to(&"Air")   # le temps « coyote » permet encore de sauter
+		return
+	var x := p.read_move_x()
+	if x == 0.0:
+		transition_to(&"Idle")
+		return
+	if p.wants_jump() and p.can_jump():
+		p.jump()
+		transition_to(&"Air")
+		return
+	if p.try_attack() == &"melee":
+		transition_to(&"Melee")
+		return
+	p.run(x)
+	p.play_anim(&"run")
+</script>
+
+<h3 id="crouch">Crouch</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/crouch.gd">
+extends State
+## Accroupi : esquive les tirs hauts et tire au ras du sol.
+## Bas + saut sur une plateforme traversable = descendre (hypothèse de confort).
+
+@onready var p: Player = owner
+@onready var body_shape: CollisionShape2D = owner.get_node("Body")
+@onready var hurt_shape: CollisionShape2D = owner.get_node("Hurtbox/CollisionShape2D")
+var _hurt_pos := Vector2.ZERO
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	p.velocity.x = 0.0
+	# On abaisse la zone vulnérable : c'est ce qui rend l'esquive réelle.
+	_hurt_pos = hurt_shape.position
+	hurt_shape.position.y += 10.0
+	hurt_shape.scale.y = 0.6
+
+
+func exit() -> void:
+	hurt_shape.position = _hurt_pos
+	hurt_shape.scale.y = 1.0
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	p.velocity.x = 0.0
+	if not p.is_on_floor():
+		transition_to(&"Air")
+		return
+	if p.wants_jump():
+		p.consume_jump()
+		p.drop_through_platform()
+		transition_to(&"Air")
+		return
+	if not Input.is_action_pressed("move_down"):
+		transition_to(&"Idle")
+		return
+	var dir := p.read_move_x()
+	if dir != 0.0:
+		p.set_facing(int(signf(dir)))
+	p.try_attack(true)
+	p.play_anim(&"crouch")
+</script>
+<div class="callout warn"><span class="tag">À vérifier</span><p>Sur un sol plein, <code>drop_through_platform()</code> n'a aucun effet visible : la couche « monde » reste active. Seuls le balcon et les caisses, sur la couche 2, laissent passer Batman.</p></div>
+
+<h3 id="air">Air : saut, chute, coup de pied sauté</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/air.gd">
+extends State
+## Saut et chute. Contrôle aérien total, saut à hauteur variable,
+## coup de pied sauté si un ennemi est à portée, sinon tir.
+
+@export var kick_duration := 0.25
+@onready var p: Player = owner
+var _kick_left := 0.0
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	_kick_left = 0.0
+
+
+func exit() -> void:
+	p.melee_off()
+
+
+func physics_update(delta: float) -> void:
+	# 1. Saut variable : relâcher le bouton pendant la montée coupe l'élan.
+	if Input.is_action_just_released("jump") and p.velocity.y < 0.0:
+		p.velocity.y *= p.jump_cut
+	p.apply_gravity(delta)
+
+	# 2. Saut retardé (coyote) : on vient de quitter le bord.
+	if p.wants_jump() and p.can_jump():
+		p.jump()
+
+	# 3. Contrôle aérien complet, typique des run & gun.
+	p.run(p.read_move_x())
+
+	# 4. Accroche sous un rebord : maintenir « haut » près du sommet du saut.
+	if Input.is_action_pressed("move_up") and p.velocity.y > -60.0:
+		var ledge_y := p.find_ledge()
+		if not is_nan(ledge_y):
+			transition_to(&"Hang", {"ledge_y": ledge_y})
+			return
+
+	# 5. Attaque.
+	if _kick_left > 0.0:
+		_kick_left -= delta
+		if _kick_left <= 0.0:
+			p.melee_off()
+	elif p.try_attack() == &"melee":
+		_kick_left = kick_duration
+		p.melee_on()
+
+	# 6. Atterrissage.
+	if p.is_on_floor() and p.velocity.y >= 0.0:
+		transition_to(&"Run" if p.read_move_x() != 0.0 else &"Idle")
+		return
+
+	if _kick_left > 0.0:
+		p.play_anim(&"kick")
+	else:
+		p.play_anim(&"jump" if p.velocity.y < 0.0 else &"fall")
+</script>
+<div class="callout concept"><span class="tag">Concept : saut variable, « coyote time » et mémoire de saut</span>
+<ul>
+  <li><strong>Saut variable :</strong> une même impulsion de départ ; relâcher tôt multiplie la vitesse verticale par <code>jump_cut</code>. Une tape donne un petit saut, une pression longue un grand saut.</li>
+  <li><strong>Coyote time :</strong> on accepte un saut quelques centièmes de seconde après avoir quitté le bord.</li>
+  <li><strong>Mémoire de saut (buffer) :</strong> un appui juste avant l'atterrissage est mémorisé et exécuté au contact du sol.</li>
+</ul>
+<p>Les deux derniers sont des conforts modernes. Pour un ressenti strictement « 1995 », mets <code>coyote_time</code> et <code>jump_buffer</code> à 0.</p></div>
+
+<h3 id="melee">Melee : l'attaque au contact</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/melee.gd">
+extends State
+## Coup au contact. La Hitbox n'est active que sur les images « actives » du coup.
+
+@export var duration := 0.24
+@export var active_from := 0.05
+@export var active_to := 0.16
+@export var combo_window := 0.35   ## délai pour enchaîner poing puis pied
+
+@onready var p: Player = owner
+var _t := 0.0
+var _active := false
+var _combo := 0
+var _last_end_ms := -100000
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	_t = 0.0
+	_active = false
+	p.velocity.x = 0.0
+	var since_last := (Time.get_ticks_msec() - _last_end_ms) / 1000.0
+	_combo = (_combo + 1) % 2 if since_last < combo_window else 0
+	p.play_anim(&"punch" if _combo == 0 else &"kick")
+
+
+func exit() -> void:
+	p.melee_off()
+	_last_end_ms = Time.get_ticks_msec()
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	p.velocity.x = 0.0
+	_t += delta
+	var should_be_active := _t >= active_from and _t < active_to
+	if should_be_active != _active:
+		_active = should_be_active
+		if _active:
+			p.melee_on()
+		else:
+			p.melee_off()
+	if _t >= duration:
+		transition_to(&"Idle")
+</script>
+<div class="callout concept"><span class="tag">Concept : images de préparation, actives et de récupération</span><p>Un coup se découpe en trois temps : la <strong>préparation</strong> (le bras recule, aucun dégât), les images <strong>actives</strong> (la Hitbox existe) et la <strong>récupération</strong> (vulnérable, rien ne se passe). Régler ces trois durées, c'est régler le « poids » d'une attaque. Toutes trois sont exposées en <code>@export</code>.</p></div>
+
+<h3 id="hang">Hang : suspendu sous le balcon</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/hang.gd">
+extends State
+## Suspendu au rebord. Saut = grimper ; bas + saut = se laisser tomber.
+## On peut tirer devant, en diagonale basse et vers le bas.
+
+@export var hang_offset := 44.0   ## distance mains → pieds, À CALIBRER selon le sprite
+@onready var p: Player = owner
+var _ledge_y := 0.0
+
+
+func enter(_previous: StringName, data: Dictionary) -> void:
+	_ledge_y = data.get("ledge_y", p.global_position.y)
+	p.velocity = Vector2.ZERO
+	p.global_position.y = _ledge_y + hang_offset
+
+
+func physics_update(_delta: float) -> void:
+	p.velocity = Vector2.ZERO
+	if p.wants_jump():
+		p.consume_jump()
+		if Input.is_action_pressed("move_down"):
+			transition_to(&"Air")   # on lâche
+		else:
+			# Grimper : on pose les pieds juste au-dessus du rebord.
+			p.global_position.y = _ledge_y - 1.0
+			transition_to(&"Air")   # Air détecte le sol au tick suivant et passe en Idle
+		return
+	var dir := p.read_move_x()
+	if dir != 0.0:
+		p.set_facing(int(signf(dir)))
+	p.try_attack(false, false)   # pas de tir vers le haut à travers le balcon
+	p.play_anim(&"hang")
+</script>
+<div class="callout warn"><span class="tag">Interprétation</span><p>La vidéo montre Batman suspendu, pas la manière d'y arriver. Comme le balcon est traversable par en dessous, on exige que le joueur <strong>maintienne « haut »</strong> près du sommet du saut pour s'accrocher ; sinon il traverse et atterrit dessus. Côté décor, chaque rebord est une petite <code>Area2D</code> sur la couche 8, dont la position Y est exactement la surface du balcon.</p></div>
+
+<h3 id="hurt-dead">Hurt, Grabbed, Dead, Victory</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/hurt.gd">
+extends State
+## Recul après un coup : pas de contrôle pendant hurt_time.
+
+@onready var p: Player = owner
+var _t := 0.0
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	_t = 0.0
+	p.melee_off()
+	p.play_anim(&"hurt")
+
+
+func physics_update(delta: float) -> void:
+	_t += delta
+	p.apply_gravity(delta)
+	p.velocity.x = move_toward(p.velocity.x, 0.0, 600.0 * delta)
+	if _t < p.hurt_time:
+		return
+	transition_to(&"Idle" if p.is_on_floor() else &"Air")
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/grabbed.gd">
+extends State
+## Empoigné par un costaud (tome 05). Marteler les boutons pour se dégager.
+
+@export var escape_presses := 6
+@onready var p: Player = owner
+var _presses := 0
+var _grabber: Node2D
+
+
+func enter(_previous: StringName, data: Dictionary) -> void:
+	_grabber = data.get("grabber")
+	_presses = 0
+	p.velocity = Vector2.ZERO
+	p.melee_off()
+	p.play_anim(&"grabbed")
+
+
+func physics_update(_delta: float) -> void:
+	p.velocity = Vector2.ZERO
+	for action in ["attack", "jump", "move_left", "move_right"]:
+		if Input.is_action_just_pressed(action):
+			_presses += 1
+	if _presses >= escape_presses or not is_instance_valid(_grabber):
+		if is_instance_valid(_grabber) and _grabber.has_method("release"):
+			_grabber.release()
+		p.velocity = Vector2(-p.facing * 120.0, -150.0)
+		p.start_invincibility(0.8)
+		transition_to(&"Air")
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/dead.gd">
+extends State
+## Animation de mort, puis signal « died » : la section décide (réapparition ou game over).
+
+@export var duration := 2.0
+@onready var p: Player = owner
+var _t := 0.0
+var _reported := false
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	_t = 0.0
+	_reported = false
+	p.melee_off()
+	p.hurtbox.invincible = true
+	p.velocity = Vector2(-p.facing * 60.0, -200.0)
+	p.play_anim(&"dead")
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	if p.is_on_floor():
+		p.velocity.x = 0.0
+	_t += delta
+	if _t >= duration and not _reported:
+		_reported = true
+		p.died.emit()
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/victory.gd">
+extends State
+## Pose de victoire après un boss : cape fermée, immobile (vidéo 6:20, 10:41, 14:33).
+
+@onready var p: Player = owner
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	p.melee_off()
+	p.hurtbox.invincible = true
+	p.velocity.x = 0.0
+	p.play_anim(&"victory")
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	p.velocity.x = 0.0
+</script>
+<div class="callout concept"><span class="tag">Pourquoi des compteurs plutôt que des <code>await</code> ?</span><p>L'ancienne doc A utilisait <code>await get_tree().create_timer(0.25).timeout</code> pour terminer une attaque. Si un coup arrive entre-temps, l'ancien <code>await</code> se réveille plus tard et remet l'état à IDLE au mauvais moment. Un compteur décrémenté dans <code>physics_update()</code> meurt avec l'état : quand on sort de l'état, il n'existe plus de minuterie fantôme.</p></div>
+
+<h2 id="camera">La caméra</h2>
+<div class="callout video"><span class="tag">Mesuré dans la vidéo</span><p>Quand Batman se met à courir, le défilement monte progressivement (6, 18, puis 30 px par 12 images) avant de se stabiliser à ~2 px/image. À l'arrêt, il retombe en douceur (18, 9, 4, 2). La caméra <strong>rattrape</strong> le joueur et <strong>anticipe</strong> dans sa direction ; elle ne lui est pas collée.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/camera_rig.gd">
+class_name CameraRig
+extends Camera2D
+## Caméra de run & gun : suit le joueur avec anticipation, ne revient jamais en arrière,
+## peut être verrouillée sur une arène ou défiler toute seule (convoi).
+
+@export var target: Player
+@export var look_ahead := 40.0     ## px d'avance dans la direction du regard
+@export var follow_rate := 5.0     ## plus grand = rattrapage plus rapide
+@export var forward_only := true   ## l'écran ne recule pas
+@export var fixed_y := 112.0       ## les sections du niveau 1 ne défilent pas verticalement
+
+var autoscroll_speed := 0.0        ## px/s, utilisé par le convoi (tome 09)
+var _locked := false
+var _lock_center_x := 0.0
+
+
+func _ready() -> void:
+	make_current()
+	if target:
+		target.camera = self
+		global_position = Vector2(target.global_position.x, fixed_y)
+
+
+func _physics_process(delta: float) -> void:
+	if target == null:
+		return
+	var x := global_position.x
+	if _locked:
+		x = move_toward(x, _lock_center_x, 240.0 * delta)
+	else:
+		var desired := target.global_position.x + look_ahead * target.facing
+		# Lissage exponentiel indépendant du nombre d'images par seconde.
+		var t := 1.0 - exp(-follow_rate * delta)
+		var next := lerpf(x, desired, t) + autoscroll_speed * delta
+		x = maxf(next, x) if forward_only else next
+	global_position = Vector2(x, fixed_y)
+
+
+## Fige l'écran sur une arène (les vagues d'ennemis du tome 05).
+func lock_on(center_x: float) -> void:
+	_locked = true
+	_lock_center_x = center_x
+
+
+func unlock() -> void:
+	_locked = false
+
+
+func view_rect() -> Rect2:
+	var size := get_viewport_rect().size / zoom
+	return Rect2(global_position - size / 2.0, size)
+
+
+func clamp_to_view(body: Node2D, margin := 10.0) -> void:
+	var r := view_rect()
+	body.global_position.x = clampf(body.global_position.x, r.position.x + margin, r.end.x - margin)
+</script>
+<div class="callout concept"><span class="tag">Concept : lissage indépendant de la fréquence d'affichage</span><p><code>lerp(x, cible, 0.1)</code> à chaque image va deux fois plus vite à 120 Hz qu'à 60 Hz. La forme <code>1 - exp(-k × delta)</code> donne la même courbe quelle que soit la fréquence. C'est le bon réflexe dès qu'on « rattrape » une valeur.</p></div>
+<p>Dans chaque section, la caméra est un nœud de la scène (pas un enfant du joueur), avec <code>target</code> pointant vers Batman. Grâce au <em>snap au pixel</em> du tome 02, la position à virgule de la caméra ne fait pas trembler les pixels.</p>
+
+<h2 id="tester">Tester</h2>
+<p>Instancie <code>player.tscn</code> et un nœud <code>Camera2D</code> avec <code>camera_rig.gd</code> dans la salle de test du tome 02. Ajoute sous le balcon une <code>Area2D</code> « Ledge » (couche 8) avec un rectangle de 200×4 dont le haut est aligné sur la surface du balcon. Tant que le tome 04 n'est pas fait, il n'y a pas de nœud <code>WeaponSystem</code> : <code>weapons</code> vaut <code>null</code> et <code>try_attack()</code> ne tire pas, sans erreur. Crée dès maintenant <code>res://player/batman.tres</code> et <code>robin.tres</code> (des <code>HeroData</code>, même avec un <code>SpriteFrames</code> provisoire) : <code>player.gd</code> charge celui qui correspond à <code>Game.hero</code>.</p>
+<div class="callout goal"><span class="tag">Objectif de l'étape</span>
+<ul class="check">
+  <li>Batman court à ~117 px/s, s'arrête net, saute plus ou moins haut selon la durée d'appui.</li>
+  <li>Il s'accroupit, descend du balcon avec bas + saut, s'accroche sous le balcon en maintenant haut, puis grimpe.</li>
+  <li>Avec une Hurtbox d'ennemi factice (couche 6) devant lui, l'attaque donne un coup de poing ; en l'air, un coup de pied.</li>
+  <li>La caméra anticipe dans le sens de la course, ne recule pas, et Batman ne peut pas sortir par la gauche de l'écran.</li>
+</ul></div>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>

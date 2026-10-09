@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 · Le niveau 1 décortiqué — Batman &amp; Robin × Godot</title>
+<meta name="description" content="Document de conception de référence du niveau 1, reconstitué image par image depuis le playthrough : frise, HUD, ennemis, bonus, boss et mesures.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Tome 01 · Référence</div>
+  <h1>Le niveau 1 décortiqué</h1>
+  <p class="lead">Le document de conception (« GDD ») qu'on aurait aimé avoir : tout ce que le playthrough montre de 0:00 à 14:37, horodaté et illustré. Les tomes suivants s'y réfèrent en permanence.</p>
+  <div class="meta"><span class="pill gold">Source : youtu.be/EDaIlrfxRnE</span><span class="pill">3 visionnages + ralentis + mesures à 60 i/s</span></div>
+</section>
+
+<h2 id="frise">La frise du niveau</h2>
+<div class="timeline">
+  <div class="tl-bar">
+    <div class="c-front" style="flex:105" title="Intro et menus 0:00–1:45">Intro &amp; menus</div>
+    <div class="c-s1" style="flex:58" title="Rue 1:46–2:43">Rue</div>
+    <div class="c-fire" style="flex:122" title="Banque en feu 2:44–4:45">Banque en feu</div>
+    <div class="c-boss" style="flex:97" title="Boss 1 4:46–6:22">Boss 1</div>
+    <div class="c-s2" style="flex:205" title="Gem Expo + entrepôt 6:23–9:47">Gem Expo · entrepôt</div>
+    <div class="c-boss" style="flex:56" title="Mini-boss 9:48–10:43">Harley</div>
+    <div class="c-s3" style="flex:140" title="Convoi 10:44–13:03">Convoi</div>
+    <div class="c-boss" style="flex:93" title="Boss Joker 13:04–14:36">Joker</div>
+    <div class="c-end" style="flex:4" title="Fin 14:37"></div>
+  </div>
+  <div class="tl-legend">
+    <span><i class="c-front"></i>Écrans hors jeu</span><span><i class="c-s1"></i>Section 1</span><span><i class="c-fire"></i>Section 1 (palette « incendie »)</span>
+    <span><i class="c-s2"></i>Section 2</span><span><i class="c-s3"></i>Section 3</span><span><i class="c-boss"></i>Combats de boss</span>
+  </div>
+</div>
+<div class="table-wrap"><table>
+<tr><th>Début</th><th>Séquence</th><th>Points clés</th></tr>
+<tr><td><a class="tc" href="#">0:00</a></td><td>Logos et cinématique d'intro</td><td>SEGA, copyright, fourgon de police, façade en perspective, Batman &amp; Robin sur le dôme, évasion d'Arkham déclenchée par une main gelée (Mr. Freeze), logo Clockwork Tortoise</td></tr>
+<tr><td><a class="tc" href="#">1:25</a></td><td>Titre → menu → options → sélection du personnage</td><td>START / OPTIONS ; CREDITS · MUSIC TEST · SOUND TEST ; PLAYER SELECT Batman / Robin</td></tr>
+<tr><td><a class="tc" href="#">1:39</a></td><td>Batmobile puis carte-titre</td><td>« LEVEL ONE — HAPPY BIRTHDAY TO ME! »</td></tr>
+<tr><td><a class="tc" href="#">1:46</a></td><td><strong>Section 1</strong> : rue de Gotham</td><td>Façade à balcon praticable, clowns, arène → GO!</td></tr>
+<tr><td><a class="tc" href="#">2:44</a></td><td>Explosion de la Bank of Gotham City</td><td>Flash blanc de 3 s, la palette passe du bleu nuit au violet/ocre, flammes géantes, débris en pluie</td></tr>
+<tr><td><a class="tc" href="#">4:46</a></td><td><strong>Boss 1</strong> : machine d'Harley</td><td>3 phases, vitalité 99 → 00, +5 000 points, pose de victoire</td></tr>
+<tr><td><a class="tc" href="#">6:23</a></td><td><strong>Section 2</strong> : Gem Expo</td><td>Colonnes de marbre au premier plan, têtes à hélice en formation</td></tr>
+<tr><td><a class="tc" href="#">9:09</a></td><td>Entrepôt de caisses</td><td>Pyramides de caisses, Harley passe en fauteuil-fusée (<a class="tc" href="#">9:25</a>)</td></tr>
+<tr><td><a class="tc" href="#">9:48</a></td><td><strong>Mini-boss</strong> : Harley + grappin de grue</td><td>Grappin en sphères (secret #3 de Burton), +5 000 points</td></tr>
+<tr><td><a class="tc" href="#">10:44</a></td><td><strong>Section 3</strong> : convoi de camions</td><td>Défilement continu, sauts entre véhicules, ballons-mines, cadeaux</td></tr>
+<tr><td><a class="tc" href="#">13:04</a></td><td><strong>Boss</strong> : montgolfière du Joker</td><td>Approche et éloignement par mise à l'échelle, grappes de bombes, +10 000 points</td></tr>
+<tr><td><a class="tc" href="#">14:37</a></td><td>Batmobile</td><td>Transition vers le niveau 2</td></tr>
+</table></div>
+<div class="callout video"><span class="tag">Observé dans la vidéo</span><p>Le jeu n'affiche <strong>aucun écran de titre entre les sections</strong> : on passe d'une section à l'autre par un simple fondu au noir (<a class="tc" href="#">6:22</a>, <a class="tc" href="#">9:08</a>, <a class="tc" href="#">10:44</a>). Les noms « 1-1, 1-2, 1-3 » des anciennes docs n'existent pas à l'écran. Ce guide parle de <strong>sections</strong>.</p></div>
+
+<h2 id="ecrans">Avant de jouer : intro et menus</h2>
+<div class="shots">
+  <figure class="shot"><img src="img/intro-perspective.jpg" alt="Façade en perspective dans l'intro"><figcaption>La façade bascule en contre-plongée. <a class="tc" href="#">0:13</a></figcaption></figure>
+  <figure class="shot"><img src="img/intro-monitors.jpg" alt="Moniteurs de surveillance d'Arkham"><figcaption>Arkham : moniteurs montrant le Joker, Double-Face et le Chapelier fou. <a class="tc" href="#">0:41</a></figcaption></figure>
+  <figure class="shot"><img src="img/title.jpg" alt="Écran titre"><figcaption>Titre : des yeux dans le noir, puis le logo. <a class="tc" href="#">1:26</a></figcaption></figure>
+  <figure class="shot"><img src="img/options.jpg" alt="Écran des options"><figcaption>Options : CREDITS 6, MUSIC TEST, SOUND TEST. Rien d'autre. <a class="tc" href="#">1:30</a></figcaption></figure>
+  <figure class="shot"><img src="img/player-select.jpg" alt="Sélection du joueur"><figcaption>PLAYER SELECT : bande bleue Batman, bande rouge Robin. <a class="tc" href="#">1:36</a></figcaption></figure>
+  <figure class="shot"><img src="img/title-card.jpg" alt="Carte-titre du niveau 1"><figcaption>Carte-titre : le Joker et un gâteau dont les bougies sont des gratte-ciel. <a class="tc" href="#">1:43</a></figcaption></figure>
+</div>
+<p>Le détail de chaque écran et leur implémentation se trouvent au <a href="10-ecrans-flux.html">tome 10</a>.</p>
+
+<h2 id="hud">Le HUD</h2>
+<figure class="shot" style="max-width:520px"><img src="img/hud.jpg" alt="Gros plan du HUD" style="aspect-ratio:3/1"><figcaption>Gros plan du HUD (×2). <a class="tc" href="#">6:09</a></figcaption></figure>
+<div class="table-wrap"><table>
+<tr><th>Élément</th><th>Position</th><th>Rôle constaté</th></tr>
+<tr><td>Tête de Batman (ou de Robin)</td><td>haut gauche</td><td>Portrait du joueur 1</td></tr>
+<tr><td>Médaillon rond avec un chiffre</td><td>à droite du portrait</td><td>Le chiffre = <strong>vies</strong> (2 au départ, puis 3 à <a class="tc" href="#">7:16</a> et 4 à <a class="tc" href="#">8:20</a>). L'<strong>anneau orange segmenté</strong> autour = <strong>santé</strong> ; il perd des segments à chaque coup.</td></tr>
+<tr><td>Score</td><td>haut</td><td>Sans zéros devant (« 60 », « 17670 »)</td></tr>
+<tr><td>Barre horizontale</td><td>sous le score</td><td><strong>Jauge de charge</strong> : se remplit seule en environ 1 s quand on ne tire pas et se vide au tir chargé. Sa couleur suit l'arme équipée.</td></tr>
+<tr><td>Pastille « 99 »</td><td>haut centre, combats de boss uniquement</td><td><strong>Vitalité du boss</strong>, de 99 à 00</td></tr>
+<tr><td>Zone joueur 2</td><td>haut droite</td><td>Alterne « PRESS START » / « CREDIT 06 » / « GAME OVER » à peu près chaque seconde. Pendant un boss : « BOSS TIME » / « PLEASE WAIT » (impossible de rejoindre).</td></tr>
+</table></div>
+
+<h2 id="section1">Section 1 : la rue et la banque en feu</h2>
+<div class="shots">
+  <figure class="shot"><img src="img/s11-start.jpg" alt="Début de la rue"><figcaption>Début : bleu nuit, balcon praticable. Une poubelle détruite lâche un bonus d'arme. <a class="tc" href="#">1:50</a></figcaption></figure>
+  <figure class="shot"><img src="img/s11-clowns.jpg" alt="Clowns sbires"><figcaption>Clowns en costume rayé violet et jaune, au corps-à-corps avec une traînée bleue. <a class="tc" href="#">2:15</a></figcaption></figure>
+  <figure class="shot"><img src="img/s11-bank-fire.jpg" alt="Banque en feu"><figcaption>Après l'explosion : palette violet/ocre, flammes géantes ondulantes. <a class="tc" href="#">2:52</a></figcaption></figure>
+  <figure class="shot"><img src="img/s11-hang.jpg" alt="Batman suspendu sous le balcon"><figcaption>Batman suspendu sous le balcon (au centre), sbire au lance-flammes en haut. <a class="tc" href="#">3:30</a></figcaption></figure>
+</div>
+<ul>
+  <li><strong>Deux niveaux de jeu :</strong> le trottoir et le balcon, qui court sur toute la façade. Les ennemis sautent du balcon. Batman peut s'accrocher dessous, puis grimper ou tirer depuis cette position.</li>
+  <li><strong>Rythme :</strong> la caméra se bloque, des vagues tombent du haut ou arrivent par les côtés. Une fois l'écran nettoyé, une bulle « GO! » apparaît à droite (<a class="tc" href="#">2:25</a>, <a class="tc" href="#">3:18</a>, <a class="tc" href="#">3:37</a>, <a class="tc" href="#">4:42</a>) et la caméra repart.</li>
+  <li><strong>Événement scripté :</strong> à <a class="tc" href="#">2:44</a>, explosions en chaîne à l'étage de la banque, flash blanc d'environ 3 s, puis toute la palette du décor bascule vers une ambiance d'incendie. Les foyers sont animés et des débris (papiers, billets) tombent en continu.</li>
+  <li><strong>Décor destructible :</strong> les poubelles explosent et lâchent des bonus, les vitrines se brisent et les trous restent affichés.</li>
+</ul>
+
+<h3 id="boss1">Boss 1 : la machine d'Harley Quinn</h3>
+<div class="shots">
+  <figure class="shot"><img src="img/boss1-phase-a.jpg" alt="Boss 1 phase A"><figcaption>Phase A : dôme à côtes rouges et bleues, canon rotatif, socle rose à pointes. <a class="tc" href="#">4:49</a></figcaption></figure>
+  <figure class="shot"><img src="img/boss1-phase-b.jpg" alt="Boss 1 phase B"><figcaption>Phase B : socle détruit, la capsule continue seule. <a class="tc" href="#">5:30</a></figcaption></figure>
+  <figure class="shot"><img src="img/boss1-phase-c.jpg" alt="Boss 1 phase C"><figcaption>Phase C : couronne bleue, mât télescopique et Harley au sommet ; Batman sur le balcon. <a class="tc" href="#">6:09</a></figcaption></figure>
+  <figure class="shot"><img src="img/victory-pose.jpg" alt="Pose de victoire"><figcaption>Pose de victoire : Batman cape fermée, immobile. <a class="tc" href="#">6:20</a></figcaption></figure>
+</div>
+<div class="table-wrap"><table>
+<tr><th>Phase</th><th>Période</th><th>Comportement</th></tr>
+<tr><td>A · machine complète</td><td><a class="tc" href="#">4:46</a>–<a class="tc" href="#">5:20</a></td><td>Glisse de gauche à droite sur toute la largeur. Le canon tourne (horizontal, diagonale haute, vertical) et tire des salves de 3–4 boules en arc qui rebondissent au sol. Flash blanc quand il est touché.</td></tr>
+<tr><td>B · capsule</td><td><a class="tc" href="#">5:20</a>–<a class="tc" href="#">5:58</a></td><td>Le socle explose et éjecte 4 bombes orange en couronne. La capsule continue de glisser, le canon fait des tours complets.</td></tr>
+<tr><td>C · Harley exposée</td><td><a class="tc" href="#">5:58</a>–<a class="tc" href="#">6:16</a></td><td>Le dôme explose en gerbe. Il reste une couronne bleue en pétales d'où sort un mât télescopique. Harley, assise dans un fauteuil au sommet, lance des bombes clignotantes et monte jusqu'au niveau du balcon.</td></tr>
+<tr><td>Fin</td><td><a class="tc" href="#">6:16</a></td><td>Vitalité à 00, anneau d'explosions plein écran, +5 000 points, pose de victoire, fondu au noir.</td></tr>
+</table></div>
+
+<h2 id="section2">Section 2 : Gem Expo, entrepôt et mini-boss</h2>
+<div class="shots">
+  <figure class="shot"><img src="img/s12-gem-expo.jpg" alt="Gem Expo"><figcaption>GEM EXPO : colonnes de marbre au premier plan, bannière, sol en damier. <a class="tc" href="#">6:24</a></figcaption></figure>
+  <figure class="shot"><img src="img/s12-propellers.jpg" alt="Têtes à hélice"><figcaption>Vague de têtes à hélice, avec explosions en chapelet. <a class="tc" href="#">6:58</a></figcaption></figure>
+  <figure class="shot"><img src="img/s12-go.jpg" alt="Panneau GO"><figcaption>La bulle « GO! » signale la fin de l'arène. <a class="tc" href="#">7:49</a></figcaption></figure>
+  <figure class="shot"><img src="img/s12-pickup.jpg" alt="Bonus d'arme"><figcaption>Bonus d'arme au sol (couleur cyclique). <a class="tc" href="#">8:41</a></figcaption></figure>
+  <figure class="shot"><img src="img/s12-warehouse.jpg" alt="Entrepôt"><figcaption>Entrepôt : pyramides de caisses à franchir. <a class="tc" href="#">9:15</a></figcaption></figure>
+  <figure class="shot"><img src="img/s12-harley-teaser.jpg" alt="Harley passe"><figcaption>Harley traverse l'écran en fauteuil-fusée : annonce du mini-boss. <a class="tc" href="#">9:27</a></figcaption></figure>
+</div>
+<ul>
+  <li><strong>Premier plan :</strong> les colonnes de marbre défilent plus vite que l'action et la masquent en partie. C'est une couche de parallaxe <em>devant</em> le joueur.</li>
+  <li><strong>Décor en boucle :</strong> la même salle (colonnes, bannière, vitrines) revient plusieurs fois. Le niveau est construit avec des modules répétés.</li>
+  <li><strong>Têtes à hélice :</strong> petits drones-jouets en tête de clown qui arrivent en file indienne (colonne verticale), puis s'alignent en haut de l'écran et lâchent des haches ou des bombes.</li>
+  <li><strong>Entrepôt :</strong> le sol monte et descend au gré des pyramides de caisses. Au fond, des verrières et des piles de caisses bleues.</li>
+</ul>
+
+<h3 id="miniboss">Mini-boss : Harley et le grappin de grue</h3>
+<div class="shots">
+  <figure class="shot"><img src="img/mb-crane-arm.jpg" alt="Grappin en sphères"><figcaption>Grappin à 4 doigts en sphères cuivrées, au bout d'une chaîne de sphères sombres. <a class="tc" href="#">10:13</a></figcaption></figure>
+  <figure class="shot"><img src="img/mb-harley.jpg" alt="Harley en fauteuil-fusée"><figcaption>Harley dans son fauteuil-fusée ; la cabine de la grue en arrière-plan. <a class="tc" href="#">10:20</a></figcaption></figure>
+  <figure class="shot"><img src="img/mb-harley-ko.jpg" alt="Harley KO"><figcaption>Harley au sol, K.O. <a class="tc" href="#">10:41</a></figcaption></figure>
+</div>
+<ul>
+  <li>Le grappin descend, frappe le sol (gerbe de débris), remonte, se déplace latéralement et passe en profondeur : il devient alors plus petit et plus sombre. C'est le secret #3 de Burton.</li>
+  <li>Harley vole dans la moitié haute, monte et descend, tire de petits projectiles et lâche des bombes. Il faut la viser en diagonale haute.</li>
+  <li>Vitalité 99 → 00 en une vingtaine de secondes de tirs nourris. +5 000 points, Harley tombe en vrille, explosion, pose de victoire.</li>
+</ul>
+
+<h2 id="section3">Section 3 : le convoi et le Joker</h2>
+<div class="shots">
+  <figure class="shot"><img src="img/s13-convoy.jpg" alt="Convoi de camions"><figcaption>Camions plateaux chargés de caisses ; la rue défile en continu. <a class="tc" href="#">10:46</a></figcaption></figure>
+  <figure class="shot"><img src="img/s13-police.jpg" alt="Véhicules du convoi"><figcaption>Fourgon violet, plateau nu, cadeau à ruban : bonus. <a class="tc" href="#">11:03</a></figcaption></figure>
+  <figure class="shot"><img src="img/s13-balloons.jpg" alt="Ballons-mines"><figcaption>Ballons de couleur portant chacun une mine à pointes. <a class="tc" href="#">11:20</a></figcaption></figure>
+  <figure class="shot"><img src="img/s13-gift.jpg" alt="Cadeau géant"><figcaption>Paquet-cadeau géant tiré par un camion ; un sbire en sort. <a class="tc" href="#">11:43</a></figcaption></figure>
+  <figure class="shot"><img src="img/s13-smartbomb.jpg" alt="Smart bomb"><figcaption>Juste après le crâne : tout ce qui est à l'écran explose. <a class="tc" href="#">12:24</a></figcaption></figure>
+</div>
+<ul>
+  <li><strong>Défilement :</strong> le décor (vitrines roses, réverbères et leur halo) défile en permanence. Les véhicules se suivent : plateau à caisses, fourgon violet, plateau nu, voiture de police, puis la séquence se répète.</li>
+  <li><strong>Plateformes mobiles :</strong> les écarts entre véhicules varient. Il faut sauter de l'un à l'autre, et les piles de caisses forment des marches.</li>
+  <li><strong>Deux vagues de ballons-mines</strong> montent depuis le bas et la droite en oscillant (<a class="tc" href="#">11:10</a>, <a class="tc" href="#">12:04</a>).</li>
+</ul>
+
+<h3 id="joker">Boss : la montgolfière du Joker</h3>
+<div class="shots">
+  <figure class="shot"><img src="img/joker-enter.jpg" alt="Entrée de la montgolfière"><figcaption>Entrée : la nacelle descend du haut de l'écran. <a class="tc" href="#">13:06</a></figcaption></figure>
+  <figure class="shot"><img src="img/joker-close.jpg" alt="Montgolfière au premier plan"><figcaption>Au plus près : l'enveloppe occupe la moitié de l'écran. <a class="tc" href="#">13:23</a></figcaption></figure>
+  <figure class="shot"><img src="img/joker-flash.jpg" alt="Flash de dégâts"><figcaption>Touchée : toute la palette vire au pastel. <a class="tc" href="#">13:38</a></figcaption></figure>
+  <figure class="shot"><img src="img/joker-explode.jpg" alt="Explosion en chaîne"><figcaption>Vitalité à 00 : explosions en chaîne sur l'enveloppe. <a class="tc" href="#">14:26</a></figcaption></figure>
+  <figure class="shot"><img src="img/joker-ko.jpg" alt="Joker KO"><figcaption>Le Joker éjecté, affalé sur le plateau. <a class="tc" href="#">14:33</a></figcaption></figure>
+  <figure class="shot"><img src="img/batmobile.jpg" alt="Batmobile"><figcaption>Fin : la Batmobile repart. <a class="tc" href="#">14:38</a></figcaption></figure>
+</div>
+<ul>
+  <li><strong>Arène :</strong> un plateau de camion vide, le seul sol. Le décor continue de défiler derrière.</li>
+  <li><strong>Cycle :</strong> la montgolfière entre par un bord, petite et haute (au loin), puis grossit en descendant vers Batman (elle approche), traverse et sort par l'autre bord. L'écran reste vide quelques secondes (<a class="tc" href="#">13:59</a>–<a class="tc" href="#">14:04</a>), puis elle revient.</li>
+  <li><strong>Attaques :</strong> grappes de petites bombes noires lâchées en ligne ou en colonne, qui rebondissent sur le plateau. D'autres sources mentionnent aussi des rebonds au sol et des charges horizontales du ballon ; elles ne sont pas visibles dans cette partie.</li>
+  <li><strong>Lecture des dégâts :</strong> flash pastel de tout le ballon (<a class="tc" href="#">13:08</a>, <a class="tc" href="#">13:29</a>, <a class="tc" href="#">13:38</a>, <a class="tc" href="#">13:51</a>, <a class="tc" href="#">14:06</a>). La vitalité descend surtout quand le ballon est grand, donc proche.</li>
+  <li><strong>Mort :</strong> 5 secondes d'explosions en chaîne, le Joker éjecté retombe sur le plateau, +10 000 points, pose de victoire, fondu, Batmobile.</li>
+</ul>
+
+<h2 id="bestiaire">Bestiaire</h2>
+<div class="table-wrap"><table>
+<tr><th>Ennemi</th><th>Première apparition</th><th>Comportement observé</th></tr>
+<tr><td>Clown rayé (bonnet d'arlequin)</td><td><a class="tc" href="#">1:52</a></td><td>Arrive par les côtés ou saute du balcon ; frappe au corps-à-corps avec un aiguillon qui laisse une traînée bleue ; lance parfois de petits projectiles</td></tr>
+<tr><td>Tireur (veste verte, arme longue)</td><td><a class="tc" href="#">2:27</a></td><td>Saute, se poste, tire à l'horizontale</td></tr>
+<tr><td>Sbire rose (crâne rasé) armé</td><td><a class="tc" href="#">2:36</a></td><td>Rafales de boules orange ou bleues, lance-flammes depuis le balcon</td></tr>
+<tr><td>Costaud au sac</td><td><a class="tc" href="#">2:51</a></td><td>Charge et <strong>empoigne</strong> Batman au corps-à-corps</td></tr>
+<tr><td>Acrobate maigre vert et violet</td><td><a class="tc" href="#">4:06</a></td><td>Lance des projectiles en arc</td></tr>
+<tr><td>Tête de clown à hélice</td><td><a class="tc" href="#">6:52</a></td><td>Vole en formation (file indienne, puis ligne) et lâche hache ou bombe</td></tr>
+<tr><td>Sbire vert au sac</td><td><a class="tc" href="#">7:42</a></td><td>Saute, frappe</td></tr>
+<tr><td>Ballon-mine</td><td><a class="tc" href="#">11:10</a></td><td>Monte en oscillant ; explose au contact ou quand on le touche</td></tr>
+<tr><td>Diable en boîte (cadeau géant)</td><td><a class="tc" href="#">11:42</a></td><td>Un sbire jaillit d'un paquet géant</td></tr>
+</table></div>
+
+<h2 id="bonus">Objets et bonus</h2>
+<div class="table-wrap"><table>
+<tr><th>Objet</th><th>Aspect</th><th>Effet</th><th>Source</th></tr>
+<tr><td>Bonus d'arme</td><td>Disque au logo chauve-souris qui change de couleur environ chaque seconde : rouge/orange → bleu → vert</td><td>La couleur au moment du ramassage donne l'arme : rouge = batarang, vert = bolas, bleu = shuriken. Même couleur que l'arme en main : niveau +1, jusqu'à 7.</td><td>Vidéo <a class="tc" href="#">1:48</a> <a class="tc" href="#">12:30</a> + TASVideos</td></tr>
+<tr><td>Crâne</td><td>Crâne qui roule au sol vers le joueur</td><td>Smart bomb : flash blanc, tous les ennemis à l'écran détruits</td><td>Vidéo <a class="tc" href="#">2:06</a> + TASVideos</td></tr>
+<tr><td>Bonus de charge</td><td>—</td><td>Remplit instantanément la jauge de charge</td><td>TASVideos (pas identifié à l'écran)</td></tr>
+<tr><td>Emblème chauve-souris (ovale)</td><td>Flotte en l'air</td><td>Probablement une vie supplémentaire (les vies augmentent vers <a class="tc" href="#">7:16</a>)</td><td>À confirmer</td></tr>
+<tr><td>Cadeau à ruban</td><td>Petit paquet rouge et vert</td><td>Conteneur à bonus</td><td>Vidéo <a class="tc" href="#">10:45</a></td></tr>
+<tr><td>Poubelles</td><td>Décor</td><td>Destructibles, lâchent des bonus</td><td>Vidéo <a class="tc" href="#">1:48</a></td></tr>
+</table></div>
+
+<h2 id="joueur">Ce que fait Batman</h2>
+<ul>
+  <li><strong>Course</strong> à environ 2 px par image (voir mesures), arrêt sec.</li>
+  <li><strong>Saut</strong> ; <strong>attaque aérienne</strong> tournoyante, cape en éventail (<a class="tc" href="#">2:06</a>, <a class="tc" href="#">6:04</a>).</li>
+  <li><strong>Accroupi</strong> pour esquiver les salves du boss 1 (<a class="tc" href="#">5:07</a>).</li>
+  <li><strong>Tir dans 8 directions</strong> : diagonale haute vers le balcon et vers les boss aériens, verticale contre la montgolfière.</li>
+  <li><strong>Attaque contextuelle</strong> : coups de poing et de pied au contact, projectile à distance (même bouton).</li>
+  <li><strong>Suspension</strong> sous le rebord du balcon (<a class="tc" href="#">3:30</a>).</li>
+  <li><strong>Empoigné</strong> par les costauds (<a class="tc" href="#">2:51</a>).</li>
+  <li><strong>Pose de victoire</strong> après chaque boss.</li>
+</ul>
+
+<h2 id="mesures">Mesures prises dans la vidéo</h2>
+<p>Sur une course continue dans la rue vide juste avant le boss 1 (<a class="tc" href="#">4:42</a>–<a class="tc" href="#">4:46</a>), j'ai extrait les images à 60 i/s en résolution native 320×224, puis mesuré par corrélation le décalage horizontal de chaque bande de 10 lignes sur 12 images :</p>
+<div class="table-wrap"><table>
+<tr><th>Lignes de l'écran</th><th>Contenu</th><th>Défilement</th></tr>
+<tr><td>20–30</td><td>HUD</td><td>0 (fixe)</td></tr>
+<tr><td>32–114</td><td>Façade haute, balcon</td><td><strong>2,00–2,08 px/image</strong></td></tr>
+<tr><td>116–162</td><td>Dessous du balcon</td><td>1,92 → 1,83 px/image</td></tr>
+<tr><td>164–174</td><td>Vitrine en retrait</td><td><strong>1,75 px/image</strong></td></tr>
+<tr><td>200–222</td><td>Trottoir</td><td>1,92 px/image</td></tr>
+</table></div>
+<div class="callout concept"><span class="tag">Ce que ça prouve</span><p>Toutes les bandes ne défilent pas à la même vitesse : la vitrine en retrait est plus « loin » que la façade du balcon. C'est exactement le secret #1 de Burton. Chaque <strong>ligne</strong> a sa propre vitesse, et c'est ce qui donne du relief à une image plate. On reproduit cette table de vitesses au <a href="06-effets-megadrive.html">tome 06</a>.</p></div>
+<ul>
+  <li><strong>Vitesse de course</strong> ≈ vitesse de caméra en régime établi ≈ <strong>1,9–2,0 px/image ≈ 115–120 px/s</strong>.</li>
+  <li><strong>Caméra :</strong> à l'accélération, le décalage monte progressivement (6 → 18 → 30 px par 12 images) avant de se stabiliser ; à l'arrêt, il décroît en douceur (18, 9, 4, 2). La caméra est donc <strong>lissée et en avance</strong> sur le joueur, pas collée à lui.</li>
+  <li><strong>Jauge de charge :</strong> vide à pleine en environ 1,1 s (<a class="tc" href="#">1:46.5</a> → <a class="tc" href="#">1:47.6</a>).</li>
+  <li><strong>Bonus d'arme :</strong> change de couleur environ une fois par seconde.</li>
+  <li><strong>Score :</strong> boss 1 et mini-boss = +5 000, Joker = +10 000. Score en fin de niveau dans cette partie : 73 410.</li>
+</ul>
+
+<h2 id="inconnues">Ce que la vidéo ne permet pas de trancher</h2>
+<div class="callout warn"><span class="tag">À calibrer dans un émulateur</span>
+<ul>
+  <li>Hauteur exacte du saut, existence d'un saut à hauteur variable ou d'un double saut.</li>
+  <li>Nombre exact de segments de santé (environ 8 à 10 visibles), dégâts de chaque ennemi.</li>
+  <li>Effet exact des niveaux 1 à 7 de chaque arme (nombre de projectiles, cadence).</li>
+  <li>Ce qui se passe quand on ramasse une couleur différente : retour au niveau 1, ou niveau conservé ?</li>
+  <li>Origine des vies supplémentaires : palier de score ou objet ?</li>
+  <li>Boutons exacts. Le manuel cite A ou C pour l'attaque contextuelle ; le saut est probablement sur B.</li>
+</ul>
+<p>Le code de ce guide expose toutes ces valeurs en <code>@export</code>, avec des valeurs par défaut raisonnables.</p></div>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>

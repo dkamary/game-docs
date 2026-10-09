@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08 · Section 2 : Gem Expo &amp; bras de grue — Batman &amp; Robin × Godot</title>
+<meta name="description" content="Section 2 : le Gem Expo en salles modulaires, les colonnes au premier plan, l'entrepôt, puis le mini-boss Harley Quinn et le bras de grue en sphères pseudo-3D (secret #3).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Tome 08</div>
+  <h1>Section 2 : Gem Expo &amp; bras de grue</h1>
+  <p class="lead">Une exposition de joyaux construite en modules, des colonnes qui passent devant la caméra, un entrepôt en escaliers de caisses, puis le morceau de bravoure technique du niveau : le grappin de grue en sphères qui plonge dans la profondeur.</p>
+  <div class="meta"><span class="pill">Modules de niveau</span><span class="pill">Cinématique en jeu</span><span class="pill">Projection perspective</span><span class="pill">Tri en profondeur</span></div>
+</section>
+
+<div class="shots">
+  <figure class="shot"><img src="img/s12-gem-expo.jpg" alt="Gem Expo"><figcaption>Le Gem Expo. <a class="tc" href="#">6:24</a></figcaption></figure>
+  <figure class="shot"><img src="img/s12-warehouse.jpg" alt="Entrepôt"><figcaption>L'entrepôt. <a class="tc" href="#">9:15</a></figcaption></figure>
+  <figure class="shot"><img src="img/mb-crane-arm.jpg" alt="Bras de grue"><figcaption>Le grappin en sphères. <a class="tc" href="#">10:13</a></figcaption></figure>
+</div>
+
+<h2 id="gem-expo">Le Gem Expo en modules</h2>
+<div class="callout video"><span class="tag">Observé dans la vidéo</span><p>La même salle revient plusieurs fois : colonnes de marbre, bannière « GEM EXPO », vitrines, plantes en pot, horloges (<a class="tc" href="#">6:24</a>, <a class="tc" href="#">7:28</a>, <a class="tc" href="#">8:32</a>). Elle alterne avec une salle à grandes baies vitrées sur la skyline (<a class="tc" href="#">7:51</a>).</p></div>
+<div class="callout md"><span class="tag">Sur Mega Drive</span><p>Une cartouche de 1995 n'a pas la place de stocker un décor unique de plusieurs milliers de pixels. Les niveaux sont faits de <strong>blocs</strong> (métatuiles) et de <strong>salles</strong> réutilisés. Ici, la répétition n'est pas une paresse : c'est une contrainte de mémoire transformée en rythme.</p></div>
+<div class="callout concept"><span class="tag">Concept : construire avec des modules</span><p>Dans Godot, une salle est une <strong>scène</strong> (<code>expo_hall.tscn</code>, <code>expo_windows.tscn</code>) qu'on instancie bout à bout dans la section. Corriger un détail dans la scène de la salle le corrige partout. Les arènes et les ennemis restent dans la scène de section : chaque instance de salle peut accueillir un combat différent.</p></div>
+<pre class="tree">S2GemExpo (Node2D, section.gd)            next_scene = s3_convoy.tscn
+├── Skyline (Parallax2D)                  scroll_scale (0.3, 0) · repeat_size = largeur de l'image
+├── World
+│   ├── Hall1 (expo_hall.tscn)            x = 0
+│   ├── Windows1 (expo_windows.tscn)      x = 640
+│   ├── Hall2 (expo_hall.tscn)            x = 1280
+│   ├── …
+│   ├── ArenaA (WaveArena)                vague 1 : clowns ; vague 2 : formation de têtes à hélice
+│   ├── …
+│   ├── Warehouse (warehouse.tscn)        caisses (TileMapLayer couche 1)
+│   ├── HarleyFlyby (Area2D)              passage d'Harley en annonce
+│   └── BossArena → CraneHarley
+├── Columns (Parallax2D)                  scroll_scale (1.3, 1) · z_index = 10 : DEVANT Batman
+├── EnemyBullets (Pool) · Player · Camera · HUD</pre>
+<ul>
+  <li><strong>Vitrines :</strong> des comptoirs bas, en <code>StaticBody2D</code> one-way (couche 2) : on peut sauter dessus.</li>
+  <li><strong>Vitres des baies :</strong> des <code>Breakable</code> avec <code>broken_texture</code> : le trou en étoile reste affiché.</li>
+  <li><strong>Colonnes :</strong> une couche <code>Parallax2D</code> au-dessus du plan de jeu. Elles masquent un instant Batman et les ennemis, comme dans le jeu. Garde-les assez fines pour que l'action reste lisible.</li>
+</ul>
+
+<h3 id="formations">Les vagues de têtes à hélice</h3>
+<p>Pour la grande vague de <a class="tc" href="#">6:52</a>–<a class="tc" href="#">7:13</a>, place deux <code>Formation</code> (tome 05) dans l'arène :</p>
+<ol>
+  <li><strong>« Chenille »</strong> : une courbe qui descend à la verticale depuis le haut de l'écran, puis serpente vers la gauche. 8 membres, <code>delay</code> 0,3 s.</li>
+  <li><strong>« Ligne »</strong> : une courbe horizontale en haut de l'écran, de droite à gauche. 6 membres, <code>delay</code> 0,25 s.</li>
+</ol>
+<p>Relie la première au champ <code>formation</code> de la vague 1 et la seconde à la vague 2. Les deux courbes se dessinent à la souris : c'est là que se joue tout le rythme de la scène.</p>
+
+<h2 id="entrepot">L'entrepôt</h2>
+<p>Les pyramides de caisses sont des blocs pleins (couche 1) dans une <code>TileMapLayer</code> : Batman doit sauter de marche en marche, et les ennemis au sol butent dessus, ce qui crée des positions de tir intéressantes. Pense à des tuiles de 16×16, la hauteur d'une caisse à l'écran.</p>
+
+<h3 id="flyby">Harley passe : une annonce en pleine partie</h3>
+<div class="callout video"><span class="tag">Observé dans la vidéo</span><p>À <a class="tc" href="#">9:25</a>–<a class="tc" href="#">9:29</a>, Harley traverse l'écran en diagonale dans son fauteuil-fusée, sans combattre. Le joueur sait désormais qui l'attend.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/s2/harley_flyby.gd">
+extends Area2D
+## Déclencheur (masque 3) : Harley traverse l'écran sans combattre (annonce du mini-boss).
+
+@export var harley_scene: PackedScene      ## juste un Sprite2D animé du fauteuil-fusée
+@export var duration := 3.0
+var _done := false
+
+
+func _ready() -> void:
+	body_entered.connect(_on_body_entered)
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if _done or not body is Player:
+		return
+	_done = true
+	var cam := (body as Player).camera.view_rect()
+	var h: Node2D = harley_scene.instantiate()
+	h.global_position = Vector2(cam.position.x - 30, cam.end.y - 60)
+	get_parent().add_child(h)
+	var tw := h.create_tween()
+	tw.tween_property(h, "global_position", Vector2(cam.end.x + 40, cam.position.y + 20), duration) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(h.queue_free)
+</script>
+<div class="callout concept"><span class="tag">Concept : le <code>Tween</code></span><p>Un <code>Tween</code> anime une propriété d'une valeur à une autre sur une durée, avec une courbe d'accélération. Pour une animation scriptée simple, c'est plus court qu'un <code>AnimationPlayer</code> et plus lisible qu'un calcul à la main dans <code>_process</code>. Il est créé sur le nœud animé (<code>h.create_tween()</code>) : si ce nœud disparaît, le tween s'arrête avec lui.</p></div>
+
+<h2 id="bras">Le mini-boss : Harley et le grappin de grue</h2>
+<div class="shots two">
+  <figure class="shot"><img src="img/mb-crane-arm.jpg" alt="Grappin au sol"><figcaption>Le grappin frappe le sol : 4 doigts de sphères cuivrées, chaîne de sphères sombres. <a class="tc" href="#">10:13</a></figcaption></figure>
+  <figure class="shot"><img src="img/mb-harley.jpg" alt="Harley en vol"><figcaption>Harley en fauteuil-fusée ; la chaîne remonte vers la cabine de la grue. <a class="tc" href="#">10:20</a></figcaption></figure>
+</div>
+<div class="callout md"><span class="tag">Ce qu'explique Burton (secret #3)</span>
+<ul>
+  <li>Des <strong>sphères</strong> : vue sous n'importe quel angle, une sphère reste un disque avec son reflet au même endroit. Pas besoin de rotation.</li>
+  <li>Environ <strong>20 sphères</strong>, chacune un sprite matériel.</li>
+  <li><strong>4 tailles</strong> de sphère orange et <strong>2</strong> de sphère noire, pré-calculées : pas de mise à l'échelle.</li>
+  <li>« Il faut des maths pour savoir comment le bras bouge » : une vraie position 3D, projetée à l'écran.</li>
+  <li>Quand le bras part vers le fond, il <strong>s'assombrit</strong> : la palette est mise à jour en direct, à chaque image.</li>
+</ul>
+<p>(<a href="https://youtu.be/Z0S92Fs5gOg?t=172" target="_blank" rel="noopener">vidéo 1, 2:52</a>)</p></div>
+
+<h3 id="projection">La projection perspective en 4 lignes</h3>
+<div class="callout concept"><span class="tag">Concept : de la 3D sur un écran 2D</span><p>On décrit le bras en <strong>3D</strong> (x à droite, y vers le bas, z vers le fond de l'écran). Pour l'afficher, on divise par la profondeur : un point deux fois plus loin paraît deux fois plus petit et deux fois plus proche du centre. Avec une « focale » <code>f</code> : <code>s = f / (f + z)</code>, puis <code>écran = (x, y) × s</code>. Le facteur <code>s</code> donne aussi la taille apparente et, ici, la luminosité. C'est toute la « 3D » du jeu.</p></div>
+<pre class="tree">CraneHarley (Node2D, crane_harley.gd)     score_value = 5000 · placé en haut-centre de l'arène
+├── Health                                 max_health = 80 (À CALIBRER)
+├── Arm (Node2D, sphere_arm.gd)            origine = point d'accroche de la chaîne (haut de l'écran)
+│   └── ClawHitbox (Hitbox)                masque 5 · damage 2
+│       └── CollisionShape2D               cercle de rayon 14
+└── Harley (Node2D, harley_chair.gd)
+    ├── Sprite2D                           matériau hit_flash
+    ├── Hurtbox                            couche 6 · health = ../../Health
+    │   └── CollisionShape2D
+    └── HitFlash</pre>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/crane_harley/sphere_arm.gd">
+class_name SphereArm
+extends Node2D
+## Secret #3 : grappin de grue en sphères, pseudo-3D.
+## Positions en 3D -> projection perspective -> image de la bonne taille + luminosité + tri.
+
+enum S { TRACK, DROP, HOLD, RAISE, SWING }
+
+@export var orange_sphere: Texture2D   ## bande horizontale de 4 tailles, de la plus petite à la plus grande
+@export var dark_sphere: Texture2D     ## bande horizontale de 2 tailles
+@export var chain_count := 10
+@export var focal := 260.0
+@export var ground_y := 150.0          ## y local du moyeu quand le grappin touche le sol
+@export var raised_y := 36.0
+@export var track_speed := 70.0
+@export var drop_speed := 420.0
+@export var raise_speed := 90.0
+@export var swing_depth := 140.0
+@export var target: Node2D
+
+## 4 « palettes » de plus en plus sombres, comme la CRAM mise à jour en direct.
+const BRIGHTNESS := [1.0, 0.8, 0.62, 0.45]
+
+var hub := Vector3(0, 36, 0)   ## moyeu du grappin, relatif au point d'accroche
+var open := 1.0                ## 1 = pince ouverte, 0 = fermée
+var spin := 0.0
+var _s := S.TRACK
+var _t := 0.0
+var _chain: Array[Sprite2D] = []
+var _claw: Array[Sprite2D] = []   ## [0] = moyeu, puis 4 doigts × 3 sphères
+
+@onready var claw_hitbox: Hitbox = $ClawHitbox
+
+
+func _ready() -> void:
+	for i in chain_count:
+		_chain.append(_make_sphere(dark_sphere, 2))
+	for i in 13:
+		_claw.append(_make_sphere(orange_sphere, 4))
+	claw_hitbox.monitoring = false
+	_layout()
+
+
+func _make_sphere(tex: Texture2D, sizes: int) -> Sprite2D:
+	var s := Sprite2D.new()
+	s.texture = tex
+	s.hframes = sizes
+	add_child(s)
+	return s
+
+
+func _physics_process(delta: float) -> void:
+	_t += delta
+	match _s:
+		S.TRACK:
+			# Se place au-dessus de Batman, pince ouverte, au premier plan.
+			open = move_toward(open, 1.0, delta * 2.0)
+			hub.y = move_toward(hub.y, raised_y, raise_speed * delta)
+			hub.z = move_toward(hub.z, 0.0, 120.0 * delta)
+			if target:
+				hub.x = move_toward(hub.x, target.global_position.x - global_position.x, track_speed * delta)
+			if _t > 1.6:
+				_go(S.DROP)
+		S.DROP:
+			hub.y = move_toward(hub.y, ground_y, drop_speed * delta)
+			if hub.y >= ground_y:
+				_impact()
+				_go(S.HOLD)
+		S.HOLD:
+			open = move_toward(open, 0.0, delta * 4.0)   # la pince se referme
+			if _t > 0.5:
+				_go(S.RAISE)
+		S.RAISE:
+			hub.y = move_toward(hub.y, raised_y, raise_speed * delta)
+			if hub.y <= raised_y:
+				_go(S.SWING if randf() < 0.5 else S.TRACK)
+		S.SWING:
+			# Passe dans le fond : plus petit, plus sombre, inoffensif.
+			hub.z = (1.0 - cos(_t * 1.6)) * 0.5 * swing_depth
+			hub.x = sin(_t * 0.8) * 60.0
+			if _t > TAU / 1.6:
+				_go(S.TRACK)
+	spin += delta * 0.8
+	# La pince ne blesse que dans le plan du joueur, pendant la frappe.
+	claw_hitbox.monitoring = (_s == S.DROP or _s == S.HOLD) and absf(hub.z) < 12.0
+	_layout()
+
+
+func _go(next: S) -> void:
+	_s = next
+	_t = 0.0
+	if next == S.DROP:
+		claw_hitbox.reset_hits()   # chaque frappe peut toucher à nouveau
+
+
+func _impact() -> void:
+	Fx.explosion(to_global(project(hub + Vector3(0, 14, 0))), get_parent())
+	get_tree().call_group("camera", "shake", 0.35)   # tremblement (tome 11), sans effet sinon
+
+
+func _layout() -> void:
+	# Chaîne : sphères sombres régulièrement réparties de l'accroche (0,0,0) au moyeu.
+	for i in chain_count:
+		var k := (i + 1.0) / (chain_count + 1.0)
+		_place(_chain[i], Vector3.ZERO.lerp(hub, k), 2)
+	# Moyeu, puis 4 doigts de 3 sphères qui s'écartent (ouvert) ou se referment.
+	_place(_claw[0], hub, 4)
+	for f in 4:
+		var a := spin + f * TAU / 4.0
+		for j in 3:
+			var r := open * (j + 1) * 7.0 + (1.0 - open) * (3.0 - j * 2.0)
+			var drop := (j + 1) * 6.0
+			var p := hub + Vector3(cos(a) * r, drop, sin(a) * r)
+			_place(_claw[1 + f * 3 + j], p, 4)
+	claw_hitbox.position = project(hub + Vector3(0, 12, 0))
+
+
+func project(p: Vector3) -> Vector2:
+	var s := focal / (focal + p.z)
+	return Vector2(p.x, p.y) * s
+
+
+func _place(sprite: Sprite2D, p: Vector3, sizes: int) -> void:
+	var s := focal / (focal + p.z)          # ~1 au premier plan, < 1 au fond
+	sprite.position = Vector2(p.x, p.y) * s
+	# Taille : l'image pré-calculée la plus proche (le VDP ne sait pas agrandir).
+	var size01 := clampf(inverse_lerp(0.55, 1.12, s), 0.0, 1.0)
+	sprite.frame = int(round(size01 * (sizes - 1)))
+	# Luminosité : 4 paliers selon la profondeur (palette assombrie).
+	var level := clampi(int(inverse_lerp(-20.0, swing_depth, p.z) * 4.0), 0, 3)
+	var v: float = BRIGHTNESS[level]
+	sprite.modulate = Color(v, v, v)
+	# Tri : le plus proche est dessiné par-dessus (algorithme du peintre).
+	sprite.z_index = -int(p.z)
+</script>
+<div class="callout concept"><span class="tag">Concept : l'algorithme du peintre</span><p>Sans tampon de profondeur, on dessine du plus lointain au plus proche, comme un peintre qui pose le fond avant les personnages. Ici, <code>z_index = -z</code> laisse Godot faire ce tri. Sur Mega Drive, l'ordre de la table des sprites jouait ce rôle, et le programme la triait à chaque image.</p></div>
+<div class="callout warn"><span class="tag">Simplifications</span><p>La projection se fait autour du point d'accroche et non du centre de l'écran : c'est plus simple et visuellement suffisant. La luminosité passe par <code>modulate</code> ; pour une fidélité totale, utilise des sphères indexées et <code>indexed.gdshader</code> (tome 06) avec une palette de 4 lignes. Tu n'as pas encore les sprites ? Dessine 4 disques de 8, 12, 16 et 20 px avec un reflet en haut à gauche : la sphère est l'objet le plus facile à faire en pixel art.</p></div>
+
+<h3 id="harley-chair">Harley et son fauteuil-fusée</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/crane_harley/harley_chair.gd">
+class_name HarleyChair
+extends Node2D
+## Harley vole dans la moitié haute de l'écran et lobe des bombes sur Batman.
+
+@export var bomb_scene: PackedScene          ## bomb.tscn, bounces = 0
+@export var flight_area := Rect2(-120, 20, 240, 50)   ## relatif au boss
+@export var throw_interval := 1.5
+@export var ko_texture: Texture2D            ## Harley assommée au sol
+var player: Node2D
+var _t := 0.0
+var _throw := 1.0
+@onready var sprite: Sprite2D = $Sprite2D
+
+
+func tick(delta: float) -> void:
+	_t += delta
+	var c := flight_area.get_center()
+	position = c + Vector2(sin(_t * 0.7) * flight_area.size.x / 2.0, sin(_t * 1.9) * flight_area.size.y / 2.0)
+	if player:
+		sprite.flip_h = player.global_position.x < global_position.x
+	_throw -= delta
+	if _throw <= 0.0 and bomb_scene and player:
+		_throw = throw_interval
+		var b := bomb_scene.instantiate() as Bomb
+		b.global_position = global_position
+		b.velocity = Fx.ballistic(global_position, player.global_position + Vector2(0, -12), b.fall_gravity, 0.8)
+		get_tree().current_scene.add_child(b)
+
+
+func show_ko() -> void:
+	rotation = 0.0
+	if ko_texture:
+		sprite.texture = ko_texture
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/crane_harley/crane_harley.gd">
+class_name CraneHarley
+extends Boss
+## Mini-boss de la section 2 (vidéo 9:48–10:43) : le grappin frappe, Harley est la cible.
+
+@export var ground_local_y := 172.0   ## y local du sol, pour la chute d'Harley
+@onready var arm: SphereArm = $Arm
+@onready var harley: HarleyChair = $Harley
+
+
+func _ready() -> void:
+	super._ready()
+	arm.target = player
+	harley.player = player
+	arm.set_physics_process(false)
+
+
+func start() -> void:
+	super.start()
+	arm.set_physics_process(true)
+
+
+func _physics_process(delta: float) -> void:
+	if active:
+		harley.tick(delta)
+
+
+func die_sequence() -> void:
+	arm.set_physics_process(false)
+	arm.claw_hitbox.set_deferred("monitoring", false)
+	# Harley part en vrille et s'écrase (vidéo 10:36–10:39).
+	var tw := create_tween()
+	tw.tween_property(harley, "rotation", TAU * 3.0, 1.2)
+	tw.parallel().tween_property(harley, "position:y", ground_local_y, 1.2) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw.finished
+	await explode_area(Rect2(harley.position - Vector2(16, 16), Vector2(32, 32)), 5, 0.08)
+	harley.show_ko()
+	# Le grappin remonte hors de l'écran.
+	create_tween().tween_property(arm, "position:y", arm.position.y - 220.0, 1.5)
+</script>
+<div class="callout concept"><span class="tag">Concept : la vulnérabilité liée à la profondeur</span><p>Le grappin ne fait mal que lorsqu'il est dans le plan du joueur (<code>|z| &lt; 12</code>) et qu'il frappe. Quand il passe dans le fond, il est plus petit, plus sombre <em>et</em> inoffensif : le visuel dit la vérité sur le gameplay. Une règle d'or de la pseudo-3D : ce qui a l'air loin ne doit pas toucher.</p></div>
+
+<div class="callout goal"><span class="tag">Objectif de l'étape</span>
+<ul class="check">
+  <li>Le Gem Expo s'assemble avec deux salles réutilisées ; les colonnes passent devant Batman plus vite que le décor.</li>
+  <li>Une chenille de têtes à hélice descend puis serpente ; une ligne traverse le haut de l'écran.</li>
+  <li>Dans l'entrepôt, Harley passe en diagonale sans combattre.</li>
+  <li>Le grappin suit Batman, s'abat, se referme, remonte et parfois s'enfonce dans le fond, plus petit et plus sombre.</li>
+  <li>Harley vole et lobe des bombes. À 00 : vrille, crash, K.O., +5 000, section 3.</li>
+</ul></div>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>

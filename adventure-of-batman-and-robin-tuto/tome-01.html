@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot 4 Masterclass : Batman & Robin Megadrive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-main: #0f172a;
+            --bg-panel: #1e293b;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-yellow: #eab308;
+            --accent-red: #ef4444;
+            --accent-green: #10b981;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            overflow: hidden; /* Empêche le double scroll */
+        }
+
+        h1, h2, h3, h4, .title-font {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        .code-block {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            position: relative;
+        }
+
+        .gd-kw { color: #ff7b72; font-weight: bold; } /* Keyword */
+        .gd-func { color: #d2a8ff; font-weight: bold; } /* Function */
+        .gd-str { color: #a5d6ff; } /* String */
+        .gd-num { color: #79c0ff; } /* Number */
+        .gd-comment { color: #8b949e; font-style: italic; } /* Comment */
+        .gd-type { color: #ff7b72; } /* Type/Class */
+        .gd-var { color: #c9d1d9; } /* Variable */
+        .gd-anno { color: #d2a8ff; } /* Annotation (@export) */
+
+        .node-tree {
+            border-left: 2px solid #334155;
+            margin-left: 1rem;
+            padding-left: 1rem;
+        }
+
+        .node-item {
+            position: relative;
+            padding: 0.25rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .node-item::before {
+            content: '';
+            position: absolute;
+            left: -1rem;
+            top: 50%;
+            width: 0.8rem;
+            height: 2px;
+            background-color: #334155;
+        }
+
+        .hitbox-demo {
+            width: 100%;
+            height: 200px;
+            background: repeating-linear-gradient(45deg, #1e293b, #1e293b 10px, #0f172a 10px, #0f172a 20px);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #334155;
+        }
+
+        .player-box {
+            position: absolute;
+            bottom: 20px;
+            left: 50px;
+            width: 40px;
+            height: 80px;
+            background-color: rgba(59, 130, 246, 0.2);
+            border: 2px solid var(--accent-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hurtbox {
+            position: absolute;
+            inset: 5px;
+            background-color: rgba(16, 185, 129, 0.3);
+            border: 2px solid var(--accent-green);
+        }
+
+        .hitbox {
+            position: absolute;
+            top: 10px;
+            right: -30px;
+            width: 40px;
+            height: 20px;
+            background-color: rgba(239, 68, 68, 0.5);
+            border: 2px solid var(--accent-red);
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.1s ease-out;
+        }
+
+        .hitbox.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .enemy-box {
+            position: absolute;
+            bottom: 20px;
+            right: 50px;
+            width: 40px;
+            height: 80px;
+            background-color: rgba(139, 92, 246, 0.2);
+            border: 2px dashed #8b5cf6;
+        }
+
+        .enemy-hurtbox {
+            position: absolute;
+            inset: 5px;
+            background-color: rgba(16, 185, 129, 0.3);
+            border: 2px solid var(--accent-green);
+            transition: background-color 0.1s;
+        }
+
+        .enemy-hurtbox.hit {
+            background-color: rgba(239, 68, 68, 0.8);
+            border-color: #fff;
+        }
+
+        /* Classes pour la gestion des sections */
+        .section-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .section-content.active { display: block; opacity: 1; animation: slideUp 0.4s ease-out forwards; }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-btn.active {
+            background-color: var(--bg-panel);
+            border-right: 4px solid var(--accent-yellow);
+            color: var(--accent-yellow);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-yellow); }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row h-screen text-slate-200">
+
+    <!-- Mobile Header -->
+    <header class="md:hidden flex items-center justify-between bg-slate-900 border-b border-slate-800 p-4 shrink-0 z-50 shadow-md">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-bat text-yellow-500 text-xl"></i>
+            <h1 class="title-font font-bold text-lg leading-none">B&R <span class="text-yellow-500">Masterclass</span></h1>
+        </div>
+        <button id="mobile-menu-btn" class="text-slate-300 hover:text-white p-2 focus:outline-none">
+            <i class="fa-solid fa-bars text-2xl"></i>
+        </button>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="absolute md:relative w-full md:w-72 h-[calc(100vh-60px)] md:h-screen bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out top-[60px] md:top-0">
+        
+        <div class="hidden md:block p-6 text-center border-b border-slate-800">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl shadow-lg mb-3 transform rotate-3">
+                <i class="fa-solid fa-gamepad text-3xl text-slate-900"></i>
+            </div>
+            <h1 class="title-font font-bold text-xl tracking-wide">BATMAN & ROBIN</h1>
+            <p class="text-xs font-mono text-slate-400 mt-1">Godot 4.x - Tome 1</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4">
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Les Fondations</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('setup')" id="nav-setup" class="nav-btn active w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-gear w-5 text-center text-slate-400"></i> 1. Setup & Inputs Exacts
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('architecture')" id="nav-architecture" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-sitemap w-5 text-center text-blue-400"></i> 2. L'Arbre de Nœuds Pro
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('components')" id="nav-components" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-boxes-stacked w-5 text-center text-green-400"></i> 3. Hitbox & Hurtbox
+                    </button>
+                </li>
+            </ul>
+
+            <p class="px-6 text-xs font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Le Chevalier Noir</p>
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="navTo('state-machine')" id="nav-state-machine" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-network-wired w-5 text-center text-purple-400"></i> 4. La State Machine
+                    </button>
+                </li>
+                <li>
+                    <button onclick="navTo('physics')" id="nav-physics" class="nav-btn w-full text-left px-6 py-3 text-sm hover:bg-slate-800 transition-colors flex items-center gap-3 font-medium">
+                        <i class="fa-solid fa-weight-hanging w-5 text-center text-yellow-500"></i> 5. Physique Megadrive
+                    </button>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="p-4 border-t border-slate-800 text-center">
+            <span class="inline-block px-3 py-1 bg-slate-800 rounded-full text-xs font-mono text-slate-400 border border-slate-700">
+                <i class="fa-solid fa-check text-green-500 mr-1"></i> Optimisé Mobile
+            </span>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 h-[calc(100vh-60px)] md:h-screen overflow-y-auto relative scroll-smooth" id="main-content">
+        <div class="max-w-4xl mx-auto p-4 md:p-8 lg:p-12 pb-24">
+
+            <!-- SECTION 1: SETUP -->
+            <section id="setup" class="section-content active">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-yellow-500 font-bold text-sm tracking-wider uppercase mb-1 block">Étape 1</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Analyse et Configuration Exacte</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Le secret d'un portage réussi réside dans les fondations.</p>
+                </div>
+
+                <div class="bg-slate-800 rounded-xl p-5 md:p-6 mb-8 shadow-xl border border-slate-700">
+                    <h3 class="title-font text-xl text-yellow-400 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass"></i> Ce que la vidéo nous apprend
+                    </h3>
+                    <p class="mb-4 leading-relaxed text-slate-300">
+                        En analysant les frames du Niveau 1 (les rues de Gotham), on remarque que les contrôles ne sont pas ceux d'un jeu de plateforme flottant comme Mario, mais rigides et punitifs comme <i>Contra</i> ou <i>Castlevania</i>.
+                    </p>
+                    <ul class="space-y-3 text-sm text-slate-300 bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                        <li class="flex items-start gap-3">
+                            <i class="fa-solid fa-caret-right text-yellow-500 mt-1"></i>
+                            <div><strong>Saut à hauteur variable :</strong> Plus on maintient le bouton appuyé, plus Batman monte haut. Si on relâche, la vélocité verticale est coupée drastiquement.</div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fa-solid fa-caret-right text-yellow-500 mt-1"></i>
+                            <div><strong>Double Saut :</strong> Indispensable. Le deuxième saut déclenche une animation de salto (flip) et réinitialise la vélocité verticale.</div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fa-solid fa-caret-right text-yellow-500 mt-1"></i>
+                            <div><strong>Attaque contextuelle :</strong> Le bouton "Attaque" lance un Batarang si l'ennemi est loin, mais déclenche un combo de mêlée (cape/poing) si une Hitbox ennemie est proche.</div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-slate-800 rounded-xl p-5 shadow-lg border border-slate-700">
+                        <h4 class="font-bold text-white mb-3 border-b border-slate-600 pb-2">Paramètres Fenêtre (Pixel Perfect)</h4>
+                        <p class="text-xs text-slate-400 mb-3"><i>Projet > Paramètres du projet > Affichage > Fenêtre</i></p>
+                        <ul class="code-font text-sm space-y-2">
+                            <li><span class="text-slate-400">Viewport Width:</span> <span class="text-green-400 font-bold">320</span></li>
+                            <li><span class="text-slate-400">Viewport Height:</span> <span class="text-green-400 font-bold">224</span> <span class="text-xs text-slate-500">(Résolution NTSC Genesis)</span></li>
+                            <li><span class="text-slate-400">Window Width Override:</span> <span class="text-yellow-400">1280</span></li>
+                            <li><span class="text-slate-400">Window Height Override:</span> <span class="text-yellow-400">896</span></li>
+                            <li><span class="text-slate-400">Stretch Mode:</span> <span class="text-blue-400">canvas_items</span></li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-800 rounded-xl p-5 shadow-lg border border-slate-700">
+                        <h4 class="font-bold text-white mb-3 border-b border-slate-600 pb-2">Input Map (Les Contrôles)</h4>
+                        <p class="text-xs text-slate-400 mb-3"><i>Projet > Paramètres du projet > Contrôles</i>. Créez ces actions exactes :</p>
+                        <ul class="code-font text-sm space-y-2">
+                            <li><span class="text-purple-400">move_left</span> <span class="text-slate-500">-> Touche Q / Fleche Gauche</span></li>
+                            <li><span class="text-purple-400">move_right</span> <span class="text-slate-500">-> Touche D / Fleche Droite</span></li>
+                            <li><span class="text-purple-400">jump</span> <span class="text-slate-500">-> Touche Espace / Bouton A</span></li>
+                            <li><span class="text-purple-400">attack</span> <span class="text-slate-500">-> Touche J / Bouton X</span></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <button onclick="navTo('architecture')" class="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all transform hover:-translate-y-1">
+                    Passer à l'architecture des nœuds <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </section>
+
+            <!-- SECTION 2: ARCHITECTURE -->
+            <section id="architecture" class="section-content">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-blue-400 font-bold text-sm tracking-wider uppercase mb-1 block">Étape 2</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">L'Arbre de Nœuds Professionnel</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Ne mettez pas toute la logique dans un seul script.</p>
+                </div>
+
+                <p class="mb-6 leading-relaxed text-slate-300">
+                    Dans les tutoriels pour débutants, Batman a un <code>Sprite2D</code>, un <code>CollisionShape2D</code>, et un script géant de 400 lignes. 
+                    C'est un cauchemar à maintenir. Sur Godot 4, nous utilisons une approche orientée <b>Composants</b>.
+                </p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+                    <div class="lg:col-span-2 bg-[#0d1117] rounded-xl p-4 border border-[#30363d] overflow-x-auto shadow-inner">
+                        <h4 class="font-bold text-slate-300 mb-4 text-sm uppercase tracking-wide border-b border-slate-700 pb-2">Scène : Player.tscn</h4>
+                        
+                        <div class="code-font text-sm text-slate-300">
+                            <div class="font-bold text-blue-400 mb-1"><i class="fa-solid fa-person-running"></i> Player (CharacterBody2D)</div>
+                            <div class="node-tree">
+                                <div class="node-item"><i class="fa-regular fa-square text-blue-300"></i> CollisionShape2D <span class="text-xs text-slate-500">(Physique monde)</span></div>
+                                <div class="node-item"><i class="fa-solid fa-image text-green-300"></i> Sprite2D</div>
+                                <div class="node-item"><i class="fa-solid fa-film text-yellow-300"></i> AnimationPlayer</div>
+                                
+                                <div class="node-item mt-2 font-bold text-purple-400"><i class="fa-solid fa-folder"></i> StateMachine (Node)</div>
+                                <div class="node-tree">
+                                    <div class="node-item"><i class="fa-brands fa-node-js text-slate-400"></i> IdleState (Node)</div>
+                                    <div class="node-item"><i class="fa-brands fa-node-js text-slate-400"></i> RunState (Node)</div>
+                                    <div class="node-item"><i class="fa-brands fa-node-js text-slate-400"></i> JumpState (Node)</div>
+                                    <div class="node-item"><i class="fa-brands fa-node-js text-slate-400"></i> AttackState (Node)</div>
+                                </div>
+
+                                <div class="node-item mt-2 font-bold text-red-400"><i class="fa-solid fa-vector-square"></i> HurtboxComponent (Area2D)</div>
+                                <div class="node-tree">
+                                    <div class="node-item"><i class="fa-regular fa-square text-blue-300"></i> CollisionShape2D <span class="text-xs text-slate-500">(Reçoit dégâts)</span></div>
+                                </div>
+
+                                <div class="node-item mt-2 font-bold text-green-400"><i class="fa-solid fa-hand-fist"></i> MeleeHitbox (Area2D)</div>
+                                <div class="node-tree">
+                                    <div class="node-item"><i class="fa-regular fa-square text-blue-300"></i> CollisionShape2D <span class="text-xs text-slate-500">(Inflige dégâts)</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-3 space-y-4">
+                        <div class="bg-slate-800 p-5 rounded-xl border-l-4 border-blue-500 shadow-md">
+                            <h4 class="font-bold text-white text-lg mb-2">Pourquoi cette structure ?</h4>
+                            <p class="text-sm text-slate-300 mb-2">
+                                <b>CollisionShape2D (racine) :</b> Ne sert QUE pour empêcher Batman de passer à travers le sol ou les murs. Il doit être petit, souvent juste un rectangle autour des pieds/jambes.
+                            </p>
+                        </div>
+                        
+                        <div class="bg-slate-800 p-5 rounded-xl border-l-4 border-red-500 shadow-md">
+                            <h4 class="font-bold text-white text-lg mb-2">HurtboxComponent</h4>
+                            <p class="text-sm text-slate-300 mb-2">
+                                C'est la zone vulnérable de Batman. Si le poing d'un clown touche cette zone, Batman perd de la vie. L'isoler dans un <code>Area2D</code> séparé permet de désactiver les collisions temporairement (frames d'invincibilité après un coup) sans que Batman ne passe à travers le sol !
+                            </p>
+                        </div>
+
+                        <div class="bg-slate-800 p-5 rounded-xl border-l-4 border-green-500 shadow-md">
+                            <h4 class="font-bold text-white text-lg mb-2">StateMachine</h4>
+                            <p class="text-sm text-slate-300">
+                                Au lieu de faire des <code>if is_attacking: ... elif is_jumping: ...</code> infiniment complexes, chaque "état" (Courir, Sauter) a son propre script simple et propre.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 3: COMPONENTS -->
+            <section id="components" class="section-content">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-green-500 font-bold text-sm tracking-wider uppercase mb-1 block">Étape 3</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Secret des Combats : Hitbox & Hurtbox</h2>
+                    <p class="text-slate-400 mt-2 text-lg">La méthode des studios professionnels pour gérer les collisions.</p>
+                </div>
+
+                <div class="mb-8">
+                    <p class="text-slate-300 mb-4 leading-relaxed">
+                        Sur la Megadrive, les combats de mêlée sont extrêmement précis. Pour recréer cela, nous ne vérifions pas si le corps entier de Batman touche le corps d'un clown. Nous vérifions si la <b>Hitbox</b> (le poing, la cape) de l'attaquant intersecte la <b>Hurtbox</b> (le corps) du défenseur.
+                    </p>
+
+                    <!-- Interactive Demo -->
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-xl mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="font-bold text-white text-sm uppercase tracking-wider">Simulation Interactive</h4>
+                            <button onclick="triggerAttack()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-bold text-sm shadow-lg transition-transform active:scale-95">
+                                <i class="fa-solid fa-hand-fist mr-2"></i> Attaquer
+                            </button>
+                        </div>
+                        
+                        <div class="hitbox-demo">
+                            <!-- Player -->
+                            <div class="player-box">
+                                <div class="text-xs font-bold text-blue-300 absolute -top-6">Player Body</div>
+                                <div class="hurtbox flex items-center justify-center">
+                                    <span class="text-[0.6rem] font-bold text-green-300 opacity-50">HURTBOX</span>
+                                </div>
+                                <div id="demo-hitbox" class="hitbox flex items-center justify-center">
+                                    <span class="text-[0.6rem] font-bold text-white">HITBOX</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Enemy -->
+                            <div class="enemy-box">
+                                <div class="text-xs font-bold text-purple-300 absolute -top-6">Enemy</div>
+                                <div id="demo-enemy-hurtbox" class="enemy-hurtbox flex items-center justify-center">
+                                    <span class="text-[0.6rem] font-bold text-green-300 opacity-50">HURTBOX</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-3 text-center">L'Area2D Hitbox (rouge) s'active brièvement pendant l'animation d'attaque. Si elle chevauche la Hurtbox (verte), le signal est envoyé.</p>
+                    </div>
+                </div>
+
+                <h3 class="title-font text-xl text-yellow-400 mb-4">Implémentation (Script HitboxComponent)</h3>
+                <div class="code-block shadow-lg mb-8">
+<pre><code><span class="gd-comment"># hitbox_component.gd (À attacher au noeud MeleeHitbox de type Area2D)</span>
+<span class="gd-keyword">class_name</span> <span class="gd-type">HitboxComponent</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">Area2D</span>
+
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> damage: <span class="gd-type">int</span> = <span class="gd-num">1</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">_init</span>():
+    <span class="gd-comment"># S'assurer que la hitbox écoute les collisions avec les hurtboxes</span>
+    collision_layer = <span class="gd-num">0</span>
+    collision_mask = <span class="gd-num">2</span> <span class="gd-comment"># Couche 2 = Les Hurtboxes ennemies</span>
+
+<span class="gd-comment"># Astuce Pro : L'AnimationPlayer va activer/désactiver la propriété 'disabled' </span>
+<span class="gd-comment"># du CollisionShape2D enfant précisément sur les frames où le poing est sorti.</span>
+</code></pre>
+                </div>
+
+            </section>
+
+            <!-- SECTION 4: STATE MACHINE -->
+            <section id="state-machine" class="section-content">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-purple-400 font-bold text-sm tracking-wider uppercase mb-1 block">Étape 4</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Cerveau : La State Machine</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Gérer les actions complexes sans s'arracher les cheveux.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Au lieu de mettre toute la logique de déplacement dans <code>_physics_process</code> du Player, nous la dédions à des scripts d'état. Voici comment structurer l'état de "Saut" (JumpState), qui gère la hauteur variable et le double saut (le fameux flip de Batman).
+                </p>
+
+                <div class="bg-slate-900 rounded-lg p-1 border-l-4 border-purple-500 mb-6">
+                    <div class="code-block border-none">
+<pre><code><span class="gd-comment"># jump_state.gd</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">State</span> <span class="gd-comment"># Hérite d'une classe de base virtuelle</span>
+
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> player: <span class="gd-type">CharacterBody2D</span>
+<span class="gd-anno">@export</span> <span class="gd-keyword">var</span> animation_player: <span class="gd-type">AnimationPlayer</span>
+
+<span class="gd-keyword">var</span> jumps_made: <span class="gd-type">int</span> = <span class="gd-num">0</span>
+<span class="gd-keyword">const</span> JUMP_VELOCITY = <span class="gd-num">-400.0</span>
+<span class="gd-keyword">const</span> DOUBLE_JUMP_VELOCITY = <span class="gd-num">-350.0</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">enter</span>():
+    <span class="gd-comment"># Appelé quand on entre dans l'état Saut</span>
+    player.velocity.y = JUMP_VELOCITY
+    animation_player.play(<span class="gd-str">"jump_rise"</span>)
+    jumps_made = <span class="gd-num">1</span>
+
+<span class="gd-keyword">func</span> <span class="gd-func">physics_update</span>(delta: <span class="gd-type">float</span>):
+    <span class="gd-comment"># 1. Gérer le relâchement du bouton (Variable Jump Height)</span>
+    <span class="gd-keyword">if</span> <span class="gd-type">Input</span>.is_action_just_released(<span class="gd-str">"jump"</span>) <span class="gd-keyword">and</span> player.velocity.y < <span class="gd-num">0</span>:
+        <span class="gd-comment"># Coupe l'élan pour retomber plus vite</span>
+        player.velocity.y *= <span class="gd-num">0.4</span> 
+
+    <span class="gd-comment"># 2. Gérer le Double Saut</span>
+    <span class="gd-keyword">if</span> <span class="gd-type">Input</span>.is_action_just_pressed(<span class="gd-str">"jump"</span>) <span class="gd-keyword">and</span> jumps_made < <span class="gd-num">2</span>:
+        player.velocity.y = DOUBLE_JUMP_VELOCITY
+        animation_player.play(<span class="gd-str">"double_jump_flip"</span>)
+        jumps_made += <span class="gd-num">1</span>
+
+    <span class="gd-comment"># 3. Transitions</span>
+    <span class="gd-keyword">if</span> player.velocity.y > <span class="gd-num">0</span> <span class="gd-keyword">and</span> jumps_made == <span class="gd-num">1</span>:
+        animation_player.play(<span class="gd-str">"fall"</span>)
+        
+    <span class="gd-keyword">if</span> player.is_on_floor():
+        Transitioned.emit(<span class="gd-keyword">self</span>, <span class="gd-str">"Idle"</span>) <span class="gd-comment"># Retour au sol</span>
+</code></pre>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex gap-4 items-start">
+                    <i class="fa-solid fa-lightbulb text-yellow-500 text-xl mt-1"></i>
+                    <div>
+                        <h4 class="font-bold text-yellow-500 mb-1">Détail Crucial : Le saut variable</h4>
+                        <p class="text-sm text-slate-300">
+                            La ligne <code>player.velocity.y *= 0.4</code> lors du <code>is_action_just_released</code> est ce qui donne le feeling arcade parfait. Si le joueur tapote brièvement le bouton, Batman fait un petit saut pour esquiver un tir bas. S'il maintient le bouton, la vélocité n'est pas coupée, permettant de franchir de grands obstacles.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 5: PHYSICS -->
+            <section id="physics" class="section-content">
+                <div class="mb-8 border-b border-slate-700 pb-4">
+                    <span class="text-yellow-500 font-bold text-sm tracking-wider uppercase mb-1 block">Étape 5</span>
+                    <h2 class="title-font text-3xl md:text-4xl text-white">Le Cœur Physique (Player.gd)</h2>
+                    <p class="text-slate-400 mt-2 text-lg">Godot 4 simplifie énormément la boucle physique principale.</p>
+                </div>
+
+                <p class="text-slate-300 mb-6 leading-relaxed">
+                    Dans notre architecture, le script attaché au nœud <code>CharacterBody2D</code> principal est extrêmement léger. Son rôle principal est d'appliquer la gravité (qui est constante) et d'appeler la fonction de déplacement de Godot 4 : <code>move_and_slide()</code>.
+                </p>
+
+                <div class="code-block shadow-lg mb-8">
+<pre><code><span class="gd-comment"># player.gd (Attaché à la racine CharacterBody2D)</span>
+<span class="gd-keyword">extends</span> <span class="gd-type">CharacterBody2D</span>
+
+<span class="gd-comment"># Récupère la gravité depuis les paramètres globaux du projet</span>
+<span class="gd-keyword">var</span> gravity = <span class="gd-type">ProjectSettings</span>.get_setting(<span class="gd-str">"physics/2d/default_gravity"</span>)
+<span class="gd-keyword">var</span> gravity_multiplier = <span class="gd-num">1.5</span> <span class="gd-comment"># Pour un feeling Megadrive (chute plus lourde)</span>
+
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> sprite: <span class="gd-type">Sprite2D</span> = $Sprite2D
+<span class="gd-anno">@onready</span> <span class="gd-keyword">var</span> state_machine = $StateMachine
+
+<span class="gd-keyword">func</span> <span class="gd-func">_ready</span>():
+    <span class="gd-comment"># Initialise la State Machine en lui passant la référence du joueur</span>
+    state_machine.init(<span class="gd-keyword">self</span>)
+
+<span class="gd-keyword">func</span> <span class="gd-func">_physics_process</span>(delta: <span class="gd-type">float</span>):
+    <span class="gd-comment"># 1. Application de la gravité indépendante de l'état</span>
+    <span class="gd-keyword">if not</span> is_on_floor():
+        <span class="gd-comment"># Astuce: Ajouter une limite (Terminal Velocity) empêche </span>
+        <span class="gd-comment"># de passer à travers le sol lors de longues chutes</span>
+        velocity.y = minf(velocity.y + (gravity * gravity_multiplier * delta), <span class="gd-num">800.0</span>)
+
+    <span class="gd-comment"># 2. La State Machine gère les inputs et modifie velocity.x et velocity.y</span>
+    state_machine.physics_update(delta)
+
+    <span class="gd-comment"># 3. Gérer l'orientation visuelle (Flip du sprite)</span>
+    <span class="gd-keyword">if</span> velocity.x > <span class="gd-num">0</span>:
+        sprite.flip_h = <span class="gd-keyword">false</span>
+        <span class="gd-comment"># Ne pas oublier de retourner la Hitbox Melee si elle est asymétrique !</span>
+        $MeleeHitbox.scale.x = <span class="gd-num">1</span>
+    <span class="gd-keyword">elif</span> velocity.x < <span class="gd-num">0</span>:
+        sprite.flip_h = <span class="gd-keyword">true</span>
+        $MeleeHitbox.scale.x = <span class="gd-num">-1</span>
+
+    <span class="gd-comment"># 4. Magie Godot 4 (sans arguments, utilise la variable globale 'velocity')</span>
+    move_and_slide()
+</code></pre>
+                </div>
+
+                <div class="mt-12 text-center pb-8 border-t border-slate-700 pt-8">
+                    <h2 class="title-font text-2xl text-yellow-500 mb-4">Fin du Tome 1 : Les Fondations Solides</h2>
+                    <p class="text-slate-300 mb-6 max-w-2xl mx-auto">
+                        Avec cette architecture (Input précis, Node Tree compartimenté, Hitboxes séparées, State Machine et physique lourde), vous possédez le squelette d'un jeu d'action professionnel, capable de supporter la frénésie du jeu Megadrive sans bugs de collision.
+                    </p>
+                    
+                    <div class="inline-block bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl text-left w-full md:w-auto">
+                        <p class="font-bold text-white mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-book-journal-whills text-blue-400"></i> À venir dans le Tome 2 :
+                        </p>
+                        <ul class="space-y-2 text-sm text-slate-400">
+                            <li><i class="fa-solid fa-check text-slate-600 mr-2"></i> Le système de Batarang (Object Pooling & Trajectoires).</li>
+                            <li><i class="fa-solid fa-check text-slate-600 mr-2"></i> Les ennemis de base (IA, Pathfinding basique).</li>
+                            <li><i class="fa-solid fa-check text-slate-600 mr-2"></i> Le Parallax Scrolling des rues de Gotham (TileMapLayer).</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        // Logique de navigation SPA (Single Page Application)
+        function navTo(sectionId) {
+            // Cacher toutes les sections
+            document.querySelectorAll('.section-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Retirer l'état actif des boutons du menu
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Afficher la section demandée
+            const section = document.getElementById(sectionId);
+            if(section) {
+                // Petit hack pour relancer l'animation CSS
+                section.style.animation = 'none';
+                section.offsetHeight; // Trigger reflow
+                section.style.animation = null; 
+                section.classList.add('active');
+            }
+            
+            // Mettre en surbrillance le bouton cliqué
+            const navBtn = document.getElementById('nav-' + sectionId);
+            if(navBtn) navBtn.classList.add('active');
+
+            // Scroll to top
+            document.getElementById('main-content').scrollTop = 0;
+
+            // Sur mobile, fermer le menu après un clic
+            if(window.innerWidth < 768) {
+                toggleMobileMenu(false);
+            }
+        }
+
+        // Gestion du menu responsive
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        let menuOpen = false;
+
+        function toggleMobileMenu(forceState = null) {
+            if(forceState !== null) {
+                menuOpen = forceState;
+            } else {
+                menuOpen = !menuOpen;
+            }
+
+            if(menuOpen) {
+                sidebar.classList.remove('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-xmark text-2xl"></i>';
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                mobileMenuBtn.innerHTML = '<i class="fa-solid fa-bars text-2xl"></i>';
+            }
+        }
+
+        mobileMenuBtn.addEventListener('click', () => toggleMobileMenu());
+
+        // Simulation interactive Hitbox/Hurtbox
+        let isAttacking = false;
+        function triggerAttack() {
+            if(isAttacking) return;
+            isAttacking = true;
+            
+            const hitbox = document.getElementById('demo-hitbox');
+            const enemyHurtbox = document.getElementById('demo-enemy-hurtbox');
+            
+            // Activer la hitbox (Le bras se tend)
+            hitbox.classList.add('active');
+            
+            // Simuler la frame active de la collision (100ms après le début de l'anim)
+            setTimeout(() => {
+                // Dans Godot, c'est le moteur physique qui fait ça via signaux.
+                // Ici on simule visuellement l'impact.
+                enemyHurtbox.classList.add('hit');
+                enemyHurtbox.innerHTML = '<span class="text-[0.6rem] font-bold text-white">OUCH! (-1 HP)</span>';
+                
+                // Désactiver (Le bras revient)
+                setTimeout(() => {
+                    hitbox.classList.remove('active');
+                    
+                    // Fin du flash de dégât
+                    setTimeout(() => {
+                        enemyHurtbox.classList.remove('hit');
+                        enemyHurtbox.innerHTML = '<span class="text-[0.6rem] font-bold text-green-300 opacity-50">HURTBOX</span>';
+                        isAttacking = false;
+                    }, 300);
+                    
+                }, 150); // Durée active de la hitbox (quelques frames Megadrive)
+            }, 100);
+        }
+
+        // Gérer le resize de la fenêtre pour reset le menu mobile si on passe sur Desktop
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768 && menuOpen) {
+                toggleMobileMenu(false);
+            }
+        });
+    </script>
+</body>
+</html>

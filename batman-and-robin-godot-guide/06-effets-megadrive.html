@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 · Effets Mega Drive dans Godot — Batman &amp; Robin × Godot</title>
+<meta name="description" content="Reproduire les effets du VDP : plan raster ligne par ligne (façade pseudo-3D), feu ondulant, palettes indexées, fondus et flashs par paliers, parallaxe, mise à l'échelle par paliers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Tome 06</div>
+  <h1>Effets Mega Drive dans Godot</h1>
+  <p class="lead">Les trois secrets de Jon Burton qui concernent le niveau 1, plus les effets de palette que le jeu utilise partout. Chaque technique est reproduite <em>au pixel et à la ligne près</em>, pilotée par la caméra comme sur la console.</p>
+  <div class="meta"><span class="pill">Raster</span><span class="pill">Shaders canvas_item</span><span class="pill">Couleurs indexées</span><span class="pill">Parallaxe</span><span class="pill">Pseudo-3D</span></div>
+</section>
+
+<h2 id="raster">Le principe du raster</h2>
+<div class="callout md"><span class="tag">Sur Mega Drive</span><p>L'écran est dessiné ligne par ligne par le faisceau du téléviseur. Entre deux lignes (le <em>HBlank</em>), le VDP lit une <strong>table H-Scroll</strong> qui contient un décalage horizontal <strong>par ligne</strong> pour chaque plan. Une interruption horizontale permet aussi au 68000 de changer d'autres registres en cours d'image : défilement vertical, palette, ligne de départ. Tous les effets « impossibles » du jeu reposent sur ce principe : à chaque image, le programme <strong>calcule une table de 224 valeurs</strong>, et le matériel l'applique gratuitement.</p></div>
+<div class="callout concept"><span class="tag">Concept : séparer le calcul et l'affichage</span><p>On reproduit exactement cette division du travail. Un script GDScript joue le rôle du 68000 : chaque image, il remplit deux tableaux de 224 valeurs, <code>h_scroll</code> (décalage de chaque ligne) et <code>v_line</code> (quelle ligne de l'image source afficher). Un shader joue le rôle du VDP : pour chaque pixel, il lit la valeur de sa ligne. Un seul shader suffit pour la façade, la route, le tunnel ou l'étirement de bâtiments : seules les tables changent.</p></div>
+
+<h3 id="raster-shader">Le shader du plan raster</h3>
+<script type="text/x-code" data-lang="glsl" data-file="res://fx/raster_plane.gdshader">
+shader_type canvas_item;
+// Émulation d'un plan du VDP piloté par une table par ligne.
+// Ce shader s'applique à un ColorRect de 320x224 placé dans un CanvasLayer :
+// UV.y correspond donc exactement à une ligne d'écran.
+
+uniform sampler2D plane : repeat_enable, filter_nearest;
+uniform float h_scroll[224];   // décalage horizontal de chaque ligne, en pixels
+uniform float v_line[224];     // ligne de la texture source affichée sur chaque ligne d'écran
+uniform vec2 screen_size = vec2(320.0, 224.0);
+
+void fragment() {
+	vec2 px = floor(UV * screen_size);              // pixel d'écran (x, numéro de ligne)
+	int line = clamp(int(px.y), 0, 223);
+	vec2 tex_size = vec2(textureSize(plane, 0));
+	vec2 src = vec2(px.x + h_scroll[line], v_line[line]) + 0.5;   // centre du texel
+	COLOR = texture(plane, src / tex_size);          // repeat_enable : la texture boucle
+}
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/raster_plane.gd">
+class_name RasterPlane
+extends ColorRect
+## « 68000 » d'un plan raster : remplit les tables à chaque image, le shader les applique.
+## À placer dans un CanvasLayer (layer négatif pour être derrière le monde).
+
+const LINES := 224
+
+@export var plane_texture: Texture2D
+var h_scroll := PackedFloat32Array()
+var v_line := PackedFloat32Array()
+var _mat: ShaderMaterial
+
+
+func _ready() -> void:
+	h_scroll.resize(LINES)
+	v_line.resize(LINES)
+	for y in LINES:
+		v_line[y] = y
+	position = Vector2.ZERO
+	size = Vector2(320, LINES)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mat = (material as ShaderMaterial).duplicate()   # chaque plan a ses propres tables
+	material = _mat
+	_mat.set_shader_parameter("plane", plane_texture)
+
+
+func _process(_delta: float) -> void:
+	var cam := get_viewport().get_camera_2d()
+	if cam:
+		compute(cam.get_screen_center_position())
+	_mat.set_shader_parameter("h_scroll", h_scroll)
+	_mat.set_shader_parameter("v_line", v_line)
+
+
+## À surcharger : remplir h_scroll et v_line pour l'image courante.
+func compute(_camera_center: Vector2) -> void:
+	pass
+</script>
+
+<h2 id="facade">Secret #1 : la façade pseudo-3D</h2>
+<div class="callout video"><span class="tag">Mesuré dans la vidéo</span><p>Pendant la course de <a class="tc" href="#">4:42</a>–<a class="tc" href="#">4:46</a>, les bandes de la façade ne défilent pas à la même vitesse (tome 01). Rapportées au trottoir où marche Batman :</p>
+<div class="table-wrap"><table>
+<tr><th>Lignes</th><th>Zone</th><th>Mesuré</th><th>Facteur (trottoir = 1)</th></tr>
+<tr><td>32–114</td><td>Façade haute et balcon</td><td>2,00–2,08 px/image</td><td><strong>≈ 1,06</strong></td></tr>
+<tr><td>116–162</td><td>Dessous du balcon</td><td>1,92 → 1,83</td><td>1,00 → 0,95</td></tr>
+<tr><td>164–174</td><td>Vitrine en retrait</td><td>1,75</td><td><strong>≈ 0,91</strong></td></tr>
+<tr><td>200–222</td><td>Trottoir</td><td>1,92</td><td>1,00</td></tr>
+</table></div></div>
+<div class="callout md"><span class="tag">Ce qu'explique Burton</span><p>C'est la technique du sol de <em>Toy Story</em> (<a href="https://youtu.be/Z0S92Fs5gOg?t=40" target="_blank" rel="noopener">vidéo 1, 0:40</a>) : une seule image, légèrement plus large que l'écran, dont chaque ligne est décalée d'une quantité différente. Le motif se répète exactement à l'amplitude maximale du cisaillement : arrivé là, on revient au début sans que ça se voie. Dans Batman &amp; Robin, c'est « tout l'immeuble, en plusieurs couches ». Comme la mémoire d'un plan Mega Drive fait au plus 512 pixels de large, une version pré-cisaillée est préparée hors écran pour boucler. Dans Godot, <code>repeat_enable</code> fait cette boucle pour nous.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/facade_raster.gd">
+class_name FacadeRaster
+extends RasterPlane
+## Secret #1 : chaque ligne de la façade défile à sa propre vitesse.
+## Les lignes où l'on marche (trottoir, dessus du balcon) DOIVENT valoir 1,0,
+## sinon les sprites glisseraient sur le décor.
+
+@export var depth: Curve          ## x : ligne d'écran (0 = haut, 1 = bas) ; y : facteur de vitesse
+@export var world_origin := Vector2(0, 0)   ## position monde du coin haut-gauche de la texture
+
+
+func compute(camera_center: Vector2) -> void:
+	var view_left := camera_center.x - 160.0
+	var view_top := camera_center.y - 112.0
+	for y in LINES:
+		var k := depth.sample(float(y) / (LINES - 1)) if depth else 1.0
+		# floor : le VDP ne connaît que des pixels entiers. Chaque ligne avance à son rythme.
+		h_scroll[y] = floor((view_left - world_origin.x) * k)
+		v_line[y] = y + floor(view_top - world_origin.y)
+</script>
+<p>Dans l'inspecteur, crée une <code>Curve</code> pour <code>depth</code>, avec <code>max_value</code> à 1,2, et pose les points mesurés : (0,14 ; 1,06), (0,51 ; 1,06), (0,52 ; 1,0), (0,72 ; 0,95), (0,73 ; 0,91), (0,78 ; 0,91), (0,89 ; 1,0), (1,0 ; 1,0). Règle les tangentes à « linéaire ». Ajuste ensuite à l'œil sur ta propre image : l'important est que <strong>les lignes où l'on marche valent 1</strong>.</p>
+<div class="callout concept"><span class="tag">Concept : séparer le visuel de la collision</span><p>La façade est une image affichée par un shader ; elle ne sait rien de la physique. Le trottoir et le balcon sur lesquels Batman marche sont des <code>StaticBody2D</code> (ou une <code>TileMapLayer</code> invisible) dans le monde, à facteur 1. Le joueur ne marche jamais « sur l'image », mais sur une géométrie invisible alignée avec elle.</p></div>
+
+<h2 id="feu">Secret #2 : le feu ondulant</h2>
+<div class="callout md"><span class="tag">Ce qu'explique Burton</span><p>« Une animation de quatre ou cinq images… je compte : <strong>six</strong>. » Puis un décalage horizontal par ligne : <strong>un peu en bas, beaucoup en haut</strong> (<a href="https://youtu.be/Z0S92Fs5gOg?t=135" target="_blank" rel="noopener">vidéo 1, 2:15</a>). Dans le jeu, ce sont les foyers qui sortent des fenêtres de la banque (<a class="tc" href="#">2:52</a>).</p></div>
+<script type="text/x-code" data-lang="glsl" data-file="res://fx/billowing_fire.gdshader">
+shader_type canvas_item;
+// Pour un Sprite2D avec hframes = 6 (les 6 images de flamme côte à côte).
+// Chaque LIGNE entière du sprite est décalée : peu en bas, beaucoup en haut.
+
+uniform float frames = 6.0;        // = hframes du Sprite2D
+uniform float amplitude = 5.0;     // décalage maximal en pixels (au sommet)
+uniform float wavelength = 22.0;   // nombre de lignes pour une période de l'onde
+uniform float speed = 5.0;
+uniform float power = 1.6;         // forme de la montée d'amplitude du bas vers le haut
+uniform float time_offset = 0.0;   // pour désynchroniser plusieurs foyers
+
+// Dans fragment(), COLOR vaut déjà « texture × modulate ». On garde donc la seule
+// modulation (modulate, self_modulate) dans une varying calculée dans vertex().
+varying vec4 tint;
+
+void vertex() {
+	tint = COLOR;
+}
+
+void fragment() {
+	vec2 tex_px = 1.0 / TEXTURE_PIXEL_SIZE;
+	float line = floor(UV.y * tex_px.y);              // ligne entière, comme le VDP
+	float height01 = 1.0 - line / tex_px.y;            // 0 en bas, 1 en haut
+	float wave = sin((TIME + time_offset) * speed + line * 6.2831853 / wavelength);
+	float shift_px = floor(wave * amplitude * pow(height01, power) + 0.5);
+
+	// On reste dans l'image courante de la planche (sinon on « mord » sur la voisine).
+	float frame_w = 1.0 / frames;
+	float frame_start = floor(UV.x / frame_w) * frame_w;
+	float u = UV.x + shift_px * TEXTURE_PIXEL_SIZE.x;
+	if (u < frame_start || u >= frame_start + frame_w) {
+		COLOR = vec4(0.0);
+	} else {
+		COLOR = texture(TEXTURE, vec2(u, UV.y)) * tint;
+	}
+}
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/fire.gd  (sur le Sprite2D, hframes = 6)">
+extends Sprite2D
+## Fait tourner les 6 images de flamme ; le shader ajoute l'ondulation par ligne.
+
+@export var fps := 12.0
+var _t := 0.0
+
+
+func _ready() -> void:
+	_t = randf() * 10.0
+	(material as ShaderMaterial).set_shader_parameter("time_offset", randf() * 10.0)
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	frame = int(_t * fps) % hframes
+</script>
+<div class="callout warn"><span class="tag">Ce qui ne marche pas</span><p>Avec un <code>AnimatedSprite2D</code> dont les images sont des <code>AtlasTexture</code> prises dans une grande planche, <code>UV</code> et <code>TEXTURE_PIXEL_SIZE</code> désignent toute la planche et le numéro de ligne devient faux. Utilise un <code>Sprite2D</code> avec <code>hframes = 6</code> et une bande d'images de même hauteur. Coche aussi « Local To Scene » sur le matériau pour pouvoir désynchroniser chaque foyer.</p></div>
+<div class="callout warn"><span class="tag">Piège Godot 4 : <code>COLOR</code> dans <code>fragment()</code></span><p>En entrée de <code>fragment()</code>, <code>COLOR</code> ne contient pas seulement la modulation : il vaut <strong>déjà la couleur de la texture multipliée par <code>modulate</code></strong>. Écrire <code>texture(TEXTURE, uv) * COLOR</code> multiplie donc la texture par elle-même, et ici par sa version <em>non déformée</em> : le feu serait découpé par sa propre silhouette. Pour une texture d'index, le résultat est même noir. La bonne pratique : recopier <code>COLOR</code> dans une <code>varying</code> depuis <code>vertex()</code>, où il ne contient que la modulation. Ce piège a été détecté en faisant tourner les shaders de ce guide dans Godot 4.5.</p></div>
+
+<h2 id="palettes">Les palettes</h2>
+<div class="callout md"><span class="tag">Sur Mega Drive</span><p>La CRAM contient <strong>4 palettes de 16 couleurs</strong>. Chaque couleur fait 9 bits : 3 bits par canal, donc <strong>8 niveaux</strong> de rouge, de vert et de bleu. L'index 0 de chaque palette est transparent. Les tuiles et les sprites ne stockent pas des couleurs mais des <strong>index</strong> (0 à 15). Changer une palette recolore instantanément tout ce qui l'utilise. C'est ainsi que le jeu réalise :</p>
+<ul>
+  <li>les <strong>fondus</strong> au noir entre les sections (<a class="tc" href="#">1:46</a>, <a class="tc" href="#">10:44</a>) ;</li>
+  <li>le <strong>flash blanc</strong> du crâne et de l'explosion de la banque (<a class="tc" href="#">2:46</a>) ;</li>
+  <li>le <strong>basculement</strong> de la rue bleu nuit vers l'ambiance d'incendie (<a class="tc" href="#">2:50</a>) ;</li>
+  <li>le <strong>flash pastel</strong> de la montgolfière touchée (<a class="tc" href="#">13:38</a>).</li>
+</ul></div>
+
+<h3 id="palette-fx">Fondus et flashs plein écran, par paliers</h3>
+<p>Sur la console, un fondu au noir retire 1 niveau à chaque canal de chaque couleur, toutes les quelques images : <strong>8 paliers visibles</strong>, et des teintes qui « tournent » parce que les canaux n'atteignent pas zéro en même temps. Un fondu Godot lisse (<code>modulate</code> animé) n'a pas ce grain. Ce post-traitement le reproduit :</p>
+<script type="text/x-code" data-lang="glsl" data-file="res://fx/palette_fx.gdshader">
+shader_type canvas_item;
+// Post-traitement plein écran façon CRAM : couleurs 9 bits, fondus et flashs par paliers.
+
+uniform sampler2D screen : hint_screen_texture, filter_nearest;
+uniform int fade = 0;           // 0..7 : paliers retirés à chaque canal (vers le noir)
+uniform int flash = 0;          // 0..7 : paliers ajoutés à chaque canal (vers le blanc)
+uniform bool quantize = true;   // forcer les 8 niveaux par canal de la Mega Drive
+
+void fragment() {
+	vec3 c = texture(screen, SCREEN_UV).rgb;
+	vec3 lv = quantize ? floor(c * 7.0 + 0.5) : c * 7.0;   // niveaux 0..7
+	lv = max(lv - float(fade), 0.0);                       // chaque canal descend séparément
+	lv = min(lv + float(flash), 7.0);
+	COLOR = vec4(lv / 7.0, 1.0);
+}
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/palette_fx.gd  (Autoload « PaletteFx », scène palette_fx.tscn)">
+extends CanvasLayer
+## palette_fx.tscn : CanvasLayer > ColorRect « Rect » (ancrage plein écran, matériau palette_fx).
+## Ajoute la SCÈNE en autoload sous le nom PaletteFx.
+
+@onready var rect: ColorRect = $Rect
+var _mat: ShaderMaterial
+var _fade := 0   ## palier courant : un fondu repart toujours de là où on en est
+
+
+func _ready() -> void:
+	layer = 100
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mat = rect.material as ShaderMaterial
+
+
+func set_fade(steps: int) -> void:
+	_fade = clampi(steps, 0, 7)
+	_mat.set_shader_parameter("fade", _fade)
+
+
+func set_flash(steps: int) -> void:
+	_mat.set_shader_parameter("flash", clampi(steps, 0, 7))
+
+
+## Fondu au noir en 8 paliers. frames_per_step = 4 donne ~0,5 s.
+func fade_out(frames_per_step := 4) -> void:
+	for s in range(_fade, 8):
+		set_fade(s)
+		await _frames(frames_per_step)
+
+
+func fade_in(frames_per_step := 4) -> void:
+	for s in range(_fade, -1, -1):
+		set_fade(s)
+		await _frames(frames_per_step)
+
+
+## Flash blanc : le crâne (2 images) ou l'explosion de la banque (bien plus long).
+func flash_white(frames := 2, steps := 7) -> void:
+	set_flash(steps)
+	await _frames(frames)
+	set_flash(0)
+
+
+func _frames(n: int) -> void:
+	for i in n:
+		await get_tree().physics_frame
+</script>
+<p>Une fois <code>PaletteFx</code> en place, tu peux remplacer le corps de <code>Fx.flash_screen()</code> (tome 04) par <code>PaletteFx.flash_white()</code>.</p>
+
+<h3 id="hit-flash">Le flash de dégâts d'un sprite</h3>
+<script type="text/x-code" data-lang="glsl" data-file="res://fx/hit_flash.gdshader">
+shader_type canvas_item;
+// Teinte un sprite vers une couleur claire, comme une palette « touchée » de la CRAM.
+
+uniform float flash : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 flash_color : source_color = vec4(1.0, 0.95, 0.92, 1.0);
+
+varying vec4 tint;   // modulate seul (voir billowing_fire.gdshader)
+
+void vertex() {
+	tint = COLOR;
+}
+
+void fragment() {
+	vec4 c = texture(TEXTURE, UV) * tint;
+	c.rgb = mix(c.rgb, flash_color.rgb, flash);
+	COLOR = c;
+}
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/hit_flash.gd">
+class_name HitFlash
+extends Node
+## Branche une Hurtbox sur le shader hit_flash d'un sprite.
+## Joker : amount ≈ 0,55 pour le rendu pastel (vidéo 13:38). Ennemis : 1,0.
+
+@export var target: CanvasItem         ## le sprite (matériau hit_flash, « Local To Scene » coché)
+@export var hurtbox: Hurtbox
+@export var amount := 1.0
+@export var duration := 0.12
+var _t := 0.0
+var _mat: ShaderMaterial
+
+
+func _ready() -> void:
+	_mat = target.material as ShaderMaterial
+	hurtbox.hurt.connect(func(_h: Hitbox) -> void: _t = duration)
+
+
+func _process(delta: float) -> void:
+	if _t <= 0.0:
+		return
+	_t -= delta
+	# Clignote une image sur deux pendant la durée.
+	var on := _t > 0.0 and int(_t * 30.0) % 2 == 0
+	_mat.set_shader_parameter("flash", amount if on else 0.0)
+</script>
+
+<h3 id="indexe">Couleurs indexées : le basculement de palette de la banque</h3>
+<div class="callout concept"><span class="tag">Concept : séparer la forme et la couleur</span><p>Une image indexée stocke pour chaque pixel un <strong>numéro de couleur</strong>, pas une couleur. La palette, à part, dit quelle couleur correspond à chaque numéro. On peut alors changer l'ambiance d'un décor entier (nuit → incendie) en changeant 16 couleurs, sans redessiner un seul pixel. C'est exactement ce qui se passe à <a class="tc" href="#">2:50</a>.</p></div>
+<p>Étape 1 : convertir une image en carte d'index et en palette, avec ce script d'éditeur.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://tools/indexer.gd">
+@tool
+extends EditorScript
+## Convertit une image (16 couleurs max) en carte d'index + bande de palette 16×1.
+## Fichier > Exécuter. Résultat : *_idx.png et *_pal.png à côté de la source.
+
+const SOURCE := "res://art/s1/facade.png"
+
+
+func _run() -> void:
+	var img := Image.load_from_file(SOURCE)
+	img.convert(Image.FORMAT_RGBA8)
+	var palette: Array[Color] = [Color(0, 0, 0, 0)]   # index 0 = transparent, comme la CRAM
+	var idx := Image.create(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8)
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			var i := 0
+			if c.a >= 0.5:
+				c.a = 1.0
+				i = palette.find(c)
+				if i == -1:
+					if palette.size() >= 16:
+						push_error("Plus de 16 couleurs : découpe l'image ou réduis sa palette.")
+						return
+					palette.append(c)
+					i = palette.size() - 1
+			var v := i / 255.0
+			idx.set_pixel(x, y, Color(v, v, v, 1.0))
+	var pal := Image.create(16, 1, false, Image.FORMAT_RGBA8)
+	for i in palette.size():
+		pal.set_pixel(i, 0, palette[i])
+	idx.save_png(SOURCE.get_basename() + "_idx.png")
+	pal.save_png(SOURCE.get_basename() + "_pal.png")
+	print("%d couleurs. Fichiers écrits." % palette.size())
+</script>
+<div class="callout warn"><span class="tag">Import indispensable</span><p>Sélectionne <code>*_idx.png</code> → onglet Import : <strong>Compress Mode = Lossless</strong>, <strong>Mipmaps = désactivé</strong>, puis « Réimporter ». Une compression VRAM ou des mipmaps mélangeraient les index et produiraient des couleurs aléatoires.</p></div>
+<p>Étape 2 : fabriquer une palette à <strong>plusieurs lignes</strong> (ligne 0 = nuit, ligne 1 = incendie) en recolorant la bande 16×1 dans un logiciel de dessin, puis afficher avec ce shader :</p>
+<script type="text/x-code" data-lang="glsl" data-file="res://fx/indexed.gdshader">
+shader_type canvas_item;
+// TEXTURE = carte d'index (valeur rouge = index / 255). palette = 16 colonnes x N lignes.
+
+uniform sampler2D palette : filter_nearest;
+uniform float palette_count = 2.0;   // nombre de lignes dans la texture de palette
+uniform float from_row = 0.0;        // palette de départ (0 = nuit)
+uniform float to_row = 1.0;          // palette d'arrivée (1 = incendie)
+uniform int blend_step = 0;          // 0..7 : transition par paliers, comme la CRAM
+
+varying vec4 tint;   // modulate seul : COLOR, dans fragment(), contient déjà la carte d'index
+
+void vertex() {
+	tint = COLOR;
+}
+
+void fragment() {
+	float idx = floor(texture(TEXTURE, UV).r * 255.0 + 0.5);
+	if (idx < 0.5) {
+		COLOR = vec4(0.0);   // index 0 : transparent
+	} else {
+		float u = (idx + 0.5) / 16.0;
+		vec4 a = texture(palette, vec2(u, (from_row + 0.5) / palette_count));
+		vec4 b = texture(palette, vec2(u, (to_row + 0.5) / palette_count));
+		vec3 mixed = mix(a.rgb, b.rgb, float(blend_step) / 7.0);
+		COLOR = vec4(floor(mixed * 7.0 + 0.5) / 7.0, 1.0) * tint;   // reste en 9 bits
+	}
+}
+</script>
+<p>Le même shader s'applique à un <code>Sprite2D</code>, à une <code>TileMapLayer</code> ou, en remplaçant <code>TEXTURE</code> par la texture du plan, au plan raster. Le tome 07 l'utilise pour l'explosion de la banque.</p>
+
+<h2 id="parallaxe">La parallaxe : du fond au premier plan</h2>
+<p>Pour les couches qui défilent d'un bloc (ciel, skyline, colonnes du Gem Expo), pas besoin de raster : <code>Parallax2D</code> (Godot 4.3+) suffit.</p>
+<div class="table-wrap"><table>
+<tr><th>Couche</th><th><code>scroll_scale</code></th><th><code>repeat_size</code></th><th>Remarque</th></tr>
+<tr><td>Ciel, lune</td><td>(0.05, 0)</td><td>—</td><td>Quasi fixe</td></tr>
+<tr><td>Skyline (baies du Gem Expo)</td><td>(0.3, 0)</td><td>largeur de l'image</td><td>Boucle à l'infini</td></tr>
+<tr><td>Plan de jeu</td><td>(1, 1)</td><td>—</td><td>TileMapLayer, ennemis, Batman</td></tr>
+<tr><td>Colonnes de marbre (Gem Expo)</td><td>(1.3, 1)</td><td>espacement des colonnes</td><td><code>z_index</code> = 10 : <strong>devant</strong> Batman (<a class="tc" href="#">6:24</a>)</td></tr>
+</table></div>
+<div class="callout concept"><span class="tag">Concept : la parallaxe</span><p>Plus un objet est loin, moins il bouge quand la caméra se déplace. Un facteur &lt; 1 place la couche derrière le plan de jeu, un facteur &gt; 1 la place devant. Le raster de la façade n'est qu'une parallaxe dont le facteur change <em>à chaque ligne</em>.</p></div>
+
+<h2 id="echelle">Mise à l'échelle par paliers</h2>
+<div class="callout md"><span class="tag">Sur Mega Drive</span><p>Le VDP ne sait pas agrandir un sprite. Pour les sphères du bras de grue, Burton compte « 4 tailles de sphère orange et 2 de sphère noire » : des images <strong>pré-calculées</strong>, rangées dans la cartouche. La montgolfière du Joker qui s'approche et s'éloigne utilise forcément le même principe, avec des tailles discrètes.</p></div>
+<p>Godot sait agrandir en continu, mais un agrandissement lisse trahit le remake. On arrondit l'échelle à un petit nombre de paliers :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/fx.gd  (à ajouter à la classe Fx du tome 04)">
+## Arrondit une échelle au palier le plus proche parmi « sizes », comme des sprites pré-calculés.
+static func snap_scale(value: float, sizes: PackedFloat32Array) -> float:
+	var best := sizes[0]
+	for s in sizes:
+		if absf(s - value) < absf(best - value):
+			best = s
+	return best
+</script>
+
+<h2 id="recap">Récapitulatif</h2>
+<div class="table-wrap"><table>
+<tr><th>Effet</th><th>Où dans le niveau 1</th><th>Outil</th></tr>
+<tr><td>Façade pseudo-3D (secret #1)</td><td>Section 1</td><td><code>FacadeRaster</code></td></tr>
+<tr><td>Feu ondulant (secret #2)</td><td>Section 1, banque</td><td><code>billowing_fire.gdshader</code></td></tr>
+<tr><td>Bras en sphères (secret #3)</td><td>Mini-boss</td><td>Tome 08 : projection 3D + tailles discrètes + assombrissement</td></tr>
+<tr><td>Fondus et flashs</td><td>Partout</td><td><code>PaletteFx</code></td></tr>
+<tr><td>Bascule nuit → incendie</td><td>Section 1</td><td><code>indexed.gdshader</code></td></tr>
+<tr><td>Flash de dégâts pastel</td><td>Boss</td><td><code>HitFlash</code></td></tr>
+<tr><td>Colonnes au premier plan</td><td>Section 2</td><td><code>Parallax2D</code>, scroll_scale &gt; 1</td></tr>
+<tr><td>Ballon qui approche</td><td>Boss Joker</td><td><code>Fx.snap_scale</code></td></tr>
+</table></div>
+<div class="callout goal"><span class="tag">Objectif de l'étape</span>
+<ul class="check">
+  <li>Une image de façade s'affiche derrière la salle de test ; en courant, le haut et la vitrine défilent à des vitesses différentes, le trottoir reste calé sur le sol de collision.</li>
+  <li>Un foyer de 6 images ondule : immobile en bas, très mobile en haut.</li>
+  <li><code>PaletteFx.fade_out()</code> assombrit l'écran en 8 paliers visibles ; <code>flash_white()</code> blanchit l'écran 2 images.</li>
+  <li>Un décor indexé passe de la palette « nuit » à la palette « incendie » en 8 paliers.</li>
+</ul></div>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 · Finitions, fidélité &amp; annexes — Batman &amp; Robin × Godot</title>
+<meta name="description" content="Ressenti de jeu (tremblement, hit stop), checklist de fidélité au jeu original, option coop, export, feuille de route, glossaire et sources.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="assets/guide.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot 4.5</span></a><select id="tome-select" aria-label="Aller à un tome"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Tome 11</div>
+  <h1>Finitions, fidélité &amp; annexes</h1>
+  <p class="lead">Le ressenti (« juice »), une checklist pour comparer ton remake à l'original détail par détail, l'option à deux joueurs, l'export, une feuille de route et un glossaire.</p>
+  <div class="meta"><span class="pill">Game feel</span><span class="pill">Fidélité</span><span class="pill">Coop locale</span><span class="pill">Export</span></div>
+</section>
+
+<h2 id="juice">Le ressenti de jeu</h2>
+<h3 id="shake">Tremblement de caméra (version corrigée)</h3>
+<p>L'algorithme « trauma » de l'ancienne doc B est le bon : une valeur de 0 à 1 qui décroît, et une amplitude proportionnelle à son carré. Seules les amplitudes changent : en 320×224, <strong>4 à 6 pixels</strong> suffisent ; 100 px représentaient un tiers de l'écran. On décale <code>offset</code> plutôt que la position, pour ne pas perturber le suivi du joueur.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/camera_rig.gd  (ajouts)">
+@export var max_shake := Vector2(5, 4)   ## pixels
+@export var shake_decay := 1.6           ## trauma perdu par seconde
+var trauma := 0.0
+
+# Dans _ready(), ajoute : add_to_group("camera")
+
+
+## Appelée par call_group("camera", "shake", 0.35) : grappin, explosions de boss…
+func shake(amount: float) -> void:
+	trauma = minf(trauma + amount, 1.0)
+
+
+func _process(delta: float) -> void:
+	trauma = maxf(trauma - shake_decay * delta, 0.0)
+	var k := trauma * trauma   # le carré : fort au début, s'éteint en douceur
+	offset = Vector2(roundf(max_shake.x * k * randf_range(-1, 1)), roundf(max_shake.y * k * randf_range(-1, 1)))
+</script>
+
+<h3 id="hitstop">Le hit stop (version corrigée)</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/fx.gd  (à ajouter)">
+## Fige le jeu un instant pour donner du poids à un impact.
+## Le 4e argument de create_timer (ignore_time_scale = true) est indispensable :
+## sans lui, la minuterie est figée elle aussi et le jeu ne repart jamais.
+static func hit_stop(tree: SceneTree, duration := 0.05) -> void:
+	Engine.time_scale = 0.0
+	await tree.create_timer(duration, true, false, true).timeout
+	Engine.time_scale = 1.0
+</script>
+<div class="callout warn"><span class="tag">Fidélité</span><p>La vidéo ne montre ni tremblement d'écran évident ni hit stop : ce sont des ajouts modernes. Utilise-les avec parcimonie (impact du grappin, transitions de phase des boss), ou désactive-les pour un remake strict.</p></div>
+
+<h3 id="crt">Filtre CRT (optionnel)</h3>
+<p>Le shader CRT du tome 4 de l'ancienne doc B (scanlines et aberration chromatique) fonctionne tel quel. Place-le dans un <code>CanvasLayer</code> de layer 101, donc <em>après</em> <code>PaletteFx</code> (layer 100) : sinon la quantification 9 bits « écraserait » les scanlines. Avec le mode d'étirement <code>viewport</code>, remplace 224 par la hauteur de la fenêtre si tu veux des scanlines plus fines que les pixels du jeu.</p>
+
+<h2 id="fidelite">Checklist de fidélité</h2>
+<p>Coche au fur et à mesure en comparant ton jeu à la vidéo.</p>
+<h3 id="fid-general">Général</h3>
+<ul class="check">
+  <li>320×224, pixels nets, 60 images/s, fondus et flashs en 8 paliers.</li>
+  <li>Pas d'écran de titre entre les sections : simple fondu au noir.</li>
+  <li>HUD : portrait, médaillon vies + anneau de santé, score sans zéros devant, jauge de charge colorée, pastille 99 → 00 des boss, zone P2 qui alterne ses messages.</li>
+  <li>Bonus d'arme qui change de couleur environ chaque seconde ; crâne qui roule ; smart bomb = flash blanc de 2 images.</li>
+  <li>Arènes : la caméra se fige, vagues avec quota, bulle « GO! » qui clignote à droite.</li>
+  <li>Pose de victoire après chaque boss ; +5 000 / +5 000 / +10 000.</li>
+</ul>
+<h3 id="fid-s1">Section 1</h3>
+<ul class="check">
+  <li>Façade dont les bandes défilent à des vitesses différentes (≈ 1,06 en haut, ≈ 0,91 pour la vitrine en retrait).</li>
+  <li>Balcon praticable, ennemis qui en sautent, Batman qui s'y accroche par en dessous.</li>
+  <li>Explosion de la banque : explosions, écran blanc, palette « incendie », foyers à 6 images qui ondulent plus en haut qu'en bas, débris qui tombent.</li>
+  <li>Boss : machine d'Harley, socle détruit à 66, dôme à 33, Harley sur mât télescopique au niveau du balcon.</li>
+</ul>
+<h3 id="fid-s2">Section 2</h3>
+<ul class="check">
+  <li>Gem Expo modulaire, colonnes au premier plan plus rapides que le décor.</li>
+  <li>Têtes à hélice en file indienne puis en ligne ; vitres qui restent brisées.</li>
+  <li>Entrepôt en escaliers de caisses ; passage d'Harley en diagonale.</li>
+  <li>Grappin d'environ 23 sphères : 4 tailles orange, 2 tailles noires, plus sombre et plus petit au fond, inoffensif au fond.</li>
+</ul>
+<h3 id="fid-s3">Section 3</h3>
+<ul class="check">
+  <li>Rue qui défile en continu, véhicules aux roues animées, écarts variables.</li>
+  <li>Ballons-mines de 4 couleurs ; paquet géant qui libère un sbire.</li>
+  <li>Montgolfière : entrée petite et haute, grossit en descendant, flash pastel, grappes de bombes, écran vide entre deux passages.</li>
+  <li>Mort : explosions en chaîne, Joker éjecté puis assommé sur le plateau, Batmobile.</li>
+</ul>
+
+<h2 id="coop">Option : deux joueurs</h2>
+<p>Le jeu original se joue à deux, et le joueur 2 peut rejoindre la partie en appuyant sur START, sauf pendant un boss (« PLEASE WAIT »). Le guide se concentre sur le solo, mais l'architecture est prête :</p>
+<ol>
+  <li><strong>Entrées :</strong> duplique les actions avec un préfixe (<code>p1_jump</code>, <code>p2_jump</code>…). Dans <code>Player</code>, ajoute <code>@export var player_id := 1</code> et une fonction <code>act(name)</code> qui renvoie <code>"p%d_%s" % [player_id, name]</code>. Remplace chaque <code>Input.is_action_pressed("jump")</code> par <code>Input.is_action_pressed(act("jump"))</code>. C'est l'idée de l'ancienne doc B, qui reste la bonne.</li>
+  <li><strong>Caméra :</strong> vise le milieu des deux joueurs, <strong>sans zoom</strong> (la Mega Drive n'en a pas). Empêche chaque joueur de sortir de l'écran avec <code>clamp_to_view()</code>. Si l'un est bloqué au bord gauche, c'est lui qui freine la caméra.</li>
+  <li><strong>Arrivée en cours de partie :</strong> dans la section, écoute l'action <code>p2_start</code> ; si aucun boss n'est actif et qu'il reste un crédit, instancie <code>player.tscn</code> avec <code>player_id = 2</code> et le héros restant, puis fais-le tomber du haut de l'écran comme un <code>respawn()</code>.</li>
+  <li><strong>HUD :</strong> la zone de droite devient le HUD du joueur 2 (même scène, liée au second joueur).</li>
+</ol>
+<div class="callout warn"><span class="tag">Équilibrage</span><p>Selon TASVideos, les boss ont un peu moins de vie en solo qu'à deux. Multiplie <code>health.max_health</code> par environ 1,2 quand un second joueur est présent au déclenchement de l'arène (valeur à calibrer).</p></div>
+
+<h2 id="perf">Performances</h2>
+<ul>
+  <li>Le niveau 1 est léger pour une machine moderne. Les seuls points à surveiller : le nombre de nœuds (projectiles et explosions), d'où le <code>Pool</code> du tome 04.</li>
+  <li><strong>Débogueur → Profileur</strong> et <strong>Moniteurs</strong> : surveille « Objets → Nœuds » pendant une arène chargée. Le nombre doit revenir au même niveau après la vague.</li>
+  <li>Le plan raster envoie 448 flottants au GPU par image : c'est négligeable.</li>
+  <li>Si tu veux retrouver la vraie limite de la console, plafonne le nombre total de sprites d'ennemis actifs, environ 60. Au-delà, le jeu original aurait fait clignoter des sprites.</li>
+</ul>
+
+<h2 id="export">Export</h2>
+<ul>
+  <li><strong>Projet → Exporter</strong> ; télécharge d'abord les modèles d'exportation. Pour Windows, fournis une icône <code>.ico</code>.</li>
+  <li><strong>Écran de démarrage</strong> (Projet → Paramètres → Application → Boot Splash) : fond noir, filtre désactivé, ton propre logo.</li>
+  <li>Exclus <code>res://tools/</code> de l'export (filtre de ressources) : ce sont des scripts d'éditeur.</li>
+  <li>Rappel : un build qui contient les sprites, la musique ou les logos originaux ne doit pas être publié.</li>
+</ul>
+
+<h2 id="feuille-de-route">Feuille de route conseillée</h2>
+<div class="table-wrap"><table>
+<tr><th>Étape</th><th>Tomes</th><th>Livrable jouable</th></tr>
+<tr><td>1 · Socle</td><td>02, 03</td><td>Batman court, saute, s'accroche, frappe une cible dans la salle de test</td></tr>
+<tr><td>2 · Combat</td><td>04, 05</td><td>Armes, jauge, bonus, une arène avec deux vagues de clowns et un GO!</td></tr>
+<tr><td>3 · Rendu</td><td>06</td><td>Façade raster, feu ondulant, fondus en paliers</td></tr>
+<tr><td>4 · Section 1</td><td>07</td><td>Toute la rue, l'explosion de la banque et la machine d'Harley</td></tr>
+<tr><td>5 · Section 2</td><td>08</td><td>Gem Expo, entrepôt et grappin en sphères</td></tr>
+<tr><td>6 · Section 3</td><td>09</td><td>Convoi et montgolfière du Joker</td></tr>
+<tr><td>7 · Jeu complet</td><td>10, 11</td><td>De l'intro à la Batmobile finale, HUD, continue, finitions</td></tr>
+</table></div>
+<div class="callout concept"><span class="tag">Concept : toujours avoir un jeu qui tourne</span><p>Chaque étape se termine sur quelque chose de <strong>jouable</strong>. Les sprites définitifs peuvent attendre : des rectangles de couleur suffisent pour valider le ressenti (l'idée des « placeholders » de l'ancienne doc A, qui reste excellente). Un bug repéré tôt, sur un petit morceau, coûte dix fois moins cher qu'à la fin.</p></div>
+
+<h2 id="glossaire">Glossaire</h2>
+<div class="table-wrap"><table>
+<tr><th>Terme</th><th>Définition</th></tr>
+<tr><td>VDP</td><td>Le processeur vidéo de la Mega Drive (Yamaha YM7101) : plans, sprites, palettes, défilement.</td></tr>
+<tr><td>Plan (A, B, Window)</td><td>Couche de décor faite de tuiles 8×8. A et B défilent ; Window est fixe (interface).</td></tr>
+<tr><td>CRAM</td><td>Mémoire des couleurs : 4 palettes × 16 couleurs, 9 bits chacune (8 niveaux par canal).</td></tr>
+<tr><td>VRAM / VSRAM</td><td>Mémoire vidéo (64 Ko : tuiles, tables) / mémoire du défilement vertical (par colonnes de 16 px).</td></tr>
+<tr><td>H-Scroll</td><td>Table de décalages horizontaux : un par ligne, ou par bande de 8 lignes, ou un pour tout l'écran.</td></tr>
+<tr><td>HBlank / VBlank</td><td>Pause du faisceau entre deux lignes / entre deux images. Moments où l'on modifie le VDP.</td></tr>
+<tr><td>Raster (effet)</td><td>Effet obtenu en changeant un réglage ligne par ligne pendant que l'image se dessine.</td></tr>
+<tr><td>Métatuile</td><td>Bloc de plusieurs tuiles réutilisé pour construire les niveaux.</td></tr>
+<tr><td>Couleur indexée</td><td>Pixel qui stocke un numéro de couleur, pas une couleur ; la palette fait la traduction.</td></tr>
+<tr><td>Hitbox / Hurtbox</td><td>Zone qui inflige des dégâts / zone qui en reçoit.</td></tr>
+<tr><td>FSM</td><td>Machine à états finis : un objet est dans un seul état à la fois, avec des transitions explicites.</td></tr>
+<tr><td>Pooling</td><td>Réutiliser des objets créés à l'avance au lieu de les créer et détruire en boucle.</td></tr>
+<tr><td>Parallaxe</td><td>Couches qui défilent à des vitesses différentes pour simuler la profondeur.</td></tr>
+<tr><td>Télégraphie</td><td>Signal visuel ou sonore qui annonce une attaque, pour que le joueur puisse réagir.</td></tr>
+<tr><td>Autoload</td><td>Nœud global créé par Godot au démarrage, qui survit aux changements de scène.</td></tr>
+<tr><td>Signal</td><td>Message émis par un nœud, reçu par ceux qui s'y sont connectés (patron Observateur).</td></tr>
+<tr><td>Resource</td><td>Objet de données sauvegardable (<code>.tres</code>), éditable dans l'inspecteur.</td></tr>
+<tr><td>Tween</td><td>Animation d'une propriété d'une valeur à une autre, avec une courbe d'accélération.</td></tr>
+<tr><td>Coyote time / buffer</td><td>Tolérances de saut : juste après avoir quitté le bord / juste avant d'atterrir.</td></tr>
+</table></div>
+
+<h2 id="sources">Sources</h2>
+<ul>
+  <li><a href="https://youtu.be/EDaIlrfxRnE" target="_blank" rel="noopener">The Adventures of Batman &amp; Robin (Genesis) Playthrough — NintendoComplete</a>, analysé de 0:00 à 14:37.</li>
+  <li><a href="https://youtu.be/Z0S92Fs5gOg" target="_blank" rel="noopener">Coding Secrets — How did this SEGA Genesis Game achieve the "Impossible"?</a> (Jon Burton, partie 1) et <a href="https://youtu.be/M7b0uUEl5hc" target="_blank" rel="noopener">partie 2</a>.</li>
+  <li><a href="https://tasvideos.org/9346S" target="_blank" rel="noopener">TASVideos, soumission #9346</a>.</li>
+  <li><a href="https://en.wikipedia.org/wiki/The_Adventures_of_Batman_%26_Robin_(video_game)" target="_blank" rel="noopener">Wikipédia (EN)</a>.</li>
+  <li>Documentations précédentes du dépôt : <a href="../batman-and-robin/">batman-and-robin/</a> et <a href="../adventure-of-batman-and-robin-tuto/tome-01.html">adventure-of-batman-and-robin-tuto/</a>.</li>
+</ul>
+<p class="footer-note">Les captures du guide sont extraites de la vidéo de référence à des fins d'analyse et d'apprentissage. The Adventures of Batman &amp; Robin © DC Comics / Warner Bros. / Sega, 1995.</p>
+
+<nav class="prevnext" aria-label="Tomes précédent et suivant"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/guide.js"></script>
+</body>
+</html>
