@@ -119,7 +119,8 @@ func compute(camera_center: Vector2) -> void:
 		h_scroll[y] = floor((view_left - world_origin.x) * k)
 		v_line[y] = y + floor(view_top - world_origin.y)
 </script>
-<p>Dans l'inspecteur, crée une <code>Curve</code> pour <code>depth</code>, avec <code>max_value</code> à 1,2, et pose les points mesurés : (0,14 ; 1,06), (0,51 ; 1,06), (0,52 ; 1,0), (0,72 ; 0,95), (0,73 ; 0,91), (0,78 ; 0,91), (0,89 ; 1,0), (1,0 ; 1,0). Règle les tangentes à « linéaire ». Ajuste ensuite à l'œil sur ta propre image : l'important est que <strong>les lignes où l'on marche valent 1</strong>.</p>
+<p>Dans l'inspecteur, crée une <code>Curve</code> pour <code>depth</code>, avec <code>max_value</code> à 1,2, et pose ces points : (0,14 ; 1,06), (0,44 ; 1,06), (0,47 ; 1,0), (0,52 ; 1,0), (0,72 ; 0,95), (0,73 ; 0,91), (0,78 ; 0,91), (0,89 ; 1,0), (1,0 ; 1,0). Règle les tangentes à « linéaire ». Ajuste ensuite à l'œil sur ta propre image : l'important est que <strong>les lignes où l'on marche valent 1</strong>.</p>
+<div class="callout warn"><span class="tag">Mesure contre règle de jeu</span><p>La mesure donne 1,06 pour toute la bande 32–114, qui contient le balcon. Mais Batman <strong>marche</strong> sur le balcon (y = 112, soit la ligne 112 ≈ 0,50 puisque la caméra est centrée sur y = 112) : avec un facteur 1,06, il glisserait de 6 % sur le décor. La bande mesurée est une moyenne dominée par la façade au-dessus du balcon. On garde donc 1,06 pour le haut de la façade (lignes 32–98) et on force 1,0 sur la tranche du balcon (lignes 105–116). Quand une mesure contredit une règle de jeu, c'est la règle de jeu qui gagne : elle se <em>voit</em> à chaque pas.</p></div>
 <div class="callout concept"><span class="tag">Concept : séparer le visuel de la collision</span><p>La façade est une image affichée par un shader ; elle ne sait rien de la physique. Le trottoir et le balcon sur lesquels Batman marche sont des <code>StaticBody2D</code> (ou une <code>TileMapLayer</code> invisible) dans le monde, à facteur 1. Le joueur ne marche jamais « sur l'image », mais sur une géométrie invisible alignée avec elle.</p></div>
 
 <h2 id="feu">Secret #2 : le feu ondulant</h2>
@@ -331,7 +332,7 @@ func _run() -> void:
 	var img := Image.load_from_file(SOURCE)
 	img.convert(Image.FORMAT_RGBA8)
 	var palette: Array[Color] = [Color(0, 0, 0, 0)]   # index 0 = transparent, comme la CRAM
-	var idx := Image.create(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8)
+	var idx := Image.create_empty(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8)
 	for y in img.get_height():
 		for x in img.get_width():
 			var c := img.get_pixel(x, y)
@@ -347,7 +348,7 @@ func _run() -> void:
 					i = palette.size() - 1
 			var v := i / 255.0
 			idx.set_pixel(x, y, Color(v, v, v, 1.0))
-	var pal := Image.create(16, 1, false, Image.FORMAT_RGBA8)
+	var pal := Image.create_empty(16, 1, false, Image.FORMAT_RGBA8)
 	for i in palette.size():
 		pal.set_pixel(i, 0, palette[i])
 	idx.save_png(SOURCE.get_basename() + "_idx.png")
@@ -385,7 +386,7 @@ void fragment() {
 	}
 }
 </script>
-<p>Le même shader s'applique à un <code>Sprite2D</code>, à une <code>TileMapLayer</code> ou, en remplaçant <code>TEXTURE</code> par la texture du plan, au plan raster. Le tome 07 l'utilise pour l'explosion de la banque.</p>
+<p>Le même shader s'applique à un <code>Sprite2D</code> ou à une <code>TileMapLayer</code>. Pour le plan raster, il faut fusionner les deux shaders : lire l'index dans <code>plane</code> à la position calculée par <code>raster_plane.gdshader</code>, puis le traduire avec la palette. Le tome 07 propose deux façons de faire basculer la banque : un simple échange de texture (version de base), ou cette bascule indexée par paliers (version fidèle).</p>
 
 <h2 id="parallaxe">La parallaxe : du fond au premier plan</h2>
 <figure class="concept"><img src="img/concepts/t06-gem-expo-mesure.jpg" alt="Contre-exemple mesuré. Dans le Gem Expo, colonnes, bannière et sol se déplacent exactement d’autant : pas de parallaxe i" loading="lazy"><figcaption><b>Contre-exemple mesuré.</b> Dans le Gem Expo, colonnes, bannière et sol se déplacent exactement d’autant : pas de parallaxe ici, tout est sur un seul plan. Mesurer avant de coder évite d’ajouter un effet qui n’existe pas.</figcaption></figure>

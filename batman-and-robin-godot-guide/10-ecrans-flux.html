@@ -209,16 +209,13 @@ extends Control
 @export var sound_effects: Array[AudioStream] = []
 @onready var rows: Array[Label] = [$List/Credits, $List/Music, $List/Sound]
 var _row := 0
-var _credits := Game.START_CREDITS
+var _credits := 0
 var _music := 1
 var _sound := 1
-const SAVE_PATH := "user://options.cfg"
 
 
 func _ready() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) == OK:
-		_credits = cfg.get_value("game", "credits", Game.START_CREDITS)
+	_credits = Game.credits_setting   # Game a déjà lu user://options.cfg au démarrage
 	_refresh()
 
 
@@ -265,12 +262,28 @@ func _refresh() -> void:
 
 
 func _save() -> void:
-	var cfg := ConfigFile.new()
-	cfg.set_value("game", "credits", _credits)
-	cfg.save(SAVE_PATH)
-	Game.credits = _credits
+	Game.credits_setting = _credits   # utilisé par Game.new_game() à la prochaine partie
+	Game.save_options()
 </script>
-<div class="callout warn"><span class="tag">Hypothèse</span><p>La vidéo montre « CREDITS: 6 » sans qu'on le voie changer. La plage 1–9 est une supposition. Pense aussi à faire lire <code>user://options.cfg</code> par <code>Game.new_game()</code> si tu veux que le réglage survive au redémarrage.</p></div>
+<p>Le réglage appartient à <code>Game</code>, pas à l'écran des options : c'est <code>Game.new_game()</code> qui l'applique. Ajoute à <code>game.gd</code> (tome 02) la lecture au démarrage et l'écriture :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://autoload/game.gd  (ajouts)">
+const OPTIONS_PATH := "user://options.cfg"
+
+
+func _ready() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(OPTIONS_PATH) == OK:
+		credits_setting = cfg.get_value("game", "credits", START_CREDITS)
+	credits = credits_setting
+
+
+func save_options() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("game", "credits", credits_setting)
+	cfg.save(OPTIONS_PATH)
+</script>
+<div class="callout concept"><span class="tag">Concept : une donnée, un propriétaire</span><p>Si l'écran des options modifiait directement <code>Game.credits</code>, la valeur serait écrasée par <code>new_game()</code> dès le lancement de la partie. On distingue donc le <strong>réglage</strong> (<code>credits_setting</code>, persistant) de l'<strong>état de la partie</strong> (<code>credits</code>, consommé par les continues). Le réglage n'a qu'un propriétaire, <code>Game</code>, qui sait le lire, l'écrire et l'appliquer.</p></div>
+<div class="callout warn"><span class="tag">Hypothèse</span><p>La vidéo montre « CREDITS: 6 » sans qu'on le voie changer. La plage 1–9 est une supposition.</p></div>
 
 <h2 id="select">La sélection du héros</h2>
 <div class="callout video"><span class="tag">Observé dans la vidéo</span><p>« PLAYER SELECT » : l'écran est coupé en deux bandes, bleue en haut avec l'emblème chauve-souris et Batman qui court, rouge en bas avec le « R » et Robin. Le mot « PLAYER » est écrit verticalement à gauche, « SELECT » à droite (<a class="tc" href="#">1:33</a>–<a class="tc" href="#">1:38</a>).</p></div>

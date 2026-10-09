@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 · Armes, jauge et bonus — Pas à pas</title>
+<meta name="description" content="Étape 6 : armes décrites par des ressources, effets partagés (Fx.spawn, explosions, flash), réserve de projectiles, WeaponSystem avec jauge de charge, bonus à couleur cyclique, crâne smart bomb et bonus de charge.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 06 / 13</div>
+  <h1>Armes, jauge et bonus</h1>
+  <p class="lead">Trois armes qui ne diffèrent que par leurs chiffres, une réserve de projectiles qui imite la limite de sprites de la console, une jauge qui se remplit quand on ne tire pas, et des bonus qui changent de couleur. Au passage, une boîte à outils d'effets que tout le jeu utilisera.</p>
+  <div class="meta"><span class="pill">⏱ ~3 h</span><span class="pill">Prérequis : étape 05</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/04-armes.html">tome 04</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li><code>Resource</code> comme fiche de données, <code>preload</code></li>
+    <li>Fonctions <code>static</code> et classes utilitaires</li>
+    <li><code>PackedScene.instantiate()</code>, <code>add_child</code>, <code>call_deferred</code></li>
+    <li><code>process_mode</code>, <code>VisibleOnScreenNotifier2D</code></li>
+    <li><code>CanvasLayer</code>, <code>ProgressBar</code></li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>La conception pilotée par les données</li>
+    <li>La réserve d'objets (<em>pooling</em>)</li>
+    <li>Le patron Observateur au service du découplage</li>
+    <li>L'objet à état cyclique</li>
+    <li>Interroger le monde par groupes</li>
+  </ul></div>
+</div>
+
+<h2 id="regles">Les règles</h2>
+
+<h3 class="step" id="e06-1">6.1 · Ce que fait le jeu original</h3>
+<figure class="concept narrow"><img src="../batman-and-robin-godot-guide/img/concepts/t04-bonus-cycle.jpg" alt="Le bonus d'arme à une seconde d'intervalle" loading="lazy"><figcaption><b>Le même bonus à une seconde d'intervalle.</b> Sa couleur, donc l'arme qu'il donne, change en permanence.</figcaption></figure>
+<div class="table-wrap"><table>
+<tr><th>Couleur du bonus</th><th>Arme</th><th>Caractère</th></tr>
+<tr><td style="color:var(--red)"><strong>Rouge / orange</strong></td><td>Batarang</td><td>Tir dispersé : plus de projectiles en éventail quand le niveau monte</td></tr>
+<tr><td style="color:var(--green)"><strong>Vert</strong></td><td>Bolas</td><td>Pas de dispersion, mais les plus gros dégâts</td></tr>
+<tr><td style="color:var(--blue)"><strong>Bleu</strong></td><td>Shuriken</td><td>L'arme la plus faible</td></tr>
+</table></div>
+<ul>
+  <li>Ramasser la couleur déjà en main fait monter l'arme d'un niveau, jusqu'à 7.</li>
+  <li>La barre sous le score se remplit seule en ~1,1 s quand on ne tire pas. Le tir suivant est un <strong>tir puissant</strong>, et la vide.</li>
+  <li>Le crâne qui roule au sol déclenche un flash blanc et détruit tous les ennemis à l'écran.</li>
+</ul>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>La jauge qui se remplit puis se vide : <a class="tc" href="#">1:46</a>–<a class="tc" href="#">1:48</a>. Le bonus qui change de couleur : <a class="tc" href="#">12:30</a>. Le crâne : <a class="tc" href="#">12:23</a>.</p></div>
+
+<h2 id="donnees">Les armes en données</h2>
+
+<h3 class="step" id="e06-2">6.2 · La fiche <code>WeaponData</code></h3>
+<div class="callout concept"><span class="tag">Concept : la conception pilotée par les données</span><p>Les trois armes ont le même comportement (tirer N projectiles à telle vitesse, avec tels dégâts) ; seuls les <strong>chiffres</strong> changent. On écrit donc le comportement une seule fois, et chaque arme devient un fichier de données éditable dans l'Inspecteur. Un game designer peut équilibrer le jeu sans toucher au code, et ajouter une quatrième arme ne demande aucune ligne de code.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://weapons/weapon_data.gd">
+class_name WeaponData
+extends Resource
+## Description d'une arme. Les tableaux « par niveau » ont 7 cases (niveaux 1 à 7).
+
+@export var id: StringName = &"batarang"
+@export var display_name := "Batarang"
+@export var color := Color(1.0, 0.42, 0.24)     ## couleur du bonus et de la jauge
+@export var projectile_texture: Texture2D
+@export var spin_speed := 14.0                   ## rad/s, rotation purement visuelle
+
+@export_group("Tir normal")
+@export var speed := 300.0                        ## px/s
+@export var fire_interval := 0.16                 ## s entre deux tirs, bouton maintenu
+@export var count_by_level := PackedInt32Array([1, 2, 3, 3, 4, 4, 5])
+@export var damage_by_level := PackedInt32Array([1, 1, 1, 2, 2, 2, 3])
+@export var spread_deg := 12.0                    ## écart entre deux projectiles de l'éventail
+@export var projectile_scale := 1.0
+
+@export_group("Tir puissant")
+@export var power_count := 5
+@export var power_spread_deg := 15.0
+@export var power_damage := 6
+@export var power_scale := 2.0
+@export var power_speed := 360.0
+
+
+func count_at(level: int) -> int:
+	return count_by_level[clampi(level, 1, count_by_level.size()) - 1]
+
+
+func damage_at(level: int) -> int:
+	return damage_by_level[clampi(level, 1, damage_by_level.size()) - 1]
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans <code>res://weapons/data/</code>, crée trois ressources <code>WeaponData</code> (clic droit → Nouveau → Ressource) : <code>batarang.tres</code>, <code>bolas.tres</code>, <code>shuriken.tres</code>.</li>
+  <li>Règle-les avec ces valeurs (les champs non cités gardent leur valeur par défaut) :</li>
+</ol>
+<div class="table-wrap"><table>
+<tr><th>Champ</th><th>batarang.tres</th><th>bolas.tres</th><th>shuriken.tres</th></tr>
+<tr><td>id / display_name</td><td>batarang / Batarang</td><td>bolas / Bolas</td><td>shuriken / Shuriken</td></tr>
+<tr><td>color</td><td>#ff6b3d</td><td>#43d18f</td><td>#5aa8ff</td></tr>
+<tr><td>speed</td><td>300</td><td>260</td><td>360</td></tr>
+<tr><td>fire_interval</td><td>0.16</td><td>0.22</td><td>0.10</td></tr>
+<tr><td>count_by_level</td><td>1, 2, 3, 3, 4, 4, 5</td><td>1, 1, 1, 1, 1, 1, 1</td><td>1, 1, 2, 2, 2, 3, 3</td></tr>
+<tr><td>damage_by_level</td><td>1, 1, 1, 2, 2, 2, 3</td><td>3, 3, 4, 4, 5, 5, 6</td><td>1, 1, 1, 1, 1, 2, 2</td></tr>
+<tr><td>spread_deg</td><td>12</td><td>0</td><td>6</td></tr>
+<tr><td>projectile_scale</td><td>1.0</td><td>1.0</td><td>0.8</td></tr>
+<tr><td>power_count / power_damage</td><td>5 / 6</td><td>1 / 16 (power_scale 2.5)</td><td>8 / 3</td></tr>
+</table></div></div>
+<div class="callout warn"><span class="tag">À calibrer</span><p>L'effet exact de chaque niveau n'est documenté nulle part : ces chiffres sont des hypothèses raisonnables. C'est justement l'intérêt des données : tu les ajusteras en jouant, sans toucher au code. Hypothèse retenue : changer de couleur ramène l'arme au niveau 1.</p></div>
+
+<h3 class="step" id="e06-3">6.3 · Le registre des armes</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://weapons/weapons.gd">
+class_name Weapons
+## Registre des armes : identifiant -> données.
+
+const DATA := {
+	&"batarang": preload("res://weapons/data/batarang.tres"),
+	&"bolas": preload("res://weapons/data/bolas.tres"),
+	&"shuriken": preload("res://weapons/data/shuriken.tres"),
+}
+## Ordre du cycle de couleurs des bonus, observé : rouge/orange → bleu → vert.
+const PICKUP_CYCLE: Array[StringName] = [&"batarang", &"shuriken", &"bolas"]
+
+
+static func get_data(id: StringName) -> WeaponData:
+	return DATA.get(id, DATA[&"batarang"])
+</script>
+<div class="callout godot"><span class="tag"><code>preload</code> et ressources partagées</span><p><code>preload()</code> charge le fichier au moment où le script est compilé ; le chemin doit donc exister, d'où l'ordre : les <code>.tres</code> d'abord. Une ressource chargée est <strong>partagée</strong> : tous ceux qui chargent <code>batarang.tres</code> reçoivent le même objet. On ne modifie donc jamais une fiche pendant le jeu (sinon toutes les armes changent) ; on lit seulement ses valeurs.</p></div>
+
+<h2 id="fx">La boîte à outils d'effets</h2>
+
+<h3 class="step" id="e06-4">6.4 · Le piège de la position mondiale</h3>
+<p>Avant d'écrire les effets, une expérience de deux minutes, pour comprendre un bug qui frappe tous les débutants.</p>
+<div class="callout do"><span class="tag">Expérience</span><ol>
+  <li>Nouvelle scène 2D <code>res://sandbox/spawn_test.tscn</code>. Ajoute un enfant <code>Node2D</code> nommé <code>Arena</code>, en position (100, 0).</li>
+  <li>Script sur la racine :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sandbox/spawn_test.gd">
+extends Node2D
+
+func _ready() -> void:
+	var a := ColorRect.new()
+	a.size = Vector2(8, 8)
+	a.color = Color.RED
+	var marker := Node2D.new()
+	marker.add_child(a)
+	marker.global_position = Vector2(160, 112)   # AVANT add_child : piège !
+	$Arena.add_child(marker)
+	print("Voulu : (160, 112) — obtenu : ", marker.global_position)
+</script>
+<div class="callout test"><span class="tag">Teste</span><p>La Sortie affiche « obtenu : (260, 112) » et le carré est décalé de 100 px. Un nœud sans parent n'a pas de « monde » : <code>global_position</code> y est rangé tel quel dans <code>position</code> (locale), puis devient relatif au parent quand on l'ajoute. Avec un parent à l'origine, le bug est invisible ; avec un parent placé ailleurs (l'arène d'un boss), l'objet surgit à des centaines de pixels.</p></div>
+
+<h3 class="step" id="e06-5">6.5 · <code>Fx</code> : faire apparaître, exploser, flasher</h3>
+<p>La classe <code>Fx</code> règle ce problème une fois pour toutes avec <code>spawn()</code>, que tout le jeu utilisera pour faire apparaître bombes, explosions, bonus et ennemis.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/fx.gd">
+class_name Fx
+## Effets visuels partagés.
+
+const EXPLOSION := preload("res://fx/explosion.tscn")
+
+
+## Ajoute « node » à la scène, à la position MONDE « at ». Parent par défaut : la scène courante.
+## deferred = true pendant un signal de collision (pas d'ajout physique à ce moment-là).
+static func spawn(node: Node2D, at: Vector2, parent: Node = null, deferred := false) -> void:
+	if parent == null:
+		parent = (Engine.get_main_loop() as SceneTree).current_scene
+	# Avant add_child(), le nœud n'a pas de parent : global_position serait pris pour une
+	# position LOCALE. On convertit donc nous-mêmes la position monde dans le repère du parent.
+	var parent_2d := parent as Node2D
+	node.position = parent_2d.to_local(at) if parent_2d else at
+	if deferred:
+		parent.add_child.call_deferred(node)
+	else:
+		parent.add_child(node)
+
+
+static func explosion(at: Vector2, parent: Node = null) -> void:
+	spawn(EXPLOSION.instantiate() as Node2D, at, parent)
+
+
+## Flash plein écran : un rectangle de couleur au-dessus de tout, pendant quelques images.
+static func flash_screen(tree: SceneTree, color := Color.WHITE, duration := 2.0 / 60.0) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 90
+	var rect := ColorRect.new()
+	rect.color = color
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(rect)
+	tree.current_scene.add_child(layer)
+	await tree.create_timer(duration, true, false, true).timeout
+	layer.queue_free()
+</script>
+<p>Elle a besoin d'une scène d'explosion. Crée d'abord son script, puis la scène :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/explosion.gd  (racine AnimatedSprite2D de explosion.tscn)">
+extends AnimatedSprite2D
+## Explosion « fire and forget » : joue son animation puis se détruit.
+
+func _ready() -> void:
+	# Tant que l'animation n'est pas dessinée (formes provisoires), on disparaît sans erreur.
+	if sprite_frames == null or not sprite_frames.has_animation(&"default"):
+		queue_free()
+		return
+	animation_finished.connect(queue_free)
+	play(&"default")
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>AnimatedSprite2D</code> nommée <code>Explosion</code>, script <code>explosion.gd</code>, enregistrée en <code>res://fx/explosion.tscn</code>.</li>
+  <li>Facultatif mais conseillé : dessine une bande de 4 images de 16×16 (des cercles orange de plus en plus grands, puis gris) et crée une animation <code>default</code> <strong>non bouclée</strong>, à 15 i/s. Sans animation, l'explosion se détruit aussitôt, sans erreur.</li>
+  <li>Crée ensuite <code>res://fx/fx.gd</code>. L'ordre compte : <code>fx.gd</code> fait un <code>preload</code> de <code>explosion.tscn</code>.</li>
+</ol></div>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>class_name Fx</code> sans <code>extends</code> : une classe utilitaire, jamais instanciée. On appelle ses fonctions <code>static</code> directement : <code>Fx.explosion(position)</code>.</li>
+  <li><code>Engine.get_main_loop() as SceneTree</code> : une fonction statique n'a pas de <code>get_tree()</code> (elle n'appartient à aucun nœud). On récupère l'arbre de scène du jeu par le moteur.</li>
+  <li><code>parent_2d.to_local(at)</code> : convertit une position du monde dans le repère du parent. C'est la correction du piège de 6.4.</li>
+  <li><code>add_child.call_deferred(node)</code> : l'ajout attend la fin de l'image. Indispensable quand on fait apparaître un objet physique pendant un signal de collision (un bonus qui sort d'un ennemi touché, par exemple).</li>
+  <li><code>create_timer(duration, true, false, true)</code> : le 4ᵉ argument fait ignorer <code>Engine.time_scale</code> à la minuterie. Utile quand le jeu sera figé un instant (étape 13).</li>
+</ul>
+<div class="callout test"><span class="tag">Teste</span><p>Dans <code>spawn_test.gd</code>, remplace les deux lignes <code>marker.global_position = …</code> et <code>$Arena.add_child(marker)</code> par <code>Fx.spawn(marker, Vector2(160, 112), $Arena)</code>. Relance : « obtenu : (160, 112) ».</p></div>
+
+<h2 id="pool">La réserve de projectiles</h2>
+
+<h3 class="step" id="e06-6">6.6 · <code>Pool</code></h3>
+<figure class="concept narrow"><img src="../batman-and-robin-godot-guide/img/concepts/t04-sprites-pool.jpg" alt="Explosions et sprites à l'écran" loading="lazy"><figcaption><b>Pourquoi une réserve d'objets.</b> La console plafonne à 80 sprites : le jeu réserve un nombre fixe d'emplacements, exactement comme notre <code>Pool</code>.</figcaption></figure>
+<div class="callout concept"><span class="tag">Concept : la réserve d'objets (<em>pooling</em>)</span><p>Créer et détruire des nœuds en rafale (<code>instantiate()</code> puis <code>queue_free()</code>) coûte des allocations et des insertions dans l'arbre. On fabrique donc les projectiles <strong>une fois</strong>, au chargement, puis on les « endort » et on les « réveille ». Bonus : un nombre maximal de tirs simultanés, comme sur la console (quand les 24 emplacements sont pris, le bouton ne fait rien).</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/pool.gd">
+class_name Pool
+extends Node
+## Réserve d'objets recyclables. Chaque objet doit avoir un signal « released ».
+## Le Pool est un Node simple : ses enfants Node2D sont donc en coordonnées du monde.
+
+@export var scene: PackedScene
+@export var size := 24
+var _free: Array[Node] = []
+
+
+func _ready() -> void:
+	for i in size:
+		var item := scene.instantiate()
+		item.process_mode = Node.PROCESS_MODE_DISABLED
+		(item as CanvasItem).hide()
+		add_child(item)
+		# item est typé Node : on passe par connect("released") pour que l'analyseur l'accepte.
+		item.connect("released", _on_released.bind(item))
+		_free.append(item)
+
+
+## Renvoie un objet prêt à l'emploi, ou null si la réserve est vide (comme la limite de sprites).
+func acquire() -> Node:
+	if _free.is_empty():
+		return null
+	var item: Node = _free.pop_back()
+	item.process_mode = Node.PROCESS_MODE_INHERIT
+	(item as CanvasItem).show()
+	return item
+
+
+func _on_released(item: Node) -> void:
+	(item as CanvasItem).hide()
+	item.set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
+	_free.append(item)
+</script>
+<div class="callout godot"><span class="tag">Endormir un nœud : <code>process_mode</code></span><p><code>hide()</code> rend invisible, mais une <code>Area2D</code> cachée détecte toujours les collisions : un batarang « rangé » blesserait encore. <code>process_mode = DISABLED</code> coupe tout : plus de <code>_physics_process</code>, et (avec le réglage par défaut <code>disable_mode = REMOVE</code>) la zone sort de la simulation physique.</p></div>
+<div class="callout godot"><span class="tag"><code>bind()</code></span><p><code>_on_released.bind(item)</code> fabrique un <code>Callable</code> qui appellera <code>_on_released(item)</code>. Le signal <code>released</code> n'a pas de paramètre ; <code>bind</code> ajoute celui dont on a besoin : <em>quel</em> objet revient dans la réserve.</p></div>
+
+<h3 class="step" id="e06-7">6.7 · Le projectile</h3>
+<p>Un projectile est une <code>Hitbox</code> qui se déplace : il hérite de tout le système de dégâts de l'étape 02.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://weapons/projectile.gd">
+class_name Projectile
+extends Hitbox
+## Projectile recyclable (Pool). fire() le lance, release() le rend à la réserve.
+
+signal released
+
+@export var lifetime := 2.0
+var velocity := Vector2.ZERO
+var spin := 0.0
+var pierce := false
+var survives_offscreen := false
+var _life := 0.0
+var _active := false
+
+@onready var sprite: Sprite2D = $Sprite2D
+@onready var notifier: VisibleOnScreenNotifier2D = $VisibleOnScreenNotifier2D
+
+
+func _ready() -> void:
+	super._ready()
+	landed.connect(_on_landed)
+	notifier.screen_exited.connect(_on_screen_exited)
+
+
+func fire(from: Vector2, direction: Vector2, move_speed: float, hit_damage: int,
+		texture: Texture2D = null, size_scale := 1.0, is_power := false, spin_speed := 0.0) -> void:
+	global_position = from
+	velocity = direction.normalized() * move_speed
+	damage = hit_damage
+	facing = 1 if direction.x >= 0.0 else -1
+	if texture:
+		sprite.texture = texture
+	scale = Vector2.ONE * size_scale
+	spin = spin_speed * facing
+	pierce = is_power
+	single_hit = not pierce
+	survives_offscreen = is_power
+	_life = 0.0
+	_active = true
+	reset_hits()
+	monitoring = true
+
+
+func _physics_process(delta: float) -> void:
+	if not _active:
+		return
+	global_position += velocity * delta
+	sprite.rotation += spin * delta
+	_life += delta
+	if _life >= lifetime:
+		release()
+
+
+func release() -> void:
+	if not _active:
+		return   # évite un double retour dans la réserve (impact + sortie d'écran)
+	_active = false
+	set_deferred("monitoring", false)
+	released.emit()
+
+
+func _on_landed(_hurtbox: Hurtbox) -> void:
+	if not pierce:
+		release()
+
+
+func _on_screen_exited() -> void:
+	if not survives_offscreen:
+		release()
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>Area2D</code> nommée <code>Projectile</code>, script <code>projectile.gd</code>. Couche vide, masque 6. Enregistre en <code>res://weapons/projectile.tscn</code>.</li>
+  <li>Enfants : <code>Sprite2D</code> (texture provisoire : <code>res://icon.svg</code> avec <strong>Scale</strong> = (0,06 ; 0,06), soit 8 px), <code>CollisionShape2D</code> (cercle de rayon 5), <code>VisibleOnScreenNotifier2D</code> (laisse son rectangle par défaut).</li>
+</ol>
+<pre class="tree">Projectile (Area2D, projectile.gd)   couche aucune · masque 6 (hurtbox_ennemis)
+├── Sprite2D                         icon.svg × 0,06 en attendant un vrai sprite
+├── CollisionShape2D                 cercle de rayon 5
+└── VisibleOnScreenNotifier2D</pre></div>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>extends Hitbox</code> : un projectile <em>est</em> une hitbox. <code>super._ready()</code> exécute d'abord le <code>_ready()</code> de <code>Hitbox</code> (qui connecte <code>area_entered</code>), puis on ajoute nos connexions.</li>
+  <li><code>fire()</code> remet <strong>tout</strong> l'état à zéro : un objet recyclé garde les valeurs de sa vie précédente. Oublier une ligne ici (par exemple <code>reset_hits()</code>), c'est un bug qui n'apparaît qu'au 25ᵉ tir.</li>
+  <li><code>_active</code> protège contre un double retour : un projectile qui touche un ennemi au bord de l'écran recevrait <code>landed</code> <em>et</em> <code>screen_exited</code>, et entrerait deux fois dans la réserve.</li>
+  <li>Le tir puissant (<code>pierce</code>) traverse les cibles et survit hors de l'écran.</li>
+</ul>
+
+<h2 id="systeme">Le système d'armes</h2>
+
+<h3 class="step" id="e06-8">6.8 · <code>WeaponSystem</code> : tir, niveaux et jauge</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t04-jauge-charge.jpg" alt="La jauge de charge agrandie" loading="lazy"><figcaption><b>La jauge de charge.</b> Elle se remplit seule en ~1,1 s quand Batman ne tire pas, puis se vide d'un coup au tir suivant.</figcaption></figure>
+<script type="text/x-code" data-lang="gdscript" data-file="res://weapons/weapon_system.gd">
+class_name WeaponSystem
+extends Node
+## Arme équipée, niveau, cadence, jauge de charge. Ajoute ce nœud à player.tscn.
+
+signal charge_changed(ratio: float)
+signal equipped(data: WeaponData, level: int)
+
+@export var projectile_scene: PackedScene      ## res://weapons/projectile.tscn
+@export var pool_size := 24
+@export var charge_time := 1.1                  ## mesuré : jauge pleine en ~1,1 s
+@export var charge_delay := 0.2                 ## s sans tirer avant que la jauge remonte
+
+var data: WeaponData
+var level := 1
+var charge := 0.0
+var _cooldown := 0.0
+var _idle := 0.0
+var _pool: Pool
+
+
+func _ready() -> void:
+	# La réserve vit dans la scène courante, pas sous Batman :
+	# un batarang lancé ne doit pas suivre ses déplacements.
+	_pool = Pool.new()
+	_pool.scene = projectile_scene
+	_pool.size = pool_size
+	get_tree().current_scene.add_child.call_deferred(_pool)
+	Game.weapon_changed.connect(_on_game_weapon_changed)
+	_on_game_weapon_changed(Game.weapon_id, Game.weapon_level)
+
+
+func _physics_process(delta: float) -> void:
+	_cooldown = maxf(_cooldown - delta, 0.0)
+	_idle += delta
+	if _idle >= charge_delay and charge < 1.0:
+		charge = minf(charge + delta / charge_time, 1.0)
+		charge_changed.emit(charge)
+
+
+## Appelé par Player.try_attack() tant que le bouton est maintenu.
+func try_fire(from: Vector2, direction: Vector2) -> bool:
+	if _cooldown > 0.0 or data == null:
+		return false
+	if charge >= 1.0:
+		_fire_pattern(from, direction, data.power_count, data.power_spread_deg,
+			data.power_speed, data.power_damage, data.power_scale, true)
+	else:
+		_fire_pattern(from, direction, data.count_at(level), data.spread_deg,
+			data.speed, data.damage_at(level), data.projectile_scale, false)
+	charge = 0.0
+	charge_changed.emit(charge)
+	_idle = 0.0
+	_cooldown = data.fire_interval
+	return true
+
+
+func fill_charge() -> void:
+	charge = 1.0
+	charge_changed.emit(charge)
+
+
+func _fire_pattern(from: Vector2, direction: Vector2, count: int, spread_deg: float,
+		move_speed: float, hit_damage: int, size_scale: float, is_power: bool) -> void:
+	for i in count:
+		var p := _pool.acquire() as Projectile
+		if p == null:
+			return   # plus d'emplacement libre : on ne tire pas, comme sur la console
+		var offset_deg := (i - (count - 1) / 2.0) * spread_deg
+		var dir := direction.rotated(deg_to_rad(offset_deg))
+		p.fire(from, dir, move_speed, hit_damage, data.projectile_texture,
+			size_scale, is_power, data.spin_speed)
+		p.sprite.modulate = data.color if is_power else Color.WHITE
+
+
+func _on_game_weapon_changed(id: StringName, new_level: int) -> void:
+	data = Weapons.get_data(id)
+	level = new_level
+	equipped.emit(data, level)
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><strong>La jauge</strong> : <code>_idle</code> compte le temps depuis le dernier tir. Après 0,2 s de repos, <code>charge</code> monte de <code>delta / 1,1</code> par tick, donc de 0 à 1 en 1,1 s. Tout tir la remet à 0.</li>
+  <li><strong>L'éventail</strong> : pour 3 projectiles écartés de 12°, <code>(i - 1) × 12</code> donne -12°, 0°, +12°. La formule <code>(i - (count - 1) / 2.0)</code> centre l'éventail quel que soit le nombre.</li>
+  <li><strong>L'arme ne sait pas d'où vient le changement d'arme</strong> : elle écoute <code>Game.weapon_changed</code>. Le bonus parle à <code>Game</code>, <code>Game</code> prévient tout le monde. Chacun peut être supprimé ou remplacé sans casser les autres.</li>
+  <li><code>add_child.call_deferred(_pool)</code> : pendant le <code>_ready()</code> d'un nœud, la scène courante est encore en construction ; on reporte l'ajout.</li>
+</ul>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans <code>player.tscn</code>, ajoute un nœud <code>WeaponSystem</code> (nommé exactement ainsi) avec <strong>Projectile Scene</strong> = <code>projectile.tscn</code>. <code>player.gd</code> le trouve tout seul grâce à <code>get_node_or_null("WeaponSystem")</code>.</li>
+  <li>Dans <code>test_room.tscn</code>, ajoute un <code>CanvasLayer</code> nommé <code>DebugUI</code> avec deux enfants : un <code>ProgressBar</code> nommé <code>Charge</code> (position (8, 8), taille 60×6, <strong>Show Percentage</strong> décoché) et un <code>Label</code> nommé <code>Weapon</code> (position (8, 16), taille de police 8).</li>
+  <li>Complète <code>test_room.gd</code> :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/test_room.gd">
+extends Node2D
+## Salle de test : réapparition après la mort, affichage de débogage, raccourcis.
+
+@onready var player: Player = $Player
+@onready var charge_bar: ProgressBar = $DebugUI/Charge
+@onready var weapon_label: Label = $DebugUI/Weapon
+
+
+func _ready() -> void:
+	player.died.connect(player.respawn)
+	var ws := player.get_node_or_null("WeaponSystem") as WeaponSystem
+	if ws:
+		ws.charge_changed.connect(func(r: float) -> void: charge_bar.value = r * 100.0)
+	Game.weapon_changed.connect(func(id: StringName, lvl: int) -> void: weapon_label.text = "%s %d" % [id, lvl])
+	weapon_label.text = "%s %d" % [Game.weapon_id, Game.weapon_level]
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("start"):
+		# Simule une empoignade : la salle joue le rôle du costaud.
+		player.fsm.force(&"Grabbed", {"grabber": self})
+	elif event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_V:
+				player.celebrate()
+			KEY_I:
+				player.fsm.force(&"Idle")
+			KEY_1, KEY_2, KEY_3:
+				# Raccourci de test : choisir l'arme, ou monter de niveau si c'est déjà la même.
+				var id: StringName = [&"batarang", &"bolas", &"shuriken"][event.keycode - KEY_1]
+				Game.set_weapon(id, Game.weapon_level + 1 if id == Game.weapon_id else 1)
+</script>
+<div class="callout test"><span class="tag">Teste</span>
+<ul>
+  <li>Loin de la cible, maintenir <kbd>J</kbd> tire en rafale, devant soi. Haut + <kbd>J</kbd> : vers le haut. Diagonales en sautant. Accroupi : au ras du sol.</li>
+  <li>Sans tirer pendant ~1,3 s, la barre se remplit ; le tir suivant est gros, coloré, et traverse la cible.</li>
+  <li>Les touches <kbd>1</kbd>, <kbd>2</kbd>, <kbd>3</kbd> changent l'arme ; appuyer plusieurs fois sur la même fait monter le niveau (le batarang s'élargit en éventail).</li>
+  <li>Ouvre <strong>Débogueur → Moniteurs → Object → Nodes</strong> : en tirant sans arrêt, le nombre de nœuds ne bouge pas. C'est la réserve qui travaille.</li>
+  <li>Avec le shuriken niveau 7 et une cadence élevée, le tir s'interrompt parfois : les 24 emplacements sont pris.</li>
+</ul></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span>
+<ul>
+  <li><strong>« Invalid call. Nonexistent function 'instantiate' in base 'Nil' »</strong> : <code>Projectile Scene</code> n'est pas renseignée sur le <code>WeaponSystem</code>.</li>
+  <li><strong>Les tirs restent collés à Batman</strong> : la réserve a été ajoutée sous Batman au lieu de la scène courante.</li>
+  <li><strong>Les tirs ne partent que vers la droite</strong> : vérifie <code>compute_aim()</code> et que <code>facing</code> change bien (l'étiquette de débogage affiche la flèche).</li>
+</ul></div>
+
+<h2 id="bonus">Les bonus</h2>
+
+<h3 class="step" id="e06-9">6.9 · La base <code>Pickup</code></h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://pickups/pickup.gd">
+class_name Pickup
+extends CharacterBody2D
+## Objet qui jaillit, retombe, clignote avant de disparaître, et se ramasse au contact.
+
+@export var gravity := 600.0
+@export var lifetime := 8.0          ## À CALIBRER
+@onready var area: Area2D = $Area2D
+@onready var sprite: Sprite2D = $Sprite2D
+
+
+func _ready() -> void:
+	area.body_entered.connect(_on_body_entered)
+	velocity.y = -140.0   # petit saut à l'apparition
+
+
+func _physics_process(delta: float) -> void:
+	velocity.y = minf(velocity.y + gravity * delta, 300.0)
+	move_and_slide()
+	if is_on_floor():
+		velocity.x = 0.0
+	lifetime -= delta
+	if lifetime < 2.0:
+		sprite.visible = int(lifetime * 15.0) % 2 == 0
+	if lifetime <= 0.0:
+		queue_free()
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if body is Player:
+		collect(body)
+		queue_free()
+
+
+## À surcharger.
+func collect(_player: Player) -> void:
+	pass
+</script>
+<div class="callout concept"><span class="tag">Concept : la méthode à surcharger</span><p><code>Pickup</code> gère tout ce qui est commun (tomber, clignoter, détecter Batman) et laisse un trou : <code>collect()</code>. Chaque bonus concret hérite de <code>Pickup</code> et ne remplit que ce trou. C'est le patron <em>méthode modèle</em> (<em>template method</em>).</p></div>
+
+<h3 class="step" id="e06-10">6.10 · Le bonus d'arme à couleur cyclique</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://pickups/weapon_pickup.gd">
+class_name WeaponPickup
+extends Pickup
+## Disque chauve-souris dont la couleur (donc l'arme) change environ chaque seconde.
+
+@export var cycle_period := 1.0     ## mesuré : ~1 changement par seconde
+var _index := 0
+var _t := 0.0
+
+
+func _ready() -> void:
+	super._ready()
+	_index = randi() % Weapons.PICKUP_CYCLE.size()
+	_refresh()
+
+
+func _physics_process(delta: float) -> void:
+	super._physics_process(delta)
+	_t += delta
+	if _t >= cycle_period:
+		_t -= cycle_period
+		_index = (_index + 1) % Weapons.PICKUP_CYCLE.size()
+		_refresh()
+
+
+func current_id() -> StringName:
+	return Weapons.PICKUP_CYCLE[_index]
+
+
+func _refresh() -> void:
+	sprite.modulate = Weapons.get_data(current_id()).color
+
+
+func collect(_player: Player) -> void:
+	var id := current_id()
+	if id == Game.weapon_id:
+		Game.set_weapon(id, Game.weapon_level + 1)   # même couleur : niveau +1 (max 7)
+	else:
+		Game.set_weapon(id, 1)                       # hypothèse : nouvelle arme au niveau 1
+	Game.add_score(100)
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>CharacterBody2D</code> nommée <code>WeaponPickup</code>, script <code>weapon_pickup.gd</code>. Couche vide, masque 1 et 2.</li>
+  <li>Enfants : <code>Sprite2D</code> (<code>icon.svg</code>, scale 0,1), <code>CollisionShape2D</code> (rectangle 10×10, position (0, -5)), <code>Area2D</code> (couche 7, masque 3) avec son propre <code>CollisionShape2D</code> (rectangle 14×14, position (0, -7)).</li>
+  <li>Enregistre en <code>res://pickups/weapon_pickup.tscn</code>, puis places-en deux dans la salle de test.</li>
+</ol>
+<pre class="tree">WeaponPickup (CharacterBody2D)   couche aucune · masque 1+2 : il tombe et se pose
+├── Sprite2D
+├── CollisionShape2D             petit rectangle
+└── Area2D                       couche 7 « bonus » · masque 3 « corps_joueur »
+    └── CollisionShape2D</pre></div>
+<div class="callout test"><span class="tag">Teste</span><p>Les bonus font un petit saut, se posent et changent de couleur chaque seconde. Ramasse-en un au bon moment : l'étiquette de débogage affiche l'arme et son niveau. Au bout de 6 s, le bonus clignote, puis disparaît à 8 s.</p></div>
+<div class="callout concept"><span class="tag">Concept : l'objet à état cyclique</span><p>C'est un mini-jeu de timing : toucher le bonus au bon moment pour avoir l'arme voulue. Une seule variable (<code>_index</code>) et un compteur suffisent. La couleur n'est qu'une <strong>conséquence</strong> de l'état, recalculée par <code>_refresh()</code> : on ne stocke jamais deux fois la même information.</p></div>
+
+<h3 class="step" id="e06-11">6.11 · Le crâne et le bonus de charge</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t04-smart-bomb.jpg" alt="Le crâne smart bomb" loading="lazy"><figcaption><b>Le crâne smart bomb.</b> Batman touche le crâne qui roule ; 2 images de blanc ; tous les ennemis à l'écran explosent.</figcaption></figure>
+<script type="text/x-code" data-lang="gdscript" data-file="res://pickups/skull_bomb.gd">
+class_name SkullBomb
+extends Pickup
+## Crâne qui roule vers le joueur. Contact : flash blanc + destruction des ennemis à l'écran.
+
+@export var roll_speed := 40.0
+@export var boss_damage := 10       ## hypothèse : les boss encaissent un coup fixe
+
+
+func _physics_process(delta: float) -> void:
+	var player := get_tree().get_first_node_in_group("player") as Node2D
+	if player and is_on_floor():
+		velocity.x = signf(player.global_position.x - global_position.x) * roll_speed
+		sprite.rotation += velocity.x / 6.0 * delta   # il roule
+	super._physics_process(delta)
+
+
+func collect(player: Player) -> void:
+	Fx.flash_screen(get_tree(), Color.WHITE, 2.0 / 60.0)
+	var view := player.camera.view_rect() if player.camera else get_viewport().get_visible_rect()
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if view.has_point(enemy.global_position) and enemy.has_method("kill"):
+			enemy.kill()
+	for boss in get_tree().get_nodes_in_group("bosses"):
+		# Seul un boss en plein combat encaisse : celui de la section 1 est déjà dans la scène
+		# dès le départ. get() renvoie null si la propriété n'existe pas (pas de classe Boss avant le tome 07).
+		if not boss.get("active"):
+			continue
+		var h: Health = boss.get_node_or_null("Health")
+		if h:
+			h.damage(boss_damage)
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://pickups/charge_pickup.gd">
+class_name ChargePickup
+extends Pickup
+## Remplit instantanément la jauge (TASVideos).
+
+func collect(player: Player) -> void:
+	if player.weapons:
+		player.weapons.fill_charge()
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée <code>skull_bomb.tscn</code> et <code>charge_pickup.tscn</code> comme <code>weapon_pickup.tscn</code> (même arbre), avec leur script. Astuce : <span class="menu">Scène → Enregistrer la scène sous</span> à partir de <code>weapon_pickup.tscn</code>, puis change le script de la racine.</li>
+  <li>Donne-leur une couleur reconnaissable (<code>modulate</code> du <code>Sprite2D</code>) : blanc cassé pour le crâne, jaune pour la charge.</li>
+  <li>Places-en un de chaque dans la salle de test.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Le crâne roule vers Batman ; le toucher blanchit l'écran pendant 2 images (les cibles ne sont pas des ennemis : elles survivent, on testera la destruction à l'étape 07). Le bonus de charge remplit la barre d'un coup.</p></div>
+<div class="callout concept"><span class="tag">Les groupes : interroger le monde sans le connaître</span><p>Le crâne ne sait pas quels ennemis existent. Il demande au <code>SceneTree</code> « tous les nœuds du groupe <code>enemies</code> », et chaque ennemi s'ajoutera lui-même au groupe à sa création. Pour les boss, il vérifie aussi qu'ils sont <code>active</code> : un boss qui attend au bout de la section ne doit pas perdre de vie avant le combat. <code>boss.get("active")</code> lit la propriété par son nom, sans avoir besoin de la classe <code>Boss</code> (elle n'arrive qu'à l'étape 09).</p></div>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>Maintenir l'attaque tire en rafale, dans 8 directions, à la cadence de l'arme.</li>
+  <li>Sans tirer pendant ~1,3 s, la jauge se remplit ; le tir suivant est gros, coloré et traverse les cibles.</li>
+  <li>Un bonus posé au sol change de couleur chaque seconde ; le ramasser change l'arme ou augmente son niveau.</li>
+  <li>Plus de 24 projectiles à l'écran est impossible.</li>
+  <li>Le nombre de nœuds reste stable pendant les rafales.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 06 : armes en données, réserve, jauge, bonus"</div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Pourquoi les armes sont-elles des fichiers <code>.tres</code> plutôt que trois scripts ?</summary><div><p>Parce que leur comportement est identique et que seuls les chiffres diffèrent. Un seul code pour le comportement, des données pour les variantes : on équilibre sans programmer, et on ajoute une arme sans écrire de code.</p></div></details>
+<details class="quiz"><summary>Que se passerait-il si <code>Pool</code> se contentait de <code>hide()</code> ?</summary><div><p>Les projectiles rangés resteraient actifs physiquement : invisibles, ils continueraient de détecter et de blesser les ennemis qui passent à l'endroit où ils ont été rangés. <code>process_mode = DISABLED</code> les retire de la simulation.</p></div></details>
+<details class="quiz"><summary>Pourquoi le bonus appelle-t-il <code>Game.set_weapon()</code> au lieu de modifier directement le <code>WeaponSystem</code> de Batman ?</summary><div><p>Pour le découplage : le bonus n'a pas à savoir où est le système d'armes. <code>Game</code> émet <code>weapon_changed</code>, et tous ceux qui sont concernés (le système d'armes, le HUD de l'étape 10) réagissent. L'arme survit aussi aux changements de scène, puisqu'elle est rangée dans <code>Game</code>.</p></div></details>
+<details class="quiz"><summary>Quel bug évite <code>Fx.spawn()</code> ?</summary><div><p>Un nœud qui reçoit <code>global_position</code> avant d'avoir un parent stocke cette valeur comme position locale ; une fois ajouté sous un parent qui n'est pas à l'origine, il apparaît décalé de la position de ce parent. <code>spawn()</code> convertit la position monde dans le repère du parent avant l'ajout.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Crée une quatrième arme « boomerang » (couleur jaune) uniquement avec un nouveau <code>.tres</code> et une ligne dans <code>Weapons.DATA</code>.</li>
+  <li>Dessine de vrais sprites pour le batarang (8×8, 2 images) et assigne-les à <code>projectile_texture</code>.</li>
+  <li>Lis <a href="../batman-and-robin-godot-guide/04-armes.html#pool">la section « réserve de projectiles » du tome 04</a>.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

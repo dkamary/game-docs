@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 · Machine à états et caméra — Pas à pas</title>
+<meta name="description" content="Étape 4 : réécrire Batman avec une machine à états par nœuds (Idle, Run, Crouch, Air), un affichage de débogage, puis une caméra lissée qui anticipe et ne recule pas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 04 / 13</div>
+  <h1>Machine à états et caméra</h1>
+  <p class="lead">On réécrit Batman proprement : un script principal qui offre des « verbes » (courir, sauter…), et un petit script par état qui décide quoi en faire. Puis une caméra qui suit Batman comme dans le jeu original : en douceur, en anticipant, sans jamais reculer.</p>
+  <div class="meta"><span class="pill">⏱ ~3 h</span><span class="pill">Prérequis : étape 03</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/03-batman.html">tome 03</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li><code>class_name</code> sur un personnage, <code>@export_group</code></li>
+    <li>Les groupes de nœuds</li>
+    <li><code>AnimatedSprite2D</code> et <code>SpriteFrames</code></li>
+    <li><code>Camera2D</code>, <code>make_current()</code></li>
+    <li>Modifier les couches de collision par le code</li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>La machine à états appliquée à un personnage</li>
+    <li>Séparer les données, les verbes et les décisions</li>
+    <li>Coyote time et mémoire de saut</li>
+    <li>L'affichage de débogage</li>
+    <li>La caméra lissée avec anticipation</li>
+  </ul></div>
+</div>
+
+<h2 id="plan">Le plan</h2>
+
+<h3 class="step" id="e04-1">4.1 · Dessiner le graphe d'états</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t03-etats-batman.jpg" alt="Les états de Batman dans le jeu" loading="lazy"><figcaption><b>Chaque état de la machine, tel qu'il apparaît dans le jeu.</b> Idle, Run, Air, Crouch, Hang, attaque aérienne, coup de pied sauté, Grabbed, Victory.</figcaption></figure>
+<div class="callout method"><span class="tag">Méthode : le schéma avant le code</span><p>Avant de coder une machine à états, on la dessine : des boîtes (les états) et des flèches (les transitions, avec leur condition). Sur papier, une flèche manquante se voit tout de suite ; dans le code, elle devient un bug « le personnage reste bloqué ». Recopie ce schéma dans ton journal.</p></div>
+<pre class="tree">                ┌──────── saut ────────┐
+   ┌─────┐  ◄──►  ┌─────┐                ▼
+   │ Idle│ croix  │ Run │ ── plus de sol ─►┌─────┐
+   └──┬──┘        └─────┘                  │ Air │ ── sol ──► Idle / Run
+  bas │  ▲                                  └─────┘
+      ▼  │ bas relâché                        ▲
+  ┌────────┐ ─────── bas + saut (descendre du balcon) ──┘
+  │ Crouch │
+  └────────┘</pre>
+<p>Cette étape construit ces quatre états. L'étape 05 ajoutera Melee, Hang, Hurt, Grabbed, Dead et Victory.</p>
+<div class="callout concept"><span class="tag">Concept : données, verbes, décisions</span><p>On sépare trois choses. Les <strong>données</strong> (vitesse, gravité…) et les <strong>verbes</strong> (<code>run()</code>, <code>jump()</code>, <code>apply_gravity()</code>) vivent dans <code>player.gd</code>. Les <strong>décisions</strong> (« si le joueur appuie sur saut et que je suis au sol, alors je saute et je passe en l'air ») vivent dans les états. Un état ne réimplémente jamais un saut : il appelle <code>p.jump()</code>. Si tu modifies le saut, tu le fais à un seul endroit.</p></div>
+
+<h2 id="scene">La scène</h2>
+
+<h3 class="step" id="e04-2">4.2 · Créer <code>player.tscn</code></h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>CharacterBody2D</code> renommée <code>Player</code>. Couche 3 seule, masque 1 et 2. Enregistre en <code>res://player/player.tscn</code>.</li>
+  <li>Construis l'arbre ci-dessous. Pour <code>Sprite</code> : un <code>AnimatedSprite2D</code>, offset y = -24, laissé sans <code>SpriteFrames</code> pour l'instant. Le rectangle <code>Placeholder</code> est un <strong>enfant</strong> du <code>Sprite</code> : quand le sprite sera masqué (clignotement d'invincibilité, étape 05), le rectangle le sera aussi.</li>
+  <li>Sous <code>StateMachine</code>, crée quatre nœuds <code>Node</code> nommés exactement <code>Idle</code>, <code>Run</code>, <code>Crouch</code>, <code>Air</code>. Les noms comptent : ils servent d'identifiants.</li>
+  <li>Sélectionne <code>StateMachine</code> : dans l'Inspecteur, <strong>Initial State</strong> = <code>Idle</code>.</li>
+  <li>Sélectionne <code>Player</code> → onglet <strong>Nœud → Groupes</strong> → ajoute le groupe <code>player</code>.</li>
+</ol>
+<pre class="tree">Player (CharacterBody2D)        couche 3 · masque 1+2 · groupe « player »
+├── Sprite (AnimatedSprite2D)   offset y = -24 (vide pour l'instant)
+│   └── Placeholder (ColorRect) 14×36 · position (-7, -36) · bleu nuit
+├── Body (CollisionShape2D)     rectangle 14×36, position (0, -18)
+├── StateDebug (Label)          position (-30, -52) · taille 60×10 · voir 4.6
+└── StateMachine (StateMachine) initial_state = Idle
+    ├── Idle    (Node)
+    ├── Run     (Node)
+    ├── Crouch  (Node)
+    └── Air     (Node)</pre></div>
+<div class="callout godot"><span class="tag">Les groupes</span><p>Un groupe est une étiquette posée sur des nœuds. N'importe quel script peut ensuite demander « donne-moi le nœud du groupe <code>player</code> » : <code>get_tree().get_first_node_in_group("player")</code>. Les ennemis trouveront Batman ainsi, sans connaître sa place dans l'arbre.</p></div>
+
+<h2 id="code">Le code</h2>
+
+<h3 class="step" id="e04-3">4.3 · <code>player.gd</code>, version 1</h3>
+<p>Attache ce script à <code>Player</code>. C'est une version réduite au déplacement ; l'étape 05 la complètera jusqu'à la version de référence du guide.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/player.gd  (version 1 — étape 04)">
+class_name Player
+extends CharacterBody2D
+## Batman ou Robin. Les décisions sont prises par les états (StateMachine) ;
+## ce script porte les réglages et les actions communes.
+
+@export_group("Déplacement")
+@export var run_speed := 117.0        ## px/s, mesuré : ~1,95 px/image
+@export var jump_velocity := -330.0   ## px/s, À CALIBRER (sommet ≈ 60 px avec gravity = 900)
+@export var gravity := 900.0
+@export var max_fall_speed := 330.0
+@export_range(0.0, 1.0) var jump_cut := 0.45  ## saut variable : part de vitesse gardée au relâchement, À CALIBRER
+@export var coyote_time := 0.06       ## tolérance moderne ; 0 = comportement strict
+@export var jump_buffer := 0.10
+
+var facing := 1
+var _coyote := 0.0
+var _buffer := 0.0
+var _drop_left := 0.0
+
+@onready var sprite: AnimatedSprite2D = $Sprite
+@onready var fsm: StateMachine = $StateMachine
+
+
+func _physics_process(delta: float) -> void:
+	_coyote = coyote_time if is_on_floor() else maxf(_coyote - delta, 0.0)
+	if Input.is_action_just_pressed("jump"):
+		_buffer = jump_buffer
+	else:
+		_buffer = maxf(_buffer - delta, 0.0)
+	if _drop_left > 0.0:
+		_drop_left -= delta
+		if _drop_left <= 0.0:
+			set_collision_mask_value(2, true)
+
+	fsm.physics_update(delta)   # l'état courant règle velocity
+	move_and_slide()
+
+
+# --- Déplacement -------------------------------------------------------------
+
+func apply_gravity(delta: float) -> void:
+	velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
+
+
+func read_move_x() -> float:
+	return Input.get_axis("move_left", "move_right")
+
+
+func run(dir_x: float) -> void:
+	# Démarrage et arrêt secs : pas d'accélération, comme dans le jeu original.
+	velocity.x = signf(dir_x) * run_speed
+	if dir_x != 0.0:
+		set_facing(int(signf(dir_x)))
+
+
+func set_facing(dir: int) -> void:
+	if dir == 0 or dir == facing:
+		return
+	facing = dir
+	sprite.flip_h = facing < 0
+
+
+func wants_jump() -> bool:
+	return _buffer > 0.0
+
+
+func can_jump() -> bool:
+	return is_on_floor() or _coyote > 0.0
+
+
+func consume_jump() -> void:
+	_buffer = 0.0
+	_coyote = 0.0
+
+
+func jump() -> void:
+	velocity.y = jump_velocity
+	consume_jump()
+
+
+func drop_through_platform() -> void:
+	## Bas + saut sur le balcon : on ignore la couche « plateformes » un instant.
+	set_collision_mask_value(2, false)
+	position.y += 2.0
+	_drop_left = 0.25
+
+
+# --- Animation ---------------------------------------------------------------
+
+## Joue l'animation demandée si elle existe ; sinon garde l'animation en cours.
+func play_anim(base: StringName) -> void:
+	if sprite.sprite_frames == null:
+		return
+	if sprite.sprite_frames.has_animation(base) and sprite.animation != base:
+		sprite.play(base)
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>class_name Player</code> : les états pourront écrire <code>var p: Player = owner</code> et profiter de l'autocomplétion sur tous les verbes.</li>
+  <li><code>@export_group("Déplacement")</code> : range les exports sous un titre repliable dans l'Inspecteur.</li>
+  <li><code>_physics_process</code> fait trois choses, toujours dans cet ordre : mettre à jour les minuteries, laisser l'état courant décider de <code>velocity</code>, puis déplacer avec <code>move_and_slide()</code>. Aucun état n'appelle <code>move_and_slide()</code> : il n'y a qu'un seul endroit où Batman bouge.</li>
+  <li><strong>Coyote time</strong> (<code>_coyote</code>) : pendant 0,06 s après avoir quitté un bord, le saut est encore accepté. <strong>Mémoire de saut</strong> (<code>_buffer</code>) : un appui 0,1 s avant l'atterrissage est gardé en mémoire et exécuté au contact du sol. Ce sont deux conforts modernes ; mets-les à 0 pour un ressenti strict de 1995.</li>
+  <li><code>set_collision_mask_value(2, false)</code> : retire la couche 2 du masque, donc Batman traverse le balcon. Un compteur la remet après 0,25 s. On décale aussi Batman de 2 px vers le bas, pour qu'il ne soit plus posé sur la plateforme quand le masque revient.</li>
+  <li><code>play_anim()</code> ne plante pas s'il n'y a pas encore d'animations : on peut avancer avec le rectangle bleu.</li>
+</ul>
+
+<h3 class="step" id="e04-4">4.4 · Les états <code>Idle</code> et <code>Run</code></h3>
+<p>Crée <code>res://player/states/</code>, puis ces deux scripts. Attache chacun au nœud du même nom sous <code>StateMachine</code>.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/idle.gd  (version 1)">
+extends State
+
+@onready var p: Player = owner
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	p.velocity.x = 0.0
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	if not p.is_on_floor():
+		transition_to(&"Air")
+		return
+	if Input.is_action_pressed("move_down"):
+		transition_to(&"Crouch")
+		return
+	if p.wants_jump() and p.can_jump():
+		p.jump()
+		transition_to(&"Air")
+		return
+	if p.read_move_x() != 0.0:
+		transition_to(&"Run")
+		return
+	p.velocity.x = 0.0
+	p.play_anim(&"idle")
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/run.gd  (version 1)">
+extends State
+
+@onready var p: Player = owner
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	if not p.is_on_floor():
+		transition_to(&"Air")   # le temps « coyote » permet encore de sauter
+		return
+	var x := p.read_move_x()
+	if x == 0.0:
+		transition_to(&"Idle")
+		return
+	if p.wants_jump() and p.can_jump():
+		p.jump()
+		transition_to(&"Air")
+		return
+	p.run(x)
+	p.play_anim(&"run")
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><strong>Le motif « vérifier puis sortir »</strong> : chaque condition de sortie est testée dans l'ordre de priorité ; dès qu'une transition est demandée, <code>return</code>. Ce qui reste en bas de la fonction, c'est le comportement « normal » de l'état.</li>
+  <li>L'ordre est une décision de game design : dans <code>Idle</code>, « tomber » passe avant « s'accroupir », qui passe avant « sauter ».</li>
+  <li>Chaque fichier fait moins de 30 lignes et ne parle que de sa situation. Compare avec le prototype version 2.</li>
+</ul>
+
+<h3 class="step" id="e04-5">4.5 · Les états <code>Crouch</code> et <code>Air</code></h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/crouch.gd  (version 1)">
+extends State
+## Accroupi : esquive les tirs hauts et tire au ras du sol.
+## Bas + saut sur une plateforme traversable = descendre (hypothèse de confort).
+
+@onready var p: Player = owner
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	p.velocity.x = 0.0
+
+
+func physics_update(delta: float) -> void:
+	p.apply_gravity(delta)
+	p.velocity.x = 0.0
+	if not p.is_on_floor():
+		transition_to(&"Air")
+		return
+	if p.wants_jump():
+		p.consume_jump()
+		p.drop_through_platform()
+		transition_to(&"Air")
+		return
+	if not Input.is_action_pressed("move_down"):
+		transition_to(&"Idle")
+		return
+	var dir := p.read_move_x()
+	if dir != 0.0:
+		p.set_facing(int(signf(dir)))
+	p.play_anim(&"crouch")
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/states/air.gd  (version 1)">
+extends State
+## Saut et chute. Contrôle aérien total, saut à hauteur variable.
+
+@onready var p: Player = owner
+
+
+func physics_update(delta: float) -> void:
+	# 1. Saut variable : relâcher le bouton pendant la montée coupe l'élan.
+	if Input.is_action_just_released("jump") and p.velocity.y < 0.0:
+		p.velocity.y *= p.jump_cut
+	p.apply_gravity(delta)
+
+	# 2. Saut retardé (coyote) : on vient de quitter le bord.
+	if p.wants_jump() and p.can_jump():
+		p.jump()
+
+	# 3. Contrôle aérien complet, typique des run & gun.
+	p.run(p.read_move_x())
+
+	# 4. Atterrissage.
+	if p.is_on_floor() and p.velocity.y >= 0.0:
+		transition_to(&"Run" if p.read_move_x() != 0.0 else &"Idle")
+		return
+
+	p.play_anim(&"jump" if p.velocity.y < 0.0 else &"fall")
+</script>
+<div class="callout concept"><span class="tag">Pourquoi l'atterrissage teste <code>velocity.y &gt;= 0</code></span><p>Au tick du saut, Batman est encore au sol (<code>is_on_floor()</code> vaut vrai jusqu'au prochain <code>move_and_slide()</code>). Sans cette condition, l'état <code>Air</code> déciderait aussitôt qu'il a atterri. On exige donc qu'il soit en train de descendre.</p></div>
+
+<h3 class="step" id="e04-6">4.6 · Voir l'état en direct</h3>
+<div class="callout method"><span class="tag">Méthode : rendre l'invisible visible</span><p>Une machine à états est invisible : quand Batman se comporte mal, il faut savoir <em>dans quel état</em> il est. Les développeurs ajoutent des affichages de débogage partout : état courant, vitesse, zones de collision. On les retire (ou on les cache) à la fin.</p></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Sur le <code>Label</code> <code>StateDebug</code> : <strong>Horizontal Alignment</strong> = Center, <strong>Theme Overrides → Font Sizes → Font Size</strong> = 8.</li>
+  <li>Attache-lui ce script, puis, dans l'Inspecteur, désigne <code>Player</code> dans le champ <strong>Player</strong> :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/state_debug.gd">
+extends Label
+## Outil de débogage : affiche l'état courant et le sens du regard au-dessus du personnage.
+
+@export var player: Player
+
+
+func _process(_delta: float) -> void:
+	text = "%s %s" % [player.fsm.current_name(), "→" if player.facing > 0 else "←"]
+</script>
+<div class="callout do"><span class="tag">À faire (suite)</span><ol start="3">
+  <li>Ouvre <code>test_room.tscn</code>, glisse <code>player.tscn</code> dedans, en (200, 100) : <strong>sur le balcon</strong>.</li>
+  <li><kbd>F6</kbd>.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span>
+<ul>
+  <li>Au départ : « Idle → », sur le balcon.</li>
+  <li>Cours : « Run ». Tombe du bord du balcon : « Air », puis « Idle » au sol.</li>
+  <li>Juste après avoir quitté le bord, un saut reste possible (coyote time).</li>
+  <li>Remonte sur le balcon en modifiant temporairement <code>jump_velocity</code> à -450 dans l'Inspecteur. Bas : « Crouch ». Bas + saut : Batman traverse le balcon et retombe dans la rue. Remets -330.</li>
+  <li>Bas sur le sol de la rue + saut : rien ne se passe, la couche « monde » ne se traverse pas.</li>
+</ul></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span>
+<ul>
+  <li><strong>« Invalid get index 'apply_gravity' (on base: 'null instance') »</strong> : un état n'arrive pas à récupérer Batman. Le script d'état est-il attaché à un enfant de <code>StateMachine</code> dans <code>player.tscn</code>, et non dans la salle de test ? <code>owner</code> désigne la racine de la scène où le nœud a été créé.</li>
+  <li><strong>« État inconnu : Air »</strong> : le nœud ne s'appelle pas exactement <code>Air</code> (majuscule, espace en trop).</li>
+  <li><strong>Batman tombe à travers le sol</strong> : son masque ne contient pas la couche 1, ou le sol n'est pas sur la couche 1.</li>
+  <li><strong>Batman ne bouge pas du tout</strong> : <code>Initial State</code> est vide et le premier enfant n'est pas un état, ou le script <code>player.gd</code> n'est pas attaché.</li>
+</ul></div>
+
+<h2 id="camera">La caméra</h2>
+
+<h3 class="step" id="e04-7">4.7 · Observer la caméra originale</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t03-camera-courbe.jpg" alt="Courbe de vitesse de la caméra mesurée" loading="lazy"><figcaption><b>La vitesse de la caméra, mesurée image par image dans la vidéo.</b> Elle dépasse d'abord la vitesse de course pour rattraper Batman (1), se stabilise (2), puis ralentit en douceur à l'arrêt (3).</figcaption></figure>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>Regarde <a class="tc" href="#">4:42</a> au ralenti : quand Batman se met à courir, l'écran accélère progressivement ; quand il s'arrête, l'écran continue un peu et freine en douceur. Batman n'est pas au centre de l'écran : il y a plus de place devant lui que derrière. Et l'écran ne revient jamais en arrière.</p></div>
+<div class="callout concept"><span class="tag">Concept : la caméra lissée avec anticipation</span><p>Une caméra collée au joueur donne mal au cœur et cache ce qui arrive. La caméra vise un point <strong>devant</strong> le joueur (<em>look-ahead</em>) et s'en rapproche à chaque image d'une fraction de la distance restante (<em>lissage exponentiel</em>). Elle rattrape vite quand elle est loin, et ralentit en approchant.</p></div>
+
+<h3 class="step" id="e04-8">4.8 · <code>camera_rig.gd</code></h3>
+<p>Crée <code>res://level/camera_rig.gd</code> (hérite de <code>Camera2D</code>) :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/camera_rig.gd">
+class_name CameraRig
+extends Camera2D
+## Caméra de run & gun : suit le joueur avec anticipation, ne revient jamais en arrière,
+## peut être verrouillée sur une arène ou défiler toute seule (convoi).
+
+@export var target: Player
+@export var look_ahead := 40.0     ## px d'avance dans la direction du regard
+@export var follow_rate := 5.0     ## plus grand = rattrapage plus rapide
+@export var forward_only := true   ## l'écran ne recule pas
+@export var fixed_y := 112.0       ## les sections du niveau 1 ne défilent pas verticalement
+
+## px/s : défilement forcé de l'écran. Non utilisé dans le niveau 1 (au convoi, c'est la rue
+## qui défile derrière un convoi immobile, tome 09), mais prêt pour un niveau à défilement imposé.
+var autoscroll_speed := 0.0
+var _locked := false
+var _lock_center_x := 0.0
+
+
+func _ready() -> void:
+	make_current()
+	if target:
+		target.camera = self
+		global_position = Vector2(target.global_position.x, fixed_y)
+
+
+func _physics_process(delta: float) -> void:
+	if target == null:
+		return
+	var x := global_position.x
+	if _locked:
+		x = move_toward(x, _lock_center_x, 240.0 * delta)
+	else:
+		var desired := target.global_position.x + look_ahead * target.facing
+		# Lissage exponentiel indépendant du nombre d'images par seconde.
+		var t := 1.0 - exp(-follow_rate * delta)
+		var next := lerpf(x, desired, t) + autoscroll_speed * delta
+		x = maxf(next, x) if forward_only else next
+	global_position = Vector2(x, fixed_y)
+
+
+## Fige l'écran sur une arène (les vagues d'ennemis du tome 05).
+func lock_on(center_x: float) -> void:
+	_locked = true
+	_lock_center_x = center_x
+
+
+func unlock() -> void:
+	_locked = false
+
+
+func view_rect() -> Rect2:
+	var size := get_viewport_rect().size / zoom
+	return Rect2(global_position - size / 2.0, size)
+
+
+func clamp_to_view(body: Node2D, margin := 10.0) -> void:
+	var r := view_rect()
+	body.global_position.x = clampf(body.global_position.x, r.position.x + margin, r.end.x - margin)
+</script>
+<p>Ce script écrit <code>target.camera</code> : il faut ajouter cette variable à <code>player.gd</code>, et faire en sorte que Batman reste dans l'écran. Deux ajouts :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://player/player.gd  (ajouts)">
+# Sous « var facing := 1 » :
+var camera: CameraRig
+
+# À la fin de _physics_process(), après move_and_slide() :
+	if camera:
+		camera.clamp_to_view(self)
+</script>
+<div class="callout debug"><span class="tag">Si l'éditeur affiche une erreur rouge</span><p><code>Player</code> parle de <code>CameraRig</code> et <code>CameraRig</code> parle de <code>Player</code>. Tant que l'un des deux fichiers n'existe pas ou n'est pas enregistré, l'autre affiche « Could not find type ». Enregistre les deux (<kbd>Ctrl Maj S</kbd> / <kbd>⌘ Maj S</kbd> : tout enregistrer) : l'erreur disparaît. Les références croisées entre classes sont permises dans Godot 4.</p></div>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>1.0 - exp(-follow_rate * delta)</code> : la fraction de distance parcourue à chaque tick. <code>lerp(x, cible, 0.1)</code> à chaque image irait deux fois plus vite à 120 Hz qu'à 60 Hz ; cette forme donne la même courbe quelle que soit la fréquence. Garde ce réflexe chaque fois que tu « rattrapes » une valeur.</li>
+  <li><code>maxf(next, x)</code> : on garde la plus grande des deux positions, donc la caméra n'avance que vers la droite.</li>
+  <li><code>lock_on()</code> et <code>unlock()</code> serviront aux arènes de l'étape 07 : l'écran se fige pendant le combat.</li>
+  <li><code>clamp_to_view()</code> : la caméra ne reculant pas, Batman ne doit pas pouvoir sortir par la gauche.</li>
+  <li><code>fixed_y</code> : les trois sections du niveau 1 ne défilent jamais verticalement. Une seule ligne suffit à le garantir.</li>
+</ul>
+
+<h3 class="step" id="e04-9">4.9 · Une salle plus longue pour tester</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans <code>test_room.tscn</code>, agrandis le sol : <code>Floor</code> en (1000, 208), rectangle de collision 2000×16, <code>ColorRect</code> 2000×16 en (-1000, -8).</li>
+  <li>Ajoute un <code>Node2D</code> nommé <code>Markers</code> avec quelques <code>ColorRect</code> verticaux (4×60) tous les 160 px, posés sur le sol : ce sont tes « réverbères » pour voir défiler l'écran.</li>
+  <li>Sélectionne la <code>Camera2D</code>, attache-lui <code>camera_rig.gd</code>, et mets <strong>Target</strong> = <code>Player</code>.</li>
+  <li>Replace <code>Player</code> au sol, en (60, 200).</li>
+  <li><kbd>F6</kbd>.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span>
+<ul>
+  <li>En courant à droite, l'écran accélère en douceur et Batman se retrouve un peu à gauche du centre.</li>
+  <li>À l'arrêt, l'écran glisse encore un peu puis s'arrête.</li>
+  <li>En courant à gauche, l'écran ne recule pas, et Batman bute contre le bord gauche.</li>
+  <li>Expériences : <code>follow_rate</code> à 20 (caméra collée), à 1 (caméra molle) ; <code>look_ahead</code> à 0 ; <code>forward_only</code> décoché.</li>
+</ul></div>
+<p>Grâce au <em>snap au pixel</em> réglé à l'étape 01, la position à virgule de la caméra ne fait pas trembler les pixels.</p>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>Batman court à ~117 px/s, s'arrête net, saute plus ou moins haut selon la durée d'appui.</li>
+  <li>Il s'accroupit, et descend du balcon avec bas + saut.</li>
+  <li>L'étiquette de débogage affiche le bon état à tout moment.</li>
+  <li>La caméra anticipe dans le sens de la course, ne recule pas, et Batman ne peut pas sortir par la gauche.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 04 : Batman en machine à états, caméra"</div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Pourquoi aucun état n'appelle-t-il <code>move_and_slide()</code> ?</summary><div><p>Pour qu'il n'y ait qu'un seul endroit où Batman se déplace : <code>player.gd</code>, après que l'état a décidé de <code>velocity</code>. Si deux états l'appelaient, on risquerait de déplacer deux fois par tick lors d'une transition.</p></div></details>
+<details class="quiz"><summary>Que fait le coyote time, et pourquoi existe-t-il ?</summary><div><p>Il accepte un saut quelques centièmes de seconde après que le personnage a quitté le bord. Le joueur a l'impression d'avoir sauté à temps ; sans lui, le jeu paraît injuste, car l'œil humain ne perçoit pas une image de retard.</p></div></details>
+<details class="quiz"><summary>Pourquoi <code>1 - exp(-k × delta)</code> plutôt qu'une constante comme 0,1 ?</summary><div><p>Une constante appliquée à chaque image dépend du nombre d'images par seconde : la caméra irait plus vite sur un écran 144 Hz. La forme exponentielle donne la même trajectoire quel que soit <code>delta</code>.</p></div></details>
+<details class="quiz"><summary>Tu ajoutes un état <code>Slide</code>. Quels fichiers modifies-tu ?</summary><div><p>Tu crées <code>slide.gd</code> et un nœud <code>Slide</code> sous <code>StateMachine</code>, puis tu ajoutes la transition dans l'état d'où on y entre (par exemple <code>Run</code>). Aucun autre état ne change. C'est tout l'intérêt de la machine à états.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Affiche aussi <code>velocity</code> dans l'étiquette de débogage, arrondie à l'entier.</li>
+  <li>Mets <code>coyote_time</code> et <code>jump_buffer</code> à 0, joue deux minutes, puis remets-les. Note la différence dans ton journal.</li>
+  <li>Lis <a href="../batman-and-robin-godot-guide/03-batman.html#camera">la section caméra du tome 03</a>.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

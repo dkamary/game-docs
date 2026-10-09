@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 · Section 2 : Gem Expo et grappin — Pas à pas</title>
+<meta name="description" content="Étape 11 : salles réutilisables, skyline en Parallax2D, formations de têtes à hélice, entrepôt en TileMapLayer, passage d'Harley en Tween, et le grappin de grue en sphères pseudo-3D (projection perspective, tri en profondeur).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 11 / 13</div>
+  <h1>Section 2 : Gem Expo et grappin</h1>
+  <p class="lead">Une exposition de joyaux construite en salles réutilisables, un entrepôt peint en tuiles, une apparition d'Harley pour annoncer la suite, puis le morceau de bravoure technique du niveau : le grappin de grue en sphères qui plonge dans la profondeur.</p>
+  <div class="meta"><span class="pill">⏱ ~5 h</span><span class="pill">Prérequis : étape 10</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/08-section-2-gem-expo.html">tome 08</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li>Scènes comme modules de niveau</li>
+    <li><code>Parallax2D</code> en pratique</li>
+    <li><code>TileSet</code> et <code>TileMapLayer</code> avec collisions</li>
+    <li><code>Tween</code> chaînés et parallèles</li>
+    <li><code>z_index</code>, <code>Vector3</code> en 2D</li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>Construire avec des modules</li>
+    <li>L'annonce d'un boss</li>
+    <li>La projection perspective</li>
+    <li>L'algorithme du peintre</li>
+    <li>La vulnérabilité liée à la profondeur</li>
+  </ul></div>
+</div>
+
+<h2 id="expo">Le Gem Expo</h2>
+
+<h3 class="step" id="e11-1">11.1 · Observer la répétition</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t08-modules.jpg" alt="Des salles réutilisées" loading="lazy"><figcaption><b>Des salles réutilisées.</b> La salle « bannière » revient à l'identique ; elle alterne avec la salle « baies vitrées ». Chaque salle est une scène instanciée plusieurs fois.</figcaption></figure>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>La même salle revient plusieurs fois : colonnes de marbre, bannière « GEM EXPO », vitrines, plantes en pot (<a class="tc" href="#">6:24</a>, <a class="tc" href="#">7:28</a>, <a class="tc" href="#">8:32</a>). Elle alterne avec une salle à grandes baies vitrées sur la ville (<a class="tc" href="#">7:51</a>).</p></div>
+<div class="callout concept"><span class="tag">Concept : construire avec des modules</span><p>Une cartouche de 1995 n'avait pas la place pour un décor unique de plusieurs milliers de pixels : les niveaux étaient faits de blocs et de salles réutilisés. Dans Godot, une salle est une <strong>scène</strong> qu'on instancie bout à bout. Corriger un détail dans la salle le corrige partout. Les arènes et les ennemis restent dans la scène de section : chaque instance de salle peut accueillir un combat différent.</p></div>
+
+<h3 class="step" id="e11-2">11.2 · Deux salles</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li><strong>Salle « bannière »</strong> : nouvelle scène 2D <code>res://sections/s2/expo_hall.tscn</code>, racine <code>ExpoHall</code>. Elle fait 640 px de large. Contenu, en formes de substitution :
+    <ul>
+      <li>un mur (<code>ColorRect</code> 640×200, beige) de y = 0 à 200 ;</li>
+      <li>trois colonnes (<code>ColorRect</code> 32×200, blanc cassé) à x = 80, 300, 520 ;</li>
+      <li>une bannière (<code>Label</code> « GEM EXPO » sur un <code>ColorRect</code> rouge) en haut ;</li>
+      <li>deux vitrines basses : chacune un <code>StaticBody2D</code> (couche 2, forme one-way 48×8) avec un <code>ColorRect</code> vitré de 48×24, posées sur le sol.</li>
+    </ul></li>
+  <li><strong>Salle « baies vitrées »</strong> : <span class="menu">Scène → Enregistrer la scène sous</span> → <code>expo_windows.tscn</code>. Remplace le mur plein par deux murs de part et d'autre d'une grande ouverture (x = 160 à 480, y = 40 à 160) : on verra la ville à travers. Dans l'ouverture, deux vitres <code>Breakable</code> (Health 1, Hurtbox couche 6, <strong>Broken Texture</strong> = une image de vitre étoilée, ou rien).</li>
+</ol></div>
+<div class="callout method"><span class="tag">Méthode : un seul sol pour toute la section</span><p>Les salles ne contiennent <strong>pas</strong> de sol. Mettre bout à bout des sols séparés crée des jointures sur lesquelles un personnage peut accrocher. Le sol est un seul long <code>StaticBody2D</code> dans la scène de section ; les salles n'apportent que le décor et les meubles.</p></div>
+<div class="callout godot"><span class="tag">Les colonnes</span><p>Mesure du guide : les colonnes défilent exactement à la vitesse du mur et Batman passe devant elles. Ce sont des éléments du décor, au même plan que le mur : pas besoin de couche à part, ni de parallaxe. Mesurer avant de coder évite d'ajouter un effet qui n'existe pas.</p></div>
+
+<h3 class="step" id="e11-3">11.3 · La section et la skyline</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène 2D <code>res://sections/s2_gem_expo.tscn</code>, racine <code>S2GemExpo</code> (script <code>section.gd</code>), en (0, 0).</li>
+  <li>Construis l'arbre. <strong>Skyline</strong> doit être le <strong>premier enfant</strong> : les nœuds sont dessinés dans l'ordre de l'arbre, donc elle sera derrière les salles.</li>
+</ol>
+<pre class="tree">S2GemExpo (Node2D, section.gd)            next_scene = level_end.tscn (provisoire) · player = Player
+├── Skyline (Parallax2D)                  scroll_scale (0.3, 0) · repeat_size (640, 0)
+│   └── Buildings (Node2D)                quelques ColorRect sombres de hauteurs variées, sur 640 px
+├── World (Node2D)
+│   ├── Ground (StaticBody2D)             couche 1 · rectangle 4400×16 en (2200, 208)
+│   ├── Hall1 (expo_hall.tscn)            x = 0
+│   ├── Windows1 (expo_windows.tscn)      x = 640
+│   ├── Hall2 (expo_hall.tscn)            x = 1280
+│   ├── Windows2 (expo_windows.tscn)      x = 1920
+│   ├── Hall3 (expo_hall.tscn)            x = 2560
+│   ├── ArenaA, ArenaB (WaveArena)        dans les salles
+│   ├── Warehouse (Node2D)                à partir de x = 3200 (11.5)
+│   ├── HarleyFlyby (Area2D)              (11.6)
+│   └── BossArena → CraneHarley           (11.8)
+├── EnemyBullets (Pool) · Player · Camera (camera_rig.gd) · Hud</pre>
+<ol start="3">
+  <li>Dans la section 1, remplace <strong>Next Scene</strong> par <code>res://sections/s2_gem_expo.tscn</code>.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F6</kbd> sur la section 2 : en courant, les salles défilent avec le sol, et la ville, visible par les baies, défile trois fois moins vite. Les vitres se brisent sous les tirs. Monte sur les vitrines.</p></div>
+
+<h3 class="step" id="e11-4">11.4 · Les vagues de têtes à hélice</h3>
+<figure class="shot" style="max-width:420px"><img src="../batman-and-robin-godot-guide/img/s12-propellers.jpg" alt="Vague de têtes à hélice"><figcaption>Vague de têtes à hélice. <a class="tc" href="#">6:58</a></figcaption></figure>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans <code>ArenaA</code> (vers x = 450), place deux <code>Formation</code> enfants :
+    <ul>
+      <li><strong>« Chenille »</strong> : une courbe qui descend à la verticale depuis le haut de l'écran, puis serpente vers la gauche. 8 membres, <code>delay</code> 0,3 s.</li>
+      <li><strong>« Ligne »</strong> : une courbe horizontale en haut de l'écran, de droite à gauche. 6 membres, <code>delay</code> 0,25 s.</li>
+    </ul></li>
+  <li>Vague 1 de <code>ArenaA</code> : quelques clowns (quota 4) + <strong>Formation</strong> = Chenille. Vague 2 : quota 4 + <strong>Formation</strong> = Ligne.</li>
+  <li><code>ArenaB</code> (vers x = 2 000) : clowns, costauds et tireurs, comme une arène de la section 1.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>La chenille descend puis serpente, la ligne traverse le haut de l'écran, et toutes deux bombardent pendant que les clowns arrivent. La première vague lance sa formation dès l'entrée dans l'arène sans erreur dans la console : c'est le démarrage différé de <code>WaveArena</code> (étape 07) qui le permet.</p></div>
+
+<h2 id="entrepot">L'entrepôt</h2>
+
+<h3 class="step" id="e11-5">11.5 · Peindre des caisses avec une <code>TileMapLayer</code></h3>
+<figure class="concept narrow"><img src="../batman-and-robin-godot-guide/img/concepts/t08-entrepot.jpg" alt="L'entrepôt" loading="lazy"><figcaption><b>L'entrepôt.</b> Les pyramides de caisses sont des blocs pleins à franchir en sautant.</figcaption></figure>
+<div class="callout godot"><span class="tag"><code>TileSet</code> et <code>TileMapLayer</code></span><p>Une <code>TileMapLayer</code> peint une grille de tuiles prises dans un <code>TileSet</code>. Chaque tuile peut porter une forme de collision : peindre une caisse, c'est aussi créer son sol et ses murs. C'est l'outil standard pour construire des niveaux 2D (et l'héritier direct des métatuiles de la Mega Drive). <code>TileMapLayer</code> remplace l'ancien <code>TileMap</code> depuis Godot 4.3.</p></div>
+<p>D'abord, des images de test pour cette section : des caisses, et les sphères du grappin (11.7).</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://tools/make_debug_s2.gd">
+@tool
+extends EditorScript
+## Génère les images de test de la section 2 :
+## - crates.png : 2 tuiles 16×16 (caisse claire, caisse bleue) pour la TileMapLayer ;
+## - sphere_orange.png : 4 tailles de sphère orange (bande de 4 cases de 20×20) ;
+## - sphere_dark.png : 2 tailles de sphère sombre (bande de 2 cases de 12×12).
+
+const DIR := "res://art/s2/"
+
+
+func _run() -> void:
+	DirAccess.make_dir_recursive_absolute(DIR)
+	_crates().save_png(DIR + "crates.png")
+	_spheres(20, [4.0, 6.0, 8.0, 9.5], Color("e0782c")).save_png(DIR + "sphere_orange.png")
+	_spheres(12, [3.5, 5.5], Color("3a3550")).save_png(DIR + "sphere_dark.png")
+	EditorInterface.get_resource_filesystem().scan()
+	print("Images de la section 2 écrites dans ", DIR)
+
+
+func _crates() -> Image:
+	var img := Image.create_empty(32, 16, false, Image.FORMAT_RGBA8)
+	var colors := [Color("b07a3c"), Color("3c5ea8")]
+	for t in 2:
+		for y in 16:
+			for x in 16:
+				var edge := x == 0 or y == 0 or x == 15 or y == 15 or x == y or x == 15 - y
+				var c: Color = colors[t]
+				img.set_pixel(t * 16 + x, y, c.darkened(0.4) if edge else c)
+	return img
+
+
+func _spheres(cell: int, radii: Array, base: Color) -> Image:
+	var img := Image.create_empty(cell * radii.size(), cell, false, Image.FORMAT_RGBA8)
+	for i in radii.size():
+		var r: float = radii[i]
+		var center := Vector2(i * cell + cell / 2.0, cell / 2.0)
+		for y in cell:
+			for x in cell:
+				var p := Vector2(i * cell + x + 0.5, y + 0.5)
+				if p.distance_to(center) <= r:
+					# Reflet en haut à gauche : plus clair près de ce point.
+					var hl := p.distance_to(center + Vector2(-r, -r) / 3.0) / r
+					img.set_pixel(i * cell + x, y, base.lightened(clampf(0.6 - hl, 0.0, 0.6)))
+	return img
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Exécute <code>make_debug_s2.gd</code>.</li>
+  <li>Sous <code>Warehouse</code>, ajoute une <code>TileMapLayer</code> nommée <code>Crates</code>. Inspecteur → <strong>Tile Set → Nouveau TileSet</strong>, puis clique dessus : <strong>Tile Size</strong> = 16×16.</li>
+  <li>Toujours dans le <code>TileSet</code> : <strong>Physics Layers → Ajouter un élément</strong>. Règle sa <strong>Collision Layer</strong> sur la couche 1 seule (« monde »).</li>
+  <li>Panneau <strong>TileSet</strong> (en bas) : glisse <code>crates.png</code> dans la liste des sources et accepte la création automatique des tuiles.</li>
+  <li>Onglet <strong>Sélectionner</strong> du panneau TileSet, choisis une tuile → <strong>Physics → Physics Layer 0</strong> : dans l'éditeur de polygone, appuie sur <kbd>F</kbd> pour remplir toute la case. Recommence pour l'autre tuile.</li>
+  <li>Onglet <strong>TileMap</strong> du panneau : choisis une tuile et peins dans la vue 2D (clic gauche peint, clic droit efface). Dessine trois ou quatre pyramides de caisses posées sur le sol, de x = 3 200 à 3 900. Une case fait 16 px : le sol est à y = 200, donc la rangée du bas va de y = 184 à 200.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Batman monte de marche en marche (une marche de 16 px se franchit en sautant), les clowns butent contre les caisses. Active les formes de collision visibles : chaque caisse a son carré.</p></div>
+
+<h3 class="step" id="e11-6">11.6 · Harley passe : une annonce en pleine partie</h3>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>À <a class="tc" href="#">9:25</a>–<a class="tc" href="#">9:29</a>, Harley traverse l'écran en diagonale dans son fauteuil-fusée, sans combattre. Le joueur sait désormais qui l'attend.</p></div>
+<div class="callout concept"><span class="tag">Concept : annoncer un boss</span><p>Montrer l'adversaire avant le combat crée de l'attente et donne du sens au parcours. C'est une technique de mise en scène vieille comme le cinéma, et presque gratuite à réaliser : un sprite et une trajectoire.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/s2/harley_flyby.gd">
+extends Area2D
+## Déclencheur (masque 3) : Harley traverse l'écran sans combattre (annonce du mini-boss).
+
+@export var harley_scene: PackedScene      ## juste un Sprite2D animé du fauteuil-fusée
+@export var duration := 3.0
+var _done := false
+
+
+func _ready() -> void:
+	body_entered.connect(_on_body_entered)
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if _done or not body is Player:
+		return
+	_done = true
+	var cam := (body as Player).camera.view_rect()
+	var h: Node2D = harley_scene.instantiate()
+	Fx.spawn(h, Vector2(cam.position.x - 30, cam.end.y - 60))
+	var tw := h.create_tween()
+	tw.tween_property(h, "global_position", Vector2(cam.end.x + 40, cam.position.y + 20), duration) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(h.queue_free)
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée <code>res://bosses/crane_harley/harley_flyby_sprite.tscn</code> : un <code>Sprite2D</code> (<code>white.png</code>, scale (1,5 ; 1,2), modulate rose).</li>
+  <li>Sous <code>World</code>, une <code>Area2D</code> <code>HarleyFlyby</code> (masque 3, forme 8×224) vers x = 3 500, script <code>harley_flyby.gd</code>, <strong>Harley Scene</strong> = la scène du sprite.</li>
+</ol></div>
+<div class="callout godot"><span class="tag">Le <code>Tween</code></span><p>Un <code>Tween</code> anime une propriété d'une valeur à une autre sur une durée, avec une courbe d'accélération (<code>TRANS_SINE</code>, <code>EASE_IN_OUT</code> : départ et arrivée en douceur). Les appels s'enchaînent : <code>tween_callback</code> s'exécute une fois l'animation précédente terminée. Créé sur le nœud animé (<code>h.create_tween()</code>), il s'arrête avec lui.</p></div>
+<div class="callout test"><span class="tag">Teste</span><p>En arrivant vers x = 3 500, un rectangle rose traverse l'écran en diagonale, de bas en haut, en accélérant puis en ralentissant, et disparaît.</p></div>
+
+<h2 id="grappin">Le grappin en sphères</h2>
+
+<h3 class="step" id="e11-7">11.7 · La projection perspective</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t08-grappin-profondeur.jpg" alt="La profondeur du grappin" loading="lazy"><figcaption><b>La profondeur du grappin, dans le jeu.</b> Au premier plan, il est grand et clair, et il blesse ; plus il s'enfonce, plus il est petit et sombre, et il devient inoffensif.</figcaption></figure>
+<div class="callout md"><span class="tag">Ce qu'explique Jon Burton (secret #3)</span>
+<ul>
+  <li>Des <strong>sphères</strong> : sous n'importe quel angle, une sphère reste un disque avec son reflet au même endroit. Pas besoin de rotation.</li>
+  <li>Environ <strong>20 sphères</strong>, chacune un sprite.</li>
+  <li><strong>4 tailles</strong> de sphère orange et <strong>2</strong> de sphère noire, pré-calculées : pas de mise à l'échelle.</li>
+  <li>Une vraie position 3D, projetée à l'écran.</li>
+  <li>Quand le bras part vers le fond, il <strong>s'assombrit</strong>.</li>
+</ul></div>
+<div class="callout concept"><span class="tag">Concept : de la 3D sur un écran 2D</span><p>On décrit le bras en <strong>3D</strong> (x à droite, y vers le bas, z vers le fond). Pour l'afficher, on divise par la profondeur : un point deux fois plus loin paraît deux fois plus petit et deux fois plus proche du centre. Avec une « focale » <code>f</code> : <code>s = f / (f + z)</code>, puis <code>écran = (x, y) × s</code>. Le facteur <code>s</code> donne aussi la taille apparente et la luminosité. C'est toute la « 3D » du jeu.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/crane_harley/sphere_arm.gd">
+class_name SphereArm
+extends Node2D
+## Secret #3 : grappin de grue en sphères, pseudo-3D.
+## Positions en 3D -> projection perspective -> image de la bonne taille + luminosité + tri.
+
+enum S { TRACK, DROP, HOLD, RAISE, SWING }
+
+@export var orange_sphere: Texture2D   ## bande horizontale de 4 tailles, de la plus petite à la plus grande
+@export var dark_sphere: Texture2D     ## bande horizontale de 2 tailles
+@export var chain_count := 10
+@export var focal := 260.0
+@export var ground_y := 150.0          ## y local du moyeu quand le grappin touche le sol
+@export var raised_y := 36.0
+@export var track_speed := 70.0
+@export var drop_speed := 420.0
+@export var raise_speed := 90.0
+@export var swing_depth := 140.0
+@export var target: Node2D
+
+## 4 « palettes » de plus en plus sombres, comme la CRAM mise à jour en direct.
+const BRIGHTNESS := [1.0, 0.8, 0.62, 0.45]
+
+var hub := Vector3(0, 36, 0)   ## moyeu du grappin, relatif au point d'accroche
+var open := 1.0                ## 1 = pince ouverte, 0 = fermée
+var spin := 0.0
+var _s := S.TRACK
+var _t := 0.0
+var _chain: Array[Sprite2D] = []
+var _claw: Array[Sprite2D] = []   ## [0] = moyeu, puis 4 doigts × 3 sphères
+
+@onready var claw_hitbox: Hitbox = $ClawHitbox
+
+
+func _ready() -> void:
+	for i in chain_count:
+		_chain.append(_make_sphere(dark_sphere, 2))
+	for i in 13:
+		_claw.append(_make_sphere(orange_sphere, 4))
+	claw_hitbox.monitoring = false
+	_layout()
+
+
+func _make_sphere(tex: Texture2D, sizes: int) -> Sprite2D:
+	var s := Sprite2D.new()
+	s.texture = tex
+	s.hframes = sizes
+	add_child(s)
+	return s
+
+
+func _physics_process(delta: float) -> void:
+	_t += delta
+	match _s:
+		S.TRACK:
+			# Se place au-dessus de Batman, pince ouverte, au premier plan.
+			open = move_toward(open, 1.0, delta * 2.0)
+			hub.y = move_toward(hub.y, raised_y, raise_speed * delta)
+			hub.z = move_toward(hub.z, 0.0, 120.0 * delta)
+			if target:
+				hub.x = move_toward(hub.x, target.global_position.x - global_position.x, track_speed * delta)
+			if _t > 1.6:
+				_go(S.DROP)
+		S.DROP:
+			hub.y = move_toward(hub.y, ground_y, drop_speed * delta)
+			if hub.y >= ground_y:
+				_impact()
+				_go(S.HOLD)
+		S.HOLD:
+			open = move_toward(open, 0.0, delta * 4.0)   # la pince se referme
+			if _t > 0.5:
+				_go(S.RAISE)
+		S.RAISE:
+			hub.y = move_toward(hub.y, raised_y, raise_speed * delta)
+			if hub.y <= raised_y:
+				_go(S.SWING if randf() < 0.5 else S.TRACK)
+		S.SWING:
+			# Passe dans le fond : plus petit, plus sombre, inoffensif.
+			hub.z = (1.0 - cos(_t * 1.6)) * 0.5 * swing_depth
+			hub.x = sin(_t * 0.8) * 60.0
+			if _t > TAU / 1.6:
+				_go(S.TRACK)
+	spin += delta * 0.8
+	# La pince ne blesse que dans le plan du joueur, pendant la frappe.
+	claw_hitbox.monitoring = (_s == S.DROP or _s == S.HOLD) and absf(hub.z) < 12.0
+	_layout()
+
+
+func _go(next: S) -> void:
+	_s = next
+	_t = 0.0
+	if next == S.DROP:
+		claw_hitbox.reset_hits()   # chaque frappe peut toucher à nouveau
+
+
+func _impact() -> void:
+	Fx.explosion(to_global(project(hub + Vector3(0, 14, 0))))
+	get_tree().call_group("camera", "shake", 0.35)   # tremblement (tome 11), sans effet sinon
+
+
+func _layout() -> void:
+	# Chaîne : sphères sombres régulièrement réparties de l'accroche (0,0,0) au moyeu.
+	for i in chain_count:
+		var k := (i + 1.0) / (chain_count + 1.0)
+		_place(_chain[i], Vector3.ZERO.lerp(hub, k), 2)
+	# Moyeu, puis 4 doigts de 3 sphères qui s'écartent (ouvert) ou se referment.
+	_place(_claw[0], hub, 4)
+	for f in 4:
+		var a := spin + f * TAU / 4.0
+		for j in 3:
+			var r := open * (j + 1) * 7.0 + (1.0 - open) * (3.0 - j * 2.0)
+			var drop := (j + 1) * 6.0
+			var p := hub + Vector3(cos(a) * r, drop, sin(a) * r)
+			_place(_claw[1 + f * 3 + j], p, 4)
+	claw_hitbox.position = project(hub + Vector3(0, 12, 0))
+
+
+func project(p: Vector3) -> Vector2:
+	var s := focal / (focal + p.z)
+	return Vector2(p.x, p.y) * s
+
+
+func _place(sprite: Sprite2D, p: Vector3, sizes: int) -> void:
+	var s := focal / (focal + p.z)          # ~1 au premier plan, < 1 au fond
+	sprite.position = Vector2(p.x, p.y) * s
+	# Taille : l'image pré-calculée la plus proche (le VDP ne sait pas agrandir).
+	var size01 := clampf(inverse_lerp(0.55, 1.12, s), 0.0, 1.0)
+	sprite.frame = int(round(size01 * (sizes - 1)))
+	# Luminosité : 4 paliers selon la profondeur (palette assombrie).
+	var level := clampi(int(inverse_lerp(-20.0, swing_depth, p.z) * 4.0), 0, 3)
+	var v: float = BRIGHTNESS[level]
+	sprite.modulate = Color(v, v, v)
+	# Tri : le plus proche est dessiné par-dessus (algorithme du peintre).
+	sprite.z_index = -int(p.z)
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><strong>Une seule vérité, la position 3D</strong> : les états (<code>TRACK</code>, <code>DROP</code>…) ne modifient que <code>hub</code> (un <code>Vector3</code>) et <code>open</code>. <code>_layout()</code> en déduit tout le reste à chaque image : position, taille, luminosité et ordre de dessin des 23 sphères.</li>
+  <li><code>_place()</code> fait trois choses avec le même facteur <code>s</code> : la <strong>position</strong> (projection), la <strong>taille</strong> (choix parmi les images pré-calculées, via <code>frame</code>), la <strong>luminosité</strong> (4 paliers, comme 4 palettes de plus en plus sombres).</li>
+  <li><code>z_index = -z</code> : <strong>l'algorithme du peintre</strong>. Sans tampon de profondeur, on dessine du plus lointain au plus proche. Godot trie les enfants par <code>z_index</code> ; sur la console, le programme triait la table des sprites à chaque image.</li>
+  <li><code>claw_hitbox.monitoring</code> n'est vrai que pendant la frappe <strong>et</strong> dans le plan du joueur (|z| &lt; 12). Ce qui a l'air loin ne touche pas.</li>
+  <li><code>call_group("camera", "shake", …)</code> : le tremblement n'existe qu'à l'étape 13. D'ici là, personne n'est dans le groupe <code>camera</code>, et l'appel ne fait rien.</li>
+</ul>
+
+<h3 class="step" id="e11-8">11.8 · Harley, son fauteuil et le mini-boss</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/crane_harley/harley_chair.gd">
+class_name HarleyChair
+extends Node2D
+## Harley vole dans la moitié haute de l'écran et lobe des bombes sur Batman.
+
+@export var bomb_scene: PackedScene          ## bomb.tscn, bounces = 0
+@export var flight_area := Rect2(-120, 20, 240, 50)   ## relatif au boss
+@export var throw_interval := 1.5
+@export var ko_texture: Texture2D            ## Harley assommée au sol
+var player: Node2D
+var _t := 0.0
+var _throw := 1.0
+@onready var sprite: Sprite2D = $Sprite2D
+
+
+func tick(delta: float) -> void:
+	_t += delta
+	var c := flight_area.get_center()
+	position = c + Vector2(sin(_t * 0.7) * flight_area.size.x / 2.0, sin(_t * 1.9) * flight_area.size.y / 2.0)
+	if player:
+		sprite.flip_h = player.global_position.x < global_position.x
+	_throw -= delta
+	if _throw <= 0.0 and bomb_scene and player:
+		_throw = throw_interval
+		var b := bomb_scene.instantiate() as Bomb
+		b.velocity = Fx.ballistic(global_position, player.global_position + Vector2(0, -12), b.fall_gravity, 0.8)
+		Fx.spawn(b, global_position)
+
+
+func show_ko() -> void:
+	rotation = 0.0
+	if ko_texture:
+		sprite.texture = ko_texture
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/crane_harley/crane_harley.gd">
+class_name CraneHarley
+extends Boss
+## Mini-boss de la section 2 (vidéo 9:48–10:43) : le grappin frappe, Harley est la cible.
+
+@export var ground_local_y := 172.0   ## y local du sol, pour la chute d'Harley
+@onready var arm: SphereArm = $Arm
+@onready var harley: HarleyChair = $Harley
+
+
+func _ready() -> void:
+	super._ready()
+	arm.target = player
+	harley.player = player
+	arm.set_physics_process(false)
+
+
+func start() -> void:
+	super.start()
+	arm.set_physics_process(true)
+
+
+func _physics_process(delta: float) -> void:
+	if active:
+		harley.tick(delta)
+
+
+func die_sequence() -> void:
+	arm.set_physics_process(false)
+	arm.claw_hitbox.set_deferred("monitoring", false)
+	# Harley part en vrille et s'écrase (vidéo 10:36–10:39).
+	var tw := create_tween()
+	tw.tween_property(harley, "rotation", TAU * 3.0, 1.2)
+	tw.parallel().tween_property(harley, "position:y", ground_local_y, 1.2) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw.finished
+	await explode_area(Rect2(harley.position - Vector2(16, 16), Vector2(32, 32)), 5, 0.08)
+	harley.show_ko()
+	# Le grappin remonte hors de l'écran.
+	create_tween().tween_property(arm, "position:y", arm.position.y - 220.0, 1.5)
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène <code>res://bosses/crane_harley/crane_harley.tscn</code>, racine <code>Node2D</code> <code>CraneHarley</code>, script <code>crane_harley.gd</code> :</li>
+</ol>
+<pre class="tree">CraneHarley (Node2D, crane_harley.gd)     score_value = 5000
+├── Health                                 max_health = 80 (À CALIBRER)
+├── Arm (Node2D, sphere_arm.gd)            origine = point d'accroche de la chaîne (haut de l'écran)
+│   └── ClawHitbox (Hitbox)                couche vide · masque 5 · damage 2
+│       └── CollisionShape2D               cercle de rayon 14
+└── Harley (Node2D, harley_chair.gd)
+    ├── Sprite2D                           white.png scale (1,5 ; 1,2), rose · matériau hit_flash (Local To Scene)
+    ├── Hurtbox                            couche 6 · health = Health
+    │   └── CollisionShape2D               rectangle 22×18
+    └── HitFlash                           target = Sprite2D · hurtbox = Hurtbox</pre>
+<ol start="2">
+  <li><code>Arm</code> : <strong>Orange Sphere</strong> = <code>sphere_orange.png</code>, <strong>Dark Sphere</strong> = <code>sphere_dark.png</code>. <code>Harley</code> : <strong>Bomb Scene</strong> = <code>harley_bomb.tscn</code> (la variante sans rebond de l'étape 09).</li>
+  <li>Dans la section, une <code>BossArena</code> en (4 200, 112), avec <code>CraneHarley</code> comme enfant en position locale (0, -112) : le point d'accroche est en haut de l'écran (y = 0). Exports : <strong>Boss</strong>, <strong>Section</strong>.</li>
+  <li>Prolonge le sol jusqu'à x = 4 500 si besoin.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span>
+<ul>
+  <li>À l'entrée de l'arène, la pastille « 99 » apparaît. Le grappin suit Batman, s'abat (explosion au sol), se referme, remonte.</li>
+  <li>Parfois, il part dans le fond : il rapetisse, s'assombrit, et passe derrière la chaîne. Pendant ce temps, il ne fait pas mal.</li>
+  <li>Harley vole en huit dans le haut de l'écran et lobe des bombes là où se trouvait Batman. Il faut la viser en diagonale haute.</li>
+  <li>À 00 : Harley part en vrille, s'écrase, explosions, le grappin remonte, pose de victoire, +5 000, puis la scène suivante.</li>
+</ul></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span>
+<ul>
+  <li><strong>Les sphères sont toutes de la même taille</strong> : la texture n'a pas le bon nombre de cases (4 pour l'orange, 2 pour le sombre), ou le générateur n'a pas été exécuté.</li>
+  <li><strong>Le grappin ne bouge pas</strong> : c'est normal avant le début du combat (<code>set_physics_process(false)</code>) ; vérifie que l'arène lance bien le boss.</li>
+  <li><strong>Le grappin ne touche jamais</strong> : masque 5 sur <code>ClawHitbox</code>, et vérifie que <code>ground_y</code> amène la pince jusqu'à la hauteur de Batman (le sol est à 200 px sous le point d'accroche).</li>
+</ul></div>
+<div class="callout concept"><span class="tag">Concept : la vulnérabilité liée à la profondeur</span><p>Quand le grappin passe dans le fond, il est plus petit, plus sombre <em>et</em> inoffensif : le visuel dit la vérité sur le gameplay. Règle d'or de toute pseudo-3D : ce qui a l'air loin ne doit pas toucher. Tu retrouveras la même règle avec la montgolfière du Joker.</p></div>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>Le Gem Expo s'assemble avec deux salles réutilisées ; la ville défile plus lentement derrière les baies.</li>
+  <li>Une chenille de têtes à hélice descend puis serpente ; une ligne traverse le haut de l'écran.</li>
+  <li>L'entrepôt est peint en tuiles avec collisions ; Harley passe en diagonale sans combattre.</li>
+  <li>Le grappin suit Batman, s'abat, se referme, remonte et parfois s'enfonce dans le fond, plus petit et plus sombre.</li>
+  <li>Harley vole et lobe des bombes. À 00 : vrille, crash, K.O., +5 000, section suivante.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 11 : section 2, Gem Expo, entrepôt et grappin"</div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Pourquoi les salles n'ont-elles pas leur propre sol ?</summary><div><p>Des sols séparés bout à bout créent des jointures où un personnage peut accrocher. Un seul sol continu dans la section évite le problème ; les salles n'apportent que le décor et les meubles.</p></div></details>
+<details class="quiz"><summary>Que donne la formule <code>s = f / (f + z)</code> ?</summary><div><p>Le facteur de réduction d'un point situé à la profondeur z : 1 au premier plan (z = 0), de plus en plus petit en s'éloignant. On l'utilise pour la position à l'écran, pour choisir l'image de la bonne taille et pour la luminosité.</p></div></details>
+<details class="quiz"><summary>À quoi sert <code>z_index = -z</code> ?</summary><div><p>À trier l'affichage : les sphères les plus proches (z petit) ont un <code>z_index</code> plus grand et sont dessinées par-dessus les lointaines. C'est l'algorithme du peintre.</p></div></details>
+<details class="quiz"><summary>Pourquoi peindre les caisses avec une <code>TileMapLayer</code> plutôt qu'avec des <code>StaticBody2D</code> ?</summary><div><p>Parce que chaque tuile porte son image et sa collision : peindre une pyramide crée à la fois le décor et le sol. On construit, modifie et efface un niveau à la souris, en quelques secondes, sans gérer des dizaines de nœuds.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Remplace <code>modulate</code> par des sphères indexées et <code>indexed.gdshader</code> avec une palette de 4 lignes (étape 08) : la fidélité totale.</li>
+  <li>Ajoute une ombre au sol sous le grappin (une ellipse sombre dont la taille dépend de <code>hub.y</code>) : elle aide le joueur à anticiper l'impact.</li>
+  <li>Lis le tome 08 du guide, et regarde la vidéo de Jon Burton sur le bras de grue.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

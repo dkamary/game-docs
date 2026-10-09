@@ -216,12 +216,11 @@ func _drop_cluster() -> void:
 	var column := randf() < 0.4
 	for i in 5:
 		var b := bomb_scene.instantiate() as Bomb
-		b.global_position = drop_point.global_position
 		if column:
 			b.velocity = Vector2(0.0, 20.0 + i * 28.0)     # colonne : chutes étagées
 		else:
 			b.velocity = Vector2((i - 2) * 32.0, -40.0)    # ligne : éventail
-		get_parent().add_child(b)
+		Fx.spawn(b, drop_point.global_position)
 
 
 func die_sequence() -> void:
@@ -256,7 +255,7 @@ func die_sequence() -> void:
   <li>Le dernier véhicule est un plateau nu (<code>drift_amplitude</code> = 0) : un sol stable et dégagé (<a class="tc" href="#">13:00</a>).</li>
   <li>La <code>BossArena</code> fige la caméra au centre du plateau ; la rue continue de défiler derrière grâce à l'<code>autoscroll</code>.</li>
   <li><code>JokerBalloon</code> est placé à la surface du plateau, au centre : toutes ses coordonnées (<code>high_y</code>, <code>low_y</code>) sont relatives à ce point.</li>
-  <li>Score : +10 000 (<a class="tc" href="#">14:30</a>). <code>next_scene</code> pointe vers l'écran de fin de niveau (Batmobile, tome 10).</li>
+  <li>Score : +10 000 (<a class="tc" href="#">14:30</a>). <code>next_scene</code> pointe vers l'écran de fin de niveau (Batmobile), qui n'est créé qu'au <a href="10-ecrans-flux.html">tome 10</a>. Si tu fais le tome 09 avant, mets provisoirement <code>next_scene</code> sur <code>res://sections/s1_streets.tscn</code> : le niveau boucle, et tu remplaces la valeur une fois <code>level_end.tscn</code> en place.</li>
 </ul>
 
 <div class="callout goal"><span class="tag">Objectif de l'étape</span>

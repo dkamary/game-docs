@@ -67,6 +67,9 @@ extends Node
 ## Change de scène entre deux fondus Mega Drive.
 
 func goto(path: String) -> void:
+	if path.is_empty():
+		push_warning("SceneFlow.goto : aucune scène indiquée (next_scene vide ?)")
+		return
 	await PaletteFx.fade_out()
 	get_tree().change_scene_to_file(path)
 	await get_tree().process_frame   # le changement de scène a lieu en fin d'image
@@ -115,7 +118,7 @@ func game_over() -> void:
 <div class="callout concept"><span class="tag">Concept : le rythme tension / détente</span><p>Arène (tension, écran figé) → couloir (détente, on avance) → arène… Le joueur respire entre deux combats, et l'apparition d'un nouvel ennemi ou d'un bonus dans un couloir est d'autant plus lisible. Quand tu places tes arènes, garde cette alternance.</p></div>
 
 <h2 id="banque">L'explosion de la banque</h2>
-<div class="callout video"><span class="tag">Mesuré dans la vidéo (60 i/s)</span><p>De <a class="tc" href="#">2:43.9</a> à <a class="tc" href="#">2:50.4</a>, des explosions en chaîne secouent l'étage, accompagnées de <strong>flashs blancs stroboscopiques</strong> : environ 24 flashs, <strong>chacun de 3 images exactement</strong>, espacés de 0,15 à 0,5 s. Ce n'est pas un écran blanc continu. La palette bascule vers le violet et l'ocre à <a class="tc" href="#">2:49.6</a>, pendant les derniers flashs. Ensuite, les flammes géantes sortent des fenêtres et les débris tombent en continu jusqu'au boss.</p></div>
+<div class="callout video"><span class="tag">Mesuré dans la vidéo (60 i/s)</span><p>De <a class="tc" href="#">2:43.9</a> à <a class="tc" href="#">2:50.4</a>, des explosions en chaîne secouent l'étage, accompagnées de <strong>flashs blancs stroboscopiques</strong> : environ 24 flashs, <strong>chacun de 3 images exactement</strong>, à intervalles irréguliers (en moyenne un flash toutes les 0,27 s). Ce n'est pas un écran blanc continu. La palette bascule vers le violet et l'ocre à <a class="tc" href="#">2:49.6</a>, pendant les derniers flashs. Ensuite, les flammes géantes sortent des fenêtres et les débris tombent en continu jusqu'au boss.</p></div>
 <figure class="concept"><img src="img/concepts/t07-banque-sequence.jpg" alt="Séquence de l'explosion de la banque" loading="lazy"><figcaption><b>La séquence, image par image.</b> Avant ; un flash de 3 images ; des explosions entre deux flashs ; le flash pendant lequel la palette bascule ; la rue en feu. (vidéo 2:43 → 2:52)</figcaption></figure>
 <div class="callout concept"><span class="tag">Concept : cacher un changement sous un flash</span><p>Changer d'un coup tout le décor serait brutal. Les flashs servent de <strong>rideau</strong> : c'est pendant l'un d'eux qu'on change la palette, qu'on active les feux et qu'on lance les débris. Quand le blanc retombe, le monde a changé et le cerveau du joueur l'accepte comme la conséquence de l'explosion. Le stroboscope crée en plus une sensation de chaos sans aucun sprite supplémentaire.</p></div>
 <script type="text/x-code" data-lang="gdscript" data-file="res://sections/s1/bank_event.gd">
@@ -144,7 +147,9 @@ func _on_body_entered(body: Node2D) -> void:
 
 @export var duration := 6.5           ## mesuré : 2:43.9 → 2:50.4
 @export var switch_at := 5.7          ## mesuré : la palette bascule à 2:49.6
-@export var flash_gap := Vector2(0.15, 0.5)   ## intervalle aléatoire entre deux flashs
+## Intervalle aléatoire entre deux flashs. Moyenne 0,225 s + 3 images de flash ≈ 0,27 s :
+## environ 24 flashs en 6,5 s, comme mesuré.
+@export var flash_gap := Vector2(0.1, 0.35)
 
 
 func _run() -> void:
@@ -161,7 +166,7 @@ func _run() -> void:
 		t += 3.0 / 60.0
 		# Entre deux flashs : des explosions à l'étage.
 		var m: Marker2D = blast_points.pick_random()
-		Fx.explosion(m.global_position + Vector2(randf_range(-16, 16), randf_range(-8, 8)), get_parent())
+		Fx.explosion(m.global_position + Vector2(randf_range(-16, 16), randf_range(-8, 8)))
 		var gap := randf_range(flash_gap.x, flash_gap.y)
 		await get_tree().create_timer(gap).timeout
 		t += gap
@@ -228,7 +233,7 @@ func die_sequence() -> void:
 func explode_area(area: Rect2, count: int, interval: float) -> void:
 	for i in count:
 		var p := Vector2(randf_range(area.position.x, area.end.x), randf_range(area.position.y, area.end.y))
-		Fx.explosion(to_global(p), get_parent())
+		Fx.explosion(to_global(p))   # dans la scène courante, pas sous la BossArena
 		await get_tree().create_timer(interval).timeout
 </script>
 <script type="text/x-code" data-lang="gdscript" data-file="res://bosses/boss_arena.gd">
@@ -381,9 +386,8 @@ func _volley(delta: float, interval: float, count: int) -> void:
 	var dir := Vector2.RIGHT.rotated(cannon.rotation)
 	for i in count:
 		var b := ball_scene.instantiate() as Bomb
-		b.global_position = muzzle.global_position
 		b.velocity = dir * (110.0 + i * 35.0)   # vitesses étagées : les boules forment un arc
-		get_parent().add_child(b)
+		Fx.spawn(b, muzzle.global_position)
 
 
 func _update_mast() -> void:
@@ -400,9 +404,8 @@ func _harley_attack(delta: float) -> void:
 		return
 	_fire_t = 1.3
 	var b := harley_bomb_scene.instantiate() as Bomb
-	b.global_position = harley.global_position
 	b.velocity = Fx.ballistic(harley.global_position, player.global_position + Vector2(0, -16), b.fall_gravity, 0.9)
-	get_parent().add_child(b)
+	Fx.spawn(b, harley.global_position)
 
 
 func _check_phase(current: int, maximum: int) -> void:
@@ -440,9 +443,8 @@ func _eject_ring(count: int) -> void:
 	## Le socle détruit projette des bombes en couronne (vidéo 5:23).
 	for i in count:
 		var b := ball_scene.instantiate() as Bomb
-		b.global_position = capsule.global_position
 		b.velocity = Vector2.UP.rotated(lerpf(-1.0, 1.0, i / float(count - 1))) * 180.0
-		get_parent().add_child(b)
+		Fx.spawn(b, capsule.global_position)
 
 
 func die_sequence() -> void:

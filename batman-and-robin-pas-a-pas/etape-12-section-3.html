@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12 · Section 3 : convoi et Joker — Pas à pas</title>
+<meta name="description" content="Étape 12 : le convoi de camions comme plateformes mobiles (AnimatableBody2D), la rue qui défile en autoscroll, la zone de chute, les ballons-mines, et la montgolfière du Joker qui approche et s'éloigne par paliers d'échelle.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 12 / 13</div>
+  <h1>Section 3 : convoi et Joker</h1>
+  <p class="lead">Une rue qui file à toute vitesse, des camions dont les écarts s'ouvrent et se ferment, des ballons-mines qui montent, puis le Joker dans sa montgolfière, qui fond sur Batman depuis le fond de l'écran. C'est la fin du niveau 1.</p>
+  <div class="meta"><span class="pill">⏱ ~4 h</span><span class="pill">Prérequis : étape 10 (l'étape 11 n'est pas nécessaire)</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/09-section-3-convoi-joker.html">tome 09</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li><code>AnimatableBody2D</code> et <code>sync_to_physics</code></li>
+    <li><code>Parallax2D.autoscroll</code></li>
+    <li><code>use_parent_material</code></li>
+    <li>Composer des <code>Tween</code> pour une séquence de fin</li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>Le référentiel : la vitesse sans bouger</li>
+    <li>Les plateformes mobiles</li>
+    <li>La pseudo-3D par l'échelle</li>
+    <li>Un boss qui alterne présence et absence</li>
+    <li>Terminer un niveau</li>
+  </ul></div>
+</div>
+
+<h2 id="convoi">Le convoi</h2>
+
+<h3 class="step" id="e12-1">12.1 · Le monde ne bouge pas, la rue si</h3>
+<figure class="concept narrow"><img src="../batman-and-robin-godot-guide/img/concepts/t09-convoi.jpg" alt="Le convoi" loading="lazy"><figcaption><b>Le convoi.</b> Les véhicules restent en place dans le monde, c'est la rue qui défile derrière eux ; chaque véhicule est une plateforme mobile.</figcaption></figure>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>De <a class="tc" href="#">10:44</a> à <a class="tc" href="#">13:03</a> : les vitrines et les réverbères défilent en continu, les véhicules se suivent (plateau à caisses, fourgon violet, plateau nu, voiture de police), et les écarts entre eux varient légèrement.</p></div>
+<div class="callout concept"><span class="tag">Concept : le référentiel</span><p>Faire réellement rouler des camions à 80 km/h en suivant le joueur compliquerait tout : caméra, ennemis, projectiles. On inverse le point de vue : <strong>le convoi est immobile</strong> dans le monde, et c'est <strong>la rue qui défile</strong> derrière lui. Le joueur ne voit aucune différence ; le code reste celui d'un niveau normal. Sur Mega Drive, c'était pareil : le « mouvement » n'est qu'une valeur de défilement du plan de fond.</p></div>
+
+<h3 class="step" id="e12-2">12.2 · La section et la rue qui défile</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène 2D <code>res://sections/s3_convoy.tscn</code>, racine <code>S3Convoy</code> (script <code>section.gd</code>), en (0, 0).</li>
+  <li>En premiers enfants (donc dessinés derrière), deux <code>Parallax2D</code> :
+    <ul>
+      <li><code>Street</code> : <strong>Scroll Scale</strong> (1, 0), <strong>Repeat Size</strong> (640, 0), <strong>Autoscroll</strong> (-300, 0). Enfants : un fond sombre (<code>ColorRect</code> 640×170), des vitrines roses et des réverbères (<code>ColorRect</code>) répartis sur 640 px.</li>
+      <li><code>Road</code> : mêmes réglages mais <strong>Autoscroll</strong> (-420, 0). Enfants : une chaussée grise de 640×54 en y = 170, avec des marquages blancs tous les 80 px.</li>
+    </ul></li>
+  <li>Complète l'arbre :</li>
+</ol>
+<pre class="tree">S3Convoy (Node2D, section.gd)            next_scene = res://screens/level_end.tscn · player = Player
+├── Street (Parallax2D)                    autoscroll (-300, 0) · repeat_size (640, 0)
+├── Road (Parallax2D)                      autoscroll (-420, 0) · plus rapide : plus proche
+├── World
+│   ├── Convoy (Node2D)                    les véhicules (12.3)
+│   ├── Gift (Breakable)                   paquet géant → spawn_enemy = clown (12.5)
+│   ├── KillZone (Area2D)                  sous la chaussée (12.4)
+│   ├── ArenaBalloons (WaveArena)          (12.5)
+│   └── BossArena → JokerBalloon           sur le dernier plateau (12.6)
+├── EnemyBullets (Pool) · Player · Camera (camera_rig.gd) · Hud</pre>
+<ol start="4">
+  <li>Dans la section 2, mets <strong>Next Scene</strong> = <code>res://sections/s3_convoy.tscn</code> (ou dans la section 1, si tu as sauté l'étape 11).</li>
+</ol></div>
+<div class="callout godot"><span class="tag">Autoscroll</span><p><code>autoscroll</code> fait défiler la couche toute seule, en px/s, en plus de son mouvement lié à la caméra. Avec <code>repeat_size</code>, son contenu boucle à l'infini ; il doit faire au moins la largeur de l'écran (ici 640 ≥ 320). Deux couches à des vitesses différentes donnent la profondeur : la chaussée, plus proche, défile plus vite que les vitrines.</p></div>
+
+<h3 class="step" id="e12-3">12.3 · Le véhicule, une plateforme mobile</h3>
+<figure class="concept narrow"><img src="../batman-and-robin-godot-guide/img/concepts/t09-ecarts.jpg" alt="Les écarts entre véhicules" loading="lazy"><figcaption><b>Les écarts entre véhicules</b> changent et obligent à sauter.</figcaption></figure>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/s3/convoy_vehicle.gd">
+class_name ConvoyVehicle
+extends AnimatableBody2D
+## Véhicule du convoi. Il dérive un peu en avant et en arrière pour ouvrir et fermer les écarts.
+## AnimatableBody2D + sync_to_physics : Batman posé dessus est emporté proprement.
+
+@export var drift_amplitude := 12.0   ## px
+@export var drift_period := 5.0       ## s
+@export var wheel_speed := 14.0       ## rad/s
+var _origin := Vector2.ZERO
+var _t := 0.0
+@onready var wheels: Node2D = $Wheels
+
+
+func _ready() -> void:
+	sync_to_physics = true
+	_origin = position
+	_t = randf() * drift_period
+
+
+func _physics_process(delta: float) -> void:
+	_t += delta
+	position = _origin + Vector2(sin(_t * TAU / drift_period) * drift_amplitude, 0.0)
+	for w in wheels.get_children():
+		(w as Node2D).rotation += wheel_speed * delta
+</script>
+<div class="callout concept"><span class="tag">Concept : pourquoi <code>AnimatableBody2D</code></span><p>C'est le corps physique prévu pour les plateformes déplacées par script ou par animation. Avec <code>sync_to_physics</code>, son déplacement est calculé au rythme de la physique, et un <code>CharacterBody2D</code> posé dessus reçoit automatiquement sa vitesse (<em>platform velocity</em>) : Batman avance avec le camion sans une ligne de code. Essaie avec un <code>StaticBody2D</code> qu'on déplace : Batman resterait sur place et le camion glisserait sous ses pieds.</p></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>AnimatableBody2D</code> nommée <code>ConvoyVehicle</code>, script <code>convoy_vehicle.gd</code>, couche 2 seule, masque vide. Enregistre en <code>res://sections/s3/convoy_vehicle.tscn</code>.</li>
+  <li>Enfants : <code>Body</code> (<code>Sprite2D</code> ou <code>ColorRect</code> : cabine + plateau, environ 160×40), un <code>CollisionShape2D</code> pour le plateau (rectangle 140×8, <strong>One Way Collision</strong> coché), et un <code>Node2D</code> nommé <code>Wheels</code> avec trois roues (<code>Sprite2D</code> <code>white.png</code> gris, avec un trait pour voir la rotation).</li>
+  <li>Variantes : à partir de cette scène, crée des <strong>scènes héritées</strong> : <code>truck_crates.tscn</code> (avec des caisses : formes rectangles <strong>non</strong> one-way, posées sur le plateau), <code>van.tscn</code> (un toit one-way plus haut), <code>police_car.tscn</code> (plus court et plus bas).</li>
+  <li>Sous <code>Convoy</code>, aligne une douzaine de véhicules de x = 0 à environ 2 800, plateaux vers y = 160, avec des écarts de 24 à 40 px. Répète la séquence plateau à caisses → fourgon → plateau nu → voiture de police. Batman démarre sur le premier.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>La rue file derrière ; les roues tournent ; les véhicules avancent et reculent doucement. Posé sur un plateau immobile, Batman est emporté par le mouvement du camion. Saute de véhicule en véhicule ; monte sur les caisses.</p></div>
+<div class="callout warn"><span class="tag">Bas + saut sur les caisses</span><p>Les caisses sont sur la couche 2 comme les plateaux. « Bas + saut » coupe toute la couche 2 pendant 0,25 s : debout sur une caisse, Batman la traverse et retombe sur le plateau. C'est acceptable (et pratique pour redescendre). Pour l'empêcher, mets les caisses sur la couche 1.</p></div>
+
+<h3 class="step" id="e12-4">12.4 · Tomber du convoi</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/s3/kill_zone.gd">
+extends Area2D
+## Sous la chaussée (masque 3) : tomber entre deux véhicules coûte une vie.
+
+func _ready() -> void:
+	body_entered.connect(_on_body_entered)
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if body is Player:
+		# Health directement : la chute tue même pendant le clignotement d'invincibilité.
+		# respawn() (tome 03) fera ensuite retomber Batman depuis le haut de l'écran.
+		(body as Player).health.damage(999)
+</script>
+<div class="callout do"><span class="tag">À faire</span><p>Sous <code>World</code>, une <code>Area2D</code> <code>KillZone</code>, masque 3, avec un rectangle de 3 200×16 en (1 400, 240) : sous le bas de l'écran.</p></div>
+<div class="callout test"><span class="tag">Teste</span><p>Rate un saut : Batman tombe entre deux véhicules, passe en « Dead », puis réapparaît depuis le haut de l'écran, au-dessus du convoi, avec une vie de moins.</p></div>
+<div class="callout warn"><span class="tag">Hypothèse</span><p>La vidéo ne montre aucune chute. On suppose qu'elle est mortelle, comme dans la plupart des run &amp; gun. Si tu préfères être indulgent, replace plutôt Batman sur le véhicule le plus proche avec un peu de dégâts.</p></div>
+
+<h3 class="step" id="e12-5">12.5 · Ballons-mines et paquet géant</h3>
+<figure class="shot" style="max-width:420px"><img src="../batman-and-robin-godot-guide/img/s13-balloons.jpg" alt="Ballons-mines"><figcaption>Ballons de couleur portant chacun une mine. <a class="tc" href="#">11:20</a></figcaption></figure>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Une <code>WaveArena</code> <code>ArenaBalloons</code> vers x = 1 000, avec <strong>Ground Y</strong> = la hauteur des plateaux (≈ 160). Deux vagues de <code>balloon_mine.tscn</code> : <code>origins</code> = ["below", "right"], <code>max_alive</code> = 8, <code>spawn_interval</code> = 0,4, quotas 14 et 18.</li>
+  <li>Le paquet géant : une instance de <code>breakable.gd</code> (comme la poubelle, mais 32×32, rouge et vert), posée sur un plateau vers x = 1 600, avec <strong>Spawn Enemy</strong> = <code>clown.tscn</code> et Health 3.</li>
+  <li>Un crâne sur un plateau juste avant l'arène des ballons (<a class="tc" href="#">12:24</a> dans la vidéo).</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Dans l'arène, des ballons de quatre couleurs montent du bas en oscillant ; Batman les abat en diagonale haute ou à la verticale. Le crâne fait tout exploser d'un coup. Plus loin, trois tirs sur le paquet libèrent un clown.</p></div>
+
+<h2 id="joker">La montgolfière du Joker</h2>
+
+<h3 class="step" id="e12-6">12.6 · Observer un passage</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t09-joker-passage.jpg" alt="Un passage complet de la montgolfière" loading="lazy"><figcaption><b>Un passage complet de la montgolfière.</b> Entrée petite et haute, approche, point le plus proche, éloignement, puis écran vide avant le passage suivant.</figcaption></figure>
+<div class="callout video"><span class="tag">Dans la vidéo</span>
+<ul>
+  <li>Chaque « passage » : entrée par un bord, petite et haute ; elle grossit en descendant vers le plateau ; traverse ; sort par l'autre bord, puis quelques secondes d'écran vide (<a class="tc" href="#">13:59</a>–<a class="tc" href="#">14:04</a>).</li>
+  <li>Certains passages sont géants (<a class="tc" href="#">13:22</a>), d'autres moyens.</li>
+  <li>Des grappes de petites bombes noires, en ligne ou en colonne, qui rebondissent.</li>
+  <li>Un flash pastel de tout le ballon quand il est touché ; la vitalité baisse surtout quand il est proche.</li>
+</ul></div>
+<div class="callout concept"><span class="tag">Concept : la profondeur par l'échelle</span><p>Un seul paramètre, la <strong>taille apparente</strong>, raconte toute la 3D : petit = loin, grand = près. On le pilote par une courbe en cloche, <code>sin(u × π)</code>, qui monte de 0 à 1 puis redescend pendant le passage. La même valeur commande la taille, la hauteur (le ballon descend en approchant) et la vulnérabilité : on ne peut le toucher que lorsqu'il est assez proche. Comme sur la console, la taille est arrondie à des <strong>paliers</strong> (<code>Fx.snap_scale</code>, étape 08).</p></div>
+
+<h3 class="step" id="e12-7">12.7 · <code>joker_balloon.gd</code></h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/joker_balloon/joker_balloon.gd">
+class_name JokerBalloon
+extends Boss
+## Boss final du niveau 1 (vidéo 13:04–14:36).
+## Cycle : attente hors écran -> passage (approche puis éloignement) -> attente…
+
+enum S { WAIT, PASS }
+
+@export var bomb_scene: PackedScene                  ## bomb.tscn : bounces = 1
+@export var pass_duration := Vector2(5.0, 7.0)
+@export var wait_time := Vector2(1.5, 4.0)
+@export var high_y := -150.0                         ## relatif au plateau (y = 0)
+@export var low_y := -70.0                           ## nacelle à hauteur de tir au plus près
+@export var half_width := 230.0                      ## départ et arrivée hors écran
+@export var sizes := PackedFloat32Array([0.35, 0.5, 0.65, 0.8, 1.0, 1.2, 1.4, 1.6])
+@export var vulnerable_scale := 0.8
+@export var drop_interval := 1.1
+@export var ko_texture: Texture2D
+
+var _s := S.WAIT
+var _t := 0.0
+var _dur := 2.0
+var _side := 1.0
+var _near := 1.0
+var _drop := 0.0
+
+@onready var visual: Node2D = $Visual
+@onready var hurtbox: Hurtbox = $Visual/Hurtbox
+@onready var drop_point: Marker2D = $Visual/DropPoint
+@onready var joker_figure: Sprite2D = $JokerFigure
+
+
+func _ready() -> void:
+	super._ready()
+	visual.hide()
+	joker_figure.hide()
+	hurtbox.monitorable = false
+
+
+func start() -> void:
+	super.start()
+	_go_wait(1.0)
+
+
+func _physics_process(delta: float) -> void:
+	if not active:
+		return
+	_t += delta
+	match _s:
+		S.WAIT:
+			if _t >= _dur:
+				_go_pass()
+		S.PASS:
+			var u := clampf(_t / _dur, 0.0, 1.0)
+			var bump := sin(u * PI)                    # 0 -> 1 -> 0 : approche puis éloignement
+			var sc := Fx.snap_scale(lerpf(sizes[0], _near, bump), sizes)
+			visual.scale = Vector2(sc, sc)
+			visual.position = Vector2(lerpf(-_side * half_width, _side * half_width, u), lerpf(high_y, low_y, bump))
+			hurtbox.monitorable = sc >= vulnerable_scale   # ce qui est loin ne se touche pas
+			_drop -= delta
+			if _drop <= 0.0 and sc >= 0.6:
+				_drop = drop_interval
+				_drop_cluster()
+			if u >= 1.0:
+				_go_wait(randf_range(wait_time.x, wait_time.y))
+
+
+func _go_wait(duration: float) -> void:
+	_s = S.WAIT
+	_t = 0.0
+	_dur = duration
+	visual.hide()
+	hurtbox.monitorable = false
+
+
+func _go_pass() -> void:
+	_s = S.PASS
+	_t = 0.0
+	_dur = randf_range(pass_duration.x, pass_duration.y)
+	_side = -_side                                       # alterne les côtés d'entrée
+	_near = sizes[sizes.size() - 1] if randf() < 0.5 else 1.0   # passage géant ou moyen
+	_drop = 0.8
+	visual.show()
+
+
+func _drop_cluster() -> void:
+	if bomb_scene == null:
+		return
+	var column := randf() < 0.4
+	for i in 5:
+		var b := bomb_scene.instantiate() as Bomb
+		if column:
+			b.velocity = Vector2(0.0, 20.0 + i * 28.0)     # colonne : chutes étagées
+		else:
+			b.velocity = Vector2((i - 2) * 32.0, -40.0)    # ligne : éventail
+		Fx.spawn(b, drop_point.global_position)
+
+
+func die_sequence() -> void:
+	hurtbox.set_deferred("monitorable", false)
+	visual.show()
+	# Le ballon se fige en haut, au centre…
+	var tw := create_tween()
+	tw.tween_property(visual, "position", Vector2(0.0, high_y + 30.0), 0.6)
+	tw.parallel().tween_property(visual, "scale", Vector2.ONE, 0.6)
+	await tw.finished
+	# …et l'enveloppe se couvre d'explosions (vidéo 14:24–14:29).
+	await explode_area(Rect2(-60.0, high_y - 30.0, 120.0, 100.0), 30, 0.12)
+	visual.hide()
+	# Le Joker est éjecté puis retombe, assommé, sur le plateau (vidéo 14:30–14:31).
+	joker_figure.position = visual.position + Vector2(0.0, 30.0)
+	joker_figure.show()
+	var tw2 := create_tween()
+	tw2.tween_property(joker_figure, "position:y", joker_figure.position.y - 40.0, 0.35) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw2.tween_property(joker_figure, "position", Vector2(30.0, -8.0), 0.6) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw2.finished
+	if ko_texture:
+		joker_figure.texture = ko_texture
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><strong>Deux états seulement</strong> : <code>WAIT</code> (hors écran) et <code>PASS</code>. Toute la richesse du combat vient d'une variable continue, <code>u</code> (avancement du passage de 0 à 1), dont on dérive la cloche <code>bump</code>.</li>
+  <li><code>bump</code> commande à la fois l'échelle (petit → grand → petit), la hauteur (haut → bas → haut) et, via l'échelle, la vulnérabilité et le droit de lâcher des bombes. Une seule cause, plusieurs effets cohérents.</li>
+  <li><code>Fx.snap_scale</code> arrondit l'échelle à 8 paliers : le ballon « saute » de taille en taille, comme des sprites pré-calculés.</li>
+  <li><code>_near</code> tiré au hasard : un passage sur deux est géant. <code>_side</code> alterne : le ballon entre une fois par la gauche, une fois par la droite.</li>
+  <li>La séquence de mort enchaîne trois <code>Tween</code> et des explosions avec <code>await</code> : c'est une petite cinématique.</li>
+</ul>
+
+<h3 class="step" id="e12-8">12.8 · Monter la montgolfière</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène <code>res://bosses/joker_balloon/joker_balloon.tscn</code> :</li>
+</ol>
+<pre class="tree">JokerBalloon (Node2D, joker_balloon.gd)   score_value = 10000 · origine = centre du plateau
+├── Health                                 max_health = 120 (À CALIBRER)
+├── Visual (Node2D)                        matériau hit_flash (Local To Scene)
+│   ├── Envelope (Sprite2D)                white.png scale (4, 4) en (0, -40), rouge · Use Parent Material
+│   ├── Basket (Sprite2D)                  white.png scale (2, 1) en (0, 0), vert · Use Parent Material
+│   ├── Hurtbox                            couche 6 · health = Health · sur la nacelle
+│   │   └── CollisionShape2D               rectangle 32×16
+│   └── DropPoint (Marker2D)               (0, 12) : sous la nacelle
+├── JokerFigure (Sprite2D, caché)          white.png scale (1, 1.5), violet : le Joker éjecté
+└── HitFlash                               target = Visual · hurtbox = Visual/Hurtbox · amount = 0.55</pre>
+<ol start="2">
+  <li><strong>Bomb Scene</strong> = <code>bomb.tscn</code> (1 rebond).</li>
+  <li>Le dernier véhicule du convoi : un plateau nu, <strong>Drift Amplitude</strong> = 0 (sol stable). Une <code>BossArena</code> au centre de ce plateau, avec <code>JokerBalloon</code> comme enfant placé exactement à la surface du plateau : <code>high_y</code> et <code>low_y</code> sont relatifs à ce point.</li>
+  <li>Exports de la <code>BossArena</code> : <strong>Boss</strong> et <strong>Section</strong>.</li>
+</ol></div>
+<div class="callout godot"><span class="tag"><code>use_parent_material</code></span><p>Le shader de flash est posé sur <code>Visual</code>, un simple <code>Node2D</code>. En cochant <strong>Use Parent Material</strong> sur l'enveloppe et la nacelle, ils utilisent le matériau de leur parent : un seul paramètre <code>flash</code> fait clignoter tout le ballon d'un coup.</p></div>
+<div class="callout test"><span class="tag">Teste</span>
+<ul>
+  <li>La caméra se fige au centre du plateau, la rue continue de défiler derrière, la pastille « 99 » apparaît.</li>
+  <li>Le ballon entre petit et haut, grossit par paliers en descendant, lâche des grappes de bombes (en ligne ou en colonne), traverse et ressort. Écran vide, puis il revient par l'autre côté.</li>
+  <li>Tes tirs le traversent quand il est petit ; quand il est grand, il clignote en pastel et la vitalité baisse.</li>
+  <li>À 00 : il se fige au centre, explosions en chaîne, le Joker est éjecté et retombe sur le plateau, pose de victoire, +10 000, fondu, écran de fin.</li>
+</ul></div>
+<div class="callout warn"><span class="tag">Ce qui n'est pas dans la vidéo</span><p>D'autres descriptions du jeu évoquent une montgolfière qui rebondit au sol et charge à l'horizontale. Ces attaques n'apparaissent pas de 13:04 à 14:36. Si tu les vois dans un émulateur, ajoute un état <code>CHARGE</code> : échelle fixée à 1, <code>y = low_y</code>, traversée rapide (1,5 s) et Hurtbox active. Un excellent exercice pour vérifier que tu maîtrises les machines à états.</p></div>
+
+<h3 class="step" id="e12-9">12.9 · Le niveau complet</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Vérifie la chaîne des <strong>Next Scene</strong> : <code>title_card</code> → <code>s1_streets</code> → <code>s2_gem_expo</code> → <code>s3_convoy</code> → <code>level_end</code> → <code>title</code>.</li>
+  <li><kbd>F5</kbd> et joue le niveau en entier, de l'intro à la Batmobile finale. Chronomètre : la vidéo de référence dure 14:37.</li>
+</ol></div>
+<div class="callout method"><span class="tag">Méthode : finir</span><p>Tu viens de terminer un niveau complet. C'est l'étape que la plupart des projets amateurs n'atteignent jamais : ils ajoutent des fonctionnalités sans jamais boucler la boucle. Un jeu court mais fini vaut plus qu'un jeu long à moitié fait. Fais un commit, et prends le temps de le faire essayer à quelqu'un.</p></div>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>La rue défile en continu ; Batman saute de camion en camion, emporté par leur mouvement ; les écarts varient.</li>
+  <li>Tomber entre deux véhicules coûte une vie.</li>
+  <li>Des ballons-mines montent du bas en oscillant ; un paquet géant libère un sbire.</li>
+  <li>La montgolfière entre petite et haute, grossit par paliers, lâche des grappes de bombes, ressort ; elle n'est vulnérable que lorsqu'elle est grande.</li>
+  <li>À 00 : explosions, Joker éjecté et assommé, pose de victoire, +10 000, écran de fin, retour au titre.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 12 : section 3, convoi et montgolfière du Joker — niveau 1 complet"</div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Pourquoi le convoi est-il immobile dans le monde ?</summary><div><p>Parce que seul le mouvement relatif compte pour le joueur. Faire défiler le décor plutôt que déplacer le convoi garde une caméra, des ennemis et des projectiles normaux, sans compenser une vitesse partout dans le code.</p></div></details>
+<details class="quiz"><summary>Qu'apporte <code>AnimatableBody2D</code> par rapport à un <code>StaticBody2D</code> qu'on déplace ?</summary><div><p>Il transmet sa vitesse aux corps posés dessus : Batman est emporté par le camion. Un <code>StaticBody2D</code> déplacé glisserait sous ses pieds.</p></div></details>
+<details class="quiz"><summary>Comment la montgolfière sait-elle si elle est vulnérable ?</summary><div><p>Par son échelle courante : <code>hurtbox.monitorable = sc &gt;= vulnerable_scale</code>. Petite (loin), les tirs la traversent ; grande (proche), elle encaisse. Le visuel dit la vérité sur le gameplay.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Ajoute l'état <code>CHARGE</code> décrit plus haut.</li>
+  <li>Fais vibrer légèrement les véhicules (±1 px vertical à haute fréquence) pour renforcer l'impression de vitesse.</li>
+  <li>Lis le tome 09 du guide.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

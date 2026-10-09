@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 · HUD, écrans et flux de jeu — Pas à pas</title>
+<meta name="description" content="Étape 10 : SceneFlow complet, audio et bus, HUD fidèle dessiné avec _draw(), intro en AnimationPlayer, titre, options persistantes, sélection du héros, interludes et continue.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 10 / 13</div>
+  <h1>HUD, écrans et flux de jeu</h1>
+  <p class="lead">Ce qui transforme une section jouable en un jeu : un HUD fidèle, l'intro, l'écran titre, les options, le choix du héros, les interludes, le « continue », la musique, et le chef d'orchestre qui enchaîne tout. On le fait maintenant, pour que les deux sections suivantes s'insèrent dans un vrai jeu.</p>
+  <div class="meta"><span class="pill">⏱ ~5 h</span><span class="pill">Prérequis : étape 09</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/10-ecrans-flux.html">tome 10</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li>Les nœuds <code>Control</code>, les ancres, le focus</li>
+    <li><code>Theme</code> et police par défaut</li>
+    <li>Dessiner soi-même : <code>_draw()</code>, <code>queue_redraw()</code></li>
+    <li><code>AnimationPlayer</code> et pistes d'appel de méthode</li>
+    <li>Bus audio, <code>AudioStreamPlayer</code>, <code>ConfigFile</code></li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>Le jeu comme machine à états</li>
+    <li>Le HUD découplé par signaux</li>
+    <li>La cinématique comme frise temporelle</li>
+    <li>Réglage persistant contre état de partie</li>
+    <li>L'<em>attract mode</em> des jeux d'arcade</li>
+  </ul></div>
+</div>
+
+<h2 id="flux">Le flux</h2>
+
+<h3 class="step" id="e10-1">10.1 · Le jeu est une machine à états</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t10-flux.jpg" alt="Les écrans du jeu dans l'ordre" loading="lazy"><figcaption><b>Les écrans réels, dans l'ordre de la vidéo.</b> Chacun est une scène Godot ; <code>SceneFlow</code> les enchaîne avec des fondus.</figcaption></figure>
+<pre class="tree">  ┌────────► Intro (attract) ──Start──┐
+  │                                   ▼
+  │  20 s sans touche ◄────────── Title ──OPTIONS──► Options ──Start──┐
+  │                                 │ START                          │
+  │                                 ▼                                ▼
+  │                          PlayerSelect ──► Batmobile ──► TitleCard « LEVEL ONE »
+  │                                                               │
+  │      ┌────────────────────────────────────────────────────────┘
+  │      ▼
+  │   S1 Rues ──► S2 Gem Expo ──► S3 Convoi ──► LevelEnd (Batmobile) ──► Title
+  │      │             │              │
+  │      └──── plus de vies ──► Continue ──oui (crédit)──► reprise de la section
+  │                                   └──non / 0 crédit──► Title</pre>
+<div class="callout concept"><span class="tag">Concept : le jeu lui-même est une machine à états</span><p>Titre, sélection, partie, continue : chaque écran est un <strong>état du jeu</strong>, chaque scène Godot en est la réalisation, et <code>SceneFlow</code> gère les transitions. Ce sont les mêmes idées que pour Batman, à l'échelle de l'application entière. Recopie ce schéma : chaque flèche est un appel à <code>SceneFlow</code> que tu vas écrire.</p></div>
+
+<h3 class="step" id="e10-2">10.2 · <code>SceneFlow</code>, version complète</h3>
+<p>Remplace le contenu de <code>scene_flow.gd</code> :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://autoload/scene_flow.gd  (Autoload « SceneFlow »)">
+extends Node
+## Chef d'orchestre des écrans. Toutes les transitions passent par ici (fondus Mega Drive).
+
+const INTRO := "res://screens/intro.tscn"
+const TITLE := "res://screens/title.tscn"
+const CONTINUE := "res://screens/continue.tscn"
+
+var _busy := false
+
+
+func goto(path: String) -> void:
+	if _busy or path.is_empty():
+		return
+	_busy = true
+	get_tree().paused = false
+	await PaletteFx.fade_out()
+	get_tree().change_scene_to_file(path)
+	await get_tree().process_frame   # le changement a lieu en fin d'image
+	await get_tree().process_frame
+	await PaletteFx.fade_in()
+	_busy = false
+
+
+func game_over() -> void:
+	goto(CONTINUE if Game.credits > 0 else TITLE)
+
+
+func to_title() -> void:
+	goto(TITLE)
+</script>
+<ul>
+  <li><code>_busy</code> : un second appel pendant une transition est ignoré. Sans lui, deux appuis rapides sur Start lanceraient deux fondus entremêlés.</li>
+  <li>Les chemins des écrans sont des constantes : on les écrit à un seul endroit.</li>
+</ul>
+
+<h2 id="audio">L'audio</h2>
+
+<h3 class="step" id="e10-3">10.3 · Bus audio et autoload <code>Audio</code></h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Ouvre le panneau <strong>Audio</strong> (en bas). <strong>Ajouter un bus</strong> deux fois : renomme-les <code>Music</code> et <code>SFX</code>. Leur sortie (<em>Send</em>) est <code>Master</code>.</li>
+  <li>Facultatif : sur <code>Music</code>, ajoute un effet <code>Compressor</code> avec <strong>Sidechain</strong> = <code>SFX</code> : la musique baisse sous les grosses explosions (<em>ducking</em>).</li>
+  <li>Crée <code>res://autoload/audio.gd</code> et ajoute-le en autoload <code>Audio</code>. Ordre final des autoloads : <code>Game</code>, <code>PaletteFx</code>, <code>Audio</code>, <code>SceneFlow</code>.</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://autoload/audio.gd  (Autoload « Audio »)">
+extends Node
+## Musique persistante entre les scènes, bruitages « fire and forget ».
+
+var _music := AudioStreamPlayer.new()
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_music.bus = &"Music"
+	add_child(_music)
+
+
+func play_music(stream: AudioStream) -> void:
+	if stream == null or (_music.stream == stream and _music.playing):
+		return   # même morceau : on ne le relance pas (réapparition, continue…)
+	_music.stream = stream
+	_music.play()
+
+
+func stop_music() -> void:
+	_music.stop()
+
+
+func sfx(stream: AudioStream, pitch_jitter := 0.04) -> void:
+	if stream == null:
+		return
+	var p := AudioStreamPlayer.new()
+	p.stream = stream
+	p.bus = &"SFX"
+	p.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
+	add_child(p)
+	p.finished.connect(p.queue_free)
+	p.play()
+</script>
+<div class="callout concept"><span class="tag">Pourquoi un autoload pour la musique</span><p>Un lecteur de musique placé dans une section serait détruit au changement de scène : la musique se couperait à chaque fondu. Dans un autoload, elle survit et enchaîne. <code>pitch_jitter</code> varie légèrement la hauteur de chaque bruitage : dix coups de poing identiques paraissent mécaniques, dix coups légèrement différents paraissent vivants.</p></div>
+<p>La section reçoit sa musique. Version finale de <code>section.gd</code> :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/section.gd">
+class_name Section
+extends Node2D
+## Base commune des 3 sections du niveau 1.
+
+@export_file("*.tscn") var next_scene: String
+@export var player: Player
+@export var victory_delay := 3.0     ## durée de la pose de victoire (vidéo : ~3 s)
+@export var music: AudioStream
+
+
+func _ready() -> void:
+	Game.current_section = scene_file_path   # point de reprise du « continue »
+	player.died.connect(_on_player_died)
+	Audio.play_music(music)
+
+
+func _on_player_died() -> void:
+	if Game.lose_life():
+		player.respawn()
+	else:
+		SceneFlow.game_over()
+
+
+## Appelé par l'arène du boss quand il est vaincu.
+func boss_defeated(points: int) -> void:
+	Game.add_score(points)
+	player.celebrate()
+	await get_tree().create_timer(victory_delay).timeout
+	SceneFlow.goto(next_scene)   # SceneFlow s'occupe du fondu au noir puis du fondu d'entrée
+</script>
+<div class="callout warn"><span class="tag">Musique de Jesper Kyd</span><p>La bande-son originale est en synthèse FM : Godot ne lit pas les fichiers VGM. Pour un projet personnel, convertis tes propres enregistrements en OGG. Pour un projet publiable, compose ou utilise une musique libre de droits. Sans musique, <code>play_music(null)</code> ne fait rien : tout fonctionne.</p></div>
+
+<h2 id="hud">Le HUD</h2>
+
+<h3 class="step" id="e10-4">10.4 · Un thème pour tout le jeu</h3>
+<div class="callout godot"><span class="tag">Le <code>Theme</code></span><p>Tous les nœuds <code>Control</code> (textes, boutons, barres) tirent leur apparence d'un <code>Theme</code>. En 320×224, la police par défaut de 16 px est énorme : on règle une fois pour toutes un thème global.</p></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée une ressource <code>Theme</code> : <code>res://ui/theme.tres</code>. Dans l'Inspecteur, <strong>Default Font Size</strong> = 8. Facultatif : <strong>Default Font</strong> = une police pixel libre (par exemple « Press Start 2P », licence OFL).</li>
+  <li><span class="menu">Projet → Paramètres du projet → GUI → Thème → Personnalisé</span> (<em>Custom</em>) = <code>theme.tres</code>.</li>
+</ol></div>
+
+<h3 class="step" id="e10-5">10.5 · Le médaillon et la jauge, dessinés à la main</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t10-hud.jpg" alt="Le HUD original décomposé" loading="lazy"><figcaption><b>Le HUD original, décomposé.</b> Chaque zone correspond à un nœud de <code>hud.tscn</code>.</figcaption></figure>
+<div class="callout concept"><span class="tag">Concept : dessiner soi-même avec <code>_draw()</code></span><p>L'anneau de vie segmenté n'existe pas comme nœud tout fait. Un <code>Control</code> peut se dessiner lui-même : on surcharge <code>_draw()</code>, on y appelle <code>draw_arc()</code>, <code>draw_circle()</code>, <code>draw_rect()</code>, et on demande un nouveau dessin avec <code>queue_redraw()</code> quand la donnée change. Godot ne redessine pas à chaque image : seulement quand on le demande.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://ui/life_medallion.gd">
+class_name LifeMedallion
+extends Control
+## Médaillon : nombre de vies au centre, anneau de segments orange = santé.
+
+@export var segments := 8                 ## À CALIBRER (8 à 10 visibles dans la vidéo)
+@export var radius := 11.0
+@export var thickness := 4.0
+@export var on_color := Color("ff8a2a")
+@export var off_color := Color("3a1c14")
+@export var core_color := Color("2f62d0")
+
+var lives := 2:
+	set(value):
+		lives = value
+		queue_redraw()
+var _health := 8
+var _max := 8
+
+
+func set_health(current: int, maximum: int) -> void:
+	_health = current
+	_max = maxi(maximum, 1)
+	queue_redraw()
+
+
+func _draw() -> void:
+	var c := size / 2.0
+	var filled := ceili(float(_health) / _max * segments)
+	var step := TAU / segments
+	for i in segments:
+		var a0 := -PI / 2.0 + i * step + 0.09
+		var a1 := -PI / 2.0 + (i + 1) * step - 0.09
+		draw_arc(c, radius, a0, a1, 6, on_color if i < filled else off_color, thickness)
+	draw_circle(c, radius - thickness * 0.5 - 1.0, core_color)
+	var font := get_theme_default_font()
+	draw_string(font, c + Vector2(-8, 4), str(lives), HORIZONTAL_ALIGNMENT_CENTER, 16, 10)
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://ui/charge_bar.gd">
+class_name ChargeBar
+extends Control
+## Jauge de charge : se remplit seule, prend la couleur de l'arme, clignote quand elle est pleine.
+
+var color := Color("ff6b3d"):
+	set(value):
+		color = value
+		queue_redraw()
+var _ratio := 0.0
+
+
+func set_ratio(ratio: float) -> void:
+	_ratio = ratio
+	queue_redraw()
+
+
+func _process(_delta: float) -> void:
+	if _ratio >= 1.0:
+		queue_redraw()   # clignotement
+
+
+func _draw() -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.55))
+	var w := floorf(size.x * _ratio)
+	var c := color
+	if _ratio >= 1.0 and (Time.get_ticks_msec() / 80) % 2 == 0:
+		c = color.lightened(0.5)
+	draw_rect(Rect2(Vector2.ZERO, Vector2(w, size.y)), c)
+</script>
+<div class="callout godot"><span class="tag">Les propriétés avec <code>set</code></span><p><code>var lives := 2: set(value): …</code> déclare un <strong>setter</strong> : chaque fois qu'on écrit <code>medallion.lives = 3</code>, la fonction s'exécute. Ici, elle demande un nouveau dessin. L'extérieur n'a pas à savoir qu'il faut redessiner.</p></div>
+
+<h3 class="step" id="e10-6">10.6 · <code>hud.tscn</code> et <code>hud.gd</code></h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://ui/hud.gd">
+class_name Hud
+extends CanvasLayer
+## HUD fidèle à l'original. N'est connu de personne : il écoute Game, le joueur et les boss.
+
+@onready var portrait: TextureRect = $Root/Portrait
+@onready var medallion: LifeMedallion = $Root/Medallion
+@onready var score_label: Label = $Root/Score
+@onready var charge: ChargeBar = $Root/Charge
+@onready var boss_badge: Control = $Root/BossBadge
+@onready var boss_value: Label = $Root/BossBadge/Value
+@onready var p2_label: Label = $Root/P2
+var _boss: Boss
+var _t := 0.0
+
+
+func _ready() -> void:
+	add_to_group("hud")
+	boss_badge.hide()
+	Game.score_changed.connect(func(s: int) -> void: score_label.text = str(s))
+	Game.lives_changed.connect(func(l: int) -> void: medallion.lives = l)
+	score_label.text = str(Game.score)
+	medallion.lives = Game.lives
+	await get_tree().process_frame   # laisse le joueur finir son _ready
+	_bind_player(get_tree().get_first_node_in_group("player") as Player)
+
+
+func _bind_player(player: Player) -> void:
+	if player == null:
+		return
+	if player.hero:
+		portrait.texture = player.hero.portrait
+	player.health.changed.connect(medallion.set_health)
+	medallion.set_health(player.health.current, player.health.max_health)
+	var weapons := player.weapons as WeaponSystem
+	if weapons:
+		weapons.charge_changed.connect(charge.set_ratio)
+		weapons.equipped.connect(func(d: WeaponData, _l: int) -> void: charge.color = d.color)
+		if weapons.data:
+			charge.color = weapons.data.color
+
+
+## Appelée par Boss.start() via call_group.
+func show_boss(boss: Boss) -> void:
+	_boss = boss
+	boss.vitality_changed.connect(_on_vitality)
+	_on_vitality(boss.vitality())
+	boss_badge.show()
+
+
+## Appelée par Boss à sa mort via call_group.
+func hide_boss() -> void:
+	if _boss and _boss.vitality_changed.is_connected(_on_vitality):
+		_boss.vitality_changed.disconnect(_on_vitality)
+	_boss = null
+	boss_badge.hide()
+
+
+func _on_vitality(value: int) -> void:
+	boss_value.text = "%02d" % value
+
+
+func _process(delta: float) -> void:
+	# Zone du joueur 2 : messages alternés chaque seconde (vidéo).
+	_t += delta
+	var messages: Array[String]
+	if boss_badge.visible:
+		messages = ["BOSS TIME", "PLEASE WAIT"]
+	else:
+		messages = ["PRESS START", "CREDIT %02d" % Game.credits, "GAME OVER"]
+	p2_label.text = messages[int(_t) % messages.size()]
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>CanvasLayer</code> nommée <code>Hud</code>, <strong>Layer</strong> = 10, script <code>hud.gd</code>. Enregistre en <code>res://ui/hud.tscn</code>.</li>
+  <li>Enfant <code>Control</code> nommé <code>Root</code> : <strong>Ancres → Rect complet</strong>, <strong>Mouse → Filter</strong> = Ignore.</li>
+  <li>Sous <code>Root</code>, place les nœuds aux positions et tailles indiquées (Inspecteur → <strong>Layout → Transform</strong>) :</li>
+</ol>
+<pre class="tree">Hud (CanvasLayer, hud.gd)             layer = 10
+└── Root (Control, plein écran, mouse_filter = Ignore)
+    ├── Portrait (TextureRect)        (2, 2)    24×24 : tête du héros
+    ├── Medallion (Control)           (26, 1)   26×26 : life_medallion.gd
+    ├── Score (Label)                 (56, 0)
+    ├── Charge (Control)              (56, 12)  52×6 : charge_bar.gd
+    ├── BossBadge (Control)           (146, 2)  28×12
+    │   ├── ColorRect                 28×12, rouge sombre : la pastille
+    │   └── Value (Label)             « 99 », centré
+    └── P2 (Label)                    (246, 2)  PRESS START / CREDIT 06 / GAME OVER</pre>
+<ol start="4">
+  <li>Instancie <code>hud.tscn</code> dans <code>s1_streets.tscn</code> (n'importe où dans l'arbre : un <code>CanvasLayer</code> s'affiche toujours par-dessus le monde).</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F5</kbd> : le HUD affiche le médaillon (anneau orange plein, « 2 » au centre), le score, la jauge colorée qui se remplit quand tu ne tires pas, et « PRESS START / CREDIT 06 / GAME OVER » qui alternent en haut à droite. Prends un coup : l'anneau perd des segments. Ramasse un bonus vert : la jauge devient verte. Au boss : la pastille apparaît avec « 99 », descend sous tes tirs, et la zone de droite affiche « BOSS TIME / PLEASE WAIT ».</p></div>
+<div class="callout concept"><span class="tag">Concept : un HUD que personne ne connaît</span><p>Ni Batman, ni <code>Game</code>, ni le boss ne savent que le HUD existe. Le HUD <strong>écoute</strong> : <code>Game.score_changed</code>, <code>player.health.changed</code>, <code>weapons.charge_changed</code>, et répond aux appels de groupe du boss. Supprime le HUD de la section : le jeu tourne exactement pareil. C'est le découplage par signaux poussé jusqu'au bout.</p></div>
+
+<h2 id="ecrans">Les écrans</h2>
+
+<h3 class="step" id="e10-7">10.7 · L'intro, une frise temporelle</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t10-intro.jpg" alt="L'intro plan par plan" loading="lazy"><figcaption><b>L'intro, plan par plan.</b> Chaque plan est une piste de l'<code>AnimationPlayer</code>.</figcaption></figure>
+<div class="callout concept"><span class="tag">Concept : une cinématique est une animation</span><p>Un <code>AnimationPlayer</code> peut animer n'importe quelle propriété (position, visibilité, couleur) et <strong>appeler des méthodes</strong> à un instant précis. On construit toute l'intro sur une frise temporelle, à la souris, sans aucun code de minuterie. Le découpage complet de la vraie intro est dans le <a href="../batman-and-robin-godot-guide/10-ecrans-flux.html#intro">tome 10</a> ; ici, on fait une version courte avec des textes.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://screens/intro.gd">
+extends Control
+## Cinématique d'intro (une animation « intro » dans l'AnimationPlayer). Start = passer.
+
+@onready var anim: AnimationPlayer = $AnimationPlayer
+
+
+func _ready() -> void:
+	anim.play(&"intro")
+	anim.animation_finished.connect(func(_n: StringName) -> void: SceneFlow.to_title())
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("start") or event.is_action_pressed("attack"):
+		SceneFlow.to_title()
+
+
+## Appelée par une piste « Appel de méthode » de l'animation.
+func lightning() -> void:
+	PaletteFx.flash_white(2, 5)
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>Control</code> nommée <code>Intro</code> (Rect complet), script <code>intro.gd</code>, enregistrée en <code>res://screens/intro.tscn</code>.</li>
+  <li>Enfants : un <code>ColorRect</code> noir plein écran, puis trois <code>Label</code> centrés nommés <code>Plan1</code> (« SEGA »), <code>Plan2</code> (« ARKHAM ASYLUM »), <code>Plan3</code> (« CLOCKWORK TORTOISE »), tous cachés. Et un <code>AnimationPlayer</code>.</li>
+  <li>Sélectionne l'<code>AnimationPlayer</code> : le panneau <strong>Animation</strong> s'ouvre. <strong>Animation → Nouveau</strong> : <code>intro</code>, longueur 9 s.</li>
+  <li><strong>Pistes de propriété</strong> : sélectionne <code>Plan1</code>, place la tête de lecture à 0 s, coche <strong>Visible</strong> dans l'Inspecteur et clique sur l'icône de clé à côté : une clé est créée. À 2,5 s, décoche et crée une clé. Fais de même pour <code>Plan2</code> (3 → 6 s) et <code>Plan3</code> (6,5 → 9 s).</li>
+  <li><strong>Piste d'appel de méthode</strong> : <strong>+ Ajouter une piste → Piste d'appel de méthode</strong>, choisis le nœud <code>Intro</code>. Clic droit sur la piste à 3,5 s → <strong>Insérer une clé</strong> → méthode <code>lightning</code>. Ajoute-en une deuxième à 4,2 s.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F6</kbd> sur l'intro : les trois plans s'enchaînent, deux éclairs (flashs de palette) frappent pendant « ARKHAM ASYLUM ». À la fin, la console signale que <code>title.tscn</code> n'existe pas encore : c'est la prochaine étape. <kbd>J</kbd> ou <kbd>Entrée</kbd> passe l'intro.</p></div>
+
+<h3 class="step" id="e10-8">10.8 · L'écran titre</h3>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>Le menu ne propose que <strong>START</strong> et <strong>OPTIONS</strong>, superposés au logo (<a class="tc" href="#">1:28</a>). Sans action, le jeu repart en boucle sur l'intro (<a class="tc" href="#">1:04</a>) : c'est l'<em>attract mode</em> des bornes d'arcade, qui montrait le jeu aux passants.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://screens/title.gd">
+extends Control
+## Logo + menu START / OPTIONS. Retour à l'intro après un délai d'inactivité (attract mode).
+
+@export var idle_to_attract := 20.0
+@onready var anim: AnimationPlayer = $AnimationPlayer   ## animation « reveal » : yeux puis logo
+@onready var menu: VBoxContainer = $Menu
+@onready var start_button: Button = $Menu/Start
+@onready var options_button: Button = $Menu/Options
+var _idle := 0.0
+
+
+func _ready() -> void:
+	menu.hide()
+	start_button.pressed.connect(func() -> void: SceneFlow.goto("res://screens/player_select.tscn"))
+	options_button.pressed.connect(func() -> void: SceneFlow.goto("res://screens/options.tscn"))
+	anim.play(&"reveal")
+	await anim.animation_finished
+	menu.show()
+	start_button.grab_focus()   # indispensable pour naviguer à la manette
+
+
+func _process(delta: float) -> void:
+	_idle += delta
+	if _idle >= idle_to_attract:
+		_idle = -INF   # une seule fois
+		SceneFlow.goto(SceneFlow.INTRO)
+
+
+func _input(event: InputEvent) -> void:
+	if event.is_pressed():
+		_idle = 0.0
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Scène <code>res://screens/title.tscn</code> : racine <code>Control</code> <code>Title</code> (Rect complet), script <code>title.gd</code>. Enfants : <code>ColorRect</code> noir plein écran, <code>Label</code> <code>Logo</code> (« BATMAN &amp; ROBIN », grand, centré, <strong>Modulate</strong> alpha 0), <code>VBoxContainer</code> nommé <code>Menu</code> (centré en bas) avec deux <code>Button</code> nommés <code>Start</code> et <code>Options</code> (textes « START », « OPTIONS », <strong>Flat</strong> coché), et un <code>AnimationPlayer</code>.</li>
+  <li>Animation <code>reveal</code> de 1,5 s : une piste sur <code>Logo:modulate</code>, alpha 0 à 0 s → alpha 1 à 1,5 s. <strong>Elle est obligatoire</strong> : le script attend sa fin pour afficher le menu.</li>
+  <li><span class="menu">Projet → Paramètres du projet → Contrôles</span> : coche <strong>Afficher les actions intégrées</strong>, trouve <code>ui_accept</code> et ajoute-lui le bouton <strong>Start</strong> de la manette. « Start » validera ainsi les menus, comme sur la console.</li>
+</ol></div>
+<div class="callout concept"><span class="tag">Le focus, la souris de la manette</span><p>Les boutons Godot réagissent à <code>ui_accept</code> quand ils ont le <strong>focus</strong>. Sans <code>grab_focus()</code>, personne ne l'a et la manette ne fait rien. Avec le focus, les flèches passent d'un bouton à l'autre automatiquement : Godot déduit les voisins de la position des boutons.</p></div>
+
+<h3 class="step" id="e10-9">10.9 · Les options et un réglage qui persiste</h3>
+<p>D'abord, <code>Game</code> apprend à lire et écrire le réglage des crédits. Ajoute à <code>game.gd</code> :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://autoload/game.gd  (ajouts)">
+const OPTIONS_PATH := "user://options.cfg"
+
+
+func _ready() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(OPTIONS_PATH) == OK:
+		credits_setting = cfg.get_value("game", "credits", START_CREDITS)
+	credits = credits_setting
+
+
+func save_options() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("game", "credits", credits_setting)
+	cfg.save(OPTIONS_PATH)
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://screens/options.gd">
+extends Control
+## CREDITS / MUSIC TEST / SOUND TEST, comme l'original (vidéo 1:30). Start = sortir.
+## Haut/bas : choisir la ligne ; gauche/droite : changer la valeur ; attaque : jouer le son.
+
+@export var music_tracks: Array[AudioStream] = []
+@export var sound_effects: Array[AudioStream] = []
+@onready var rows: Array[Label] = [$List/Credits, $List/Music, $List/Sound]
+var _row := 0
+var _credits := 0
+var _music := 1
+var _sound := 1
+
+
+func _ready() -> void:
+	_credits = Game.credits_setting   # Game a déjà lu user://options.cfg au démarrage
+	_refresh()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("move_up"):
+		_row = posmod(_row - 1, rows.size())
+	elif event.is_action_pressed("move_down"):
+		_row = posmod(_row + 1, rows.size())
+	elif event.is_action_pressed("move_left"):
+		_change(-1)
+	elif event.is_action_pressed("move_right"):
+		_change(1)
+	elif event.is_action_pressed("attack"):
+		_play()
+	elif event.is_action_pressed("start"):
+		_save()
+		SceneFlow.to_title()
+		return
+	else:
+		return
+	_refresh()
+
+
+func _change(d: int) -> void:
+	match _row:
+		0: _credits = clampi(_credits + d, 1, 9)
+		1: _music = clampi(_music + d, 1, maxi(music_tracks.size(), 1))
+		2: _sound = clampi(_sound + d, 1, maxi(sound_effects.size(), 1))
+
+
+func _play() -> void:
+	if _row == 1 and _music <= music_tracks.size():
+		Audio.play_music(music_tracks[_music - 1])
+	elif _row == 2 and _sound <= sound_effects.size():
+		Audio.sfx(sound_effects[_sound - 1], 0.0)
+
+
+func _refresh() -> void:
+	rows[0].text = "CREDITS: %d" % _credits
+	rows[1].text = "MUSIC TEST: %d" % _music
+	rows[2].text = "SOUND TEST: %d" % _sound
+	for i in rows.size():
+		rows[i].modulate = Color.WHITE if i == _row else Color(0.55, 0.55, 0.7)
+
+
+func _save() -> void:
+	Game.credits_setting = _credits   # utilisé par Game.new_game() à la prochaine partie
+	Game.save_options()
+</script>
+<div class="callout do"><span class="tag">À faire</span><p>Scène <code>res://screens/options.tscn</code> : racine <code>Control</code> (script <code>options.gd</code>), fond noir, un <code>VBoxContainer</code> nommé <code>List</code> centré, avec trois <code>Label</code> nommés <code>Credits</code>, <code>Music</code>, <code>Sound</code>.</p></div>
+<div class="callout concept"><span class="tag">Concept : une donnée, un propriétaire</span><p>L'écran des options ne modifie pas directement <code>Game.credits</code> : la valeur serait écrasée par <code>new_game()</code> au lancement de la partie. On distingue le <strong>réglage</strong> (<code>credits_setting</code>, enregistré sur le disque) de l'<strong>état de la partie</strong> (<code>credits</code>, consommé par les continues). Le réglage a un seul propriétaire, <code>Game</code>, qui sait le lire, l'écrire et l'appliquer.</p></div>
+<div class="callout godot"><span class="tag"><code>user://</code> et <code>ConfigFile</code></span><p><code>res://</code> est en lecture seule une fois le jeu exporté. <code>user://</code> désigne un dossier propre au jeu dans le profil de l'utilisateur (sur macOS : <code>~/Library/Application Support/Godot/app_userdata/&lt;projet&gt;/</code>). <code>ConfigFile</code> lit et écrit des fichiers texte au format INI : idéal pour des réglages. <span class="menu">Projet → Ouvrir le dossier de données utilisateur</span> t'y emmène.</p></div>
+
+<h3 class="step" id="e10-10">10.10 · La sélection du héros</h3>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>« PLAYER SELECT » : l'écran est coupé en deux bandes, bleue en haut avec Batman qui court, rouge en bas avec Robin (<a class="tc" href="#">1:33</a>–<a class="tc" href="#">1:38</a>).</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://screens/player_select.gd">
+extends Control
+## Deux bandes : Batman (haut), Robin (bas). Haut/bas pour choisir, Start pour valider.
+
+@onready var batman_band: Control = $Batman
+@onready var robin_band: Control = $Robin
+@onready var batman_runner: AnimatedSprite2D = $Batman/Runner
+@onready var robin_runner: AnimatedSprite2D = $Robin/Runner
+var _choice := Game.Hero.BATMAN   # valeur de l'enum déclaré dans game.gd
+
+
+func _ready() -> void:
+	_refresh()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("move_up") or event.is_action_pressed("move_down"):
+		_choice = Game.Hero.ROBIN if _choice == Game.Hero.BATMAN else Game.Hero.BATMAN
+		_refresh()
+	elif event.is_action_pressed("start") or event.is_action_pressed("attack"):
+		Game.new_game(_choice)
+		SceneFlow.goto("res://screens/batmobile.tscn")
+
+
+func _refresh() -> void:
+	var is_batman := _choice == Game.Hero.BATMAN
+	batman_runner.play(&"run" if is_batman else &"idle")
+	robin_runner.play(&"run" if not is_batman else &"idle")
+	batman_band.modulate = Color.WHITE if is_batman else Color(0.45, 0.45, 0.45)
+	robin_band.modulate = Color.WHITE if not is_batman else Color(0.45, 0.45, 0.45)
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Scène <code>res://screens/player_select.tscn</code> : racine <code>Control</code> (script). Deux <code>ColorRect</code> nommés <code>Batman</code> (bleu, moitié haute) et <code>Robin</code> (rouge, moitié basse), chacun avec un <code>Label</code> (« BATMAN », « ROBIN ») et un <code>AnimatedSprite2D</code> nommé <code>Runner</code>.</li>
+  <li>Chaque <code>Runner</code> a besoin des animations <code>run</code> et <code>idle</code>. Avec les formes de substitution : duplique <code>placeholder_frames.tres</code> en <code>runner_placeholder.tres</code>, renomme <code>default</code> en <code>idle</code> et ajoute une animation <code>run</code> avec la même image.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Haut/bas : la bande choisie s'éclaire, l'autre s'assombrit. Valider appelle <code>Game.new_game()</code> : le héros est mémorisé, les crédits sont remis au réglage des options, et <code>player.gd</code> chargera <code>robin.tres</code> si tu as choisi Robin (étape 05).</p></div>
+
+<h3 class="step" id="e10-11">10.11 · Les interludes et le continue</h3>
+<p>Batmobile, carte-titre et fin de niveau : trois écrans fixes de quelques secondes. Un seul script suffit.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://screens/interlude.gd">
+extends Control
+## Écran fixe ou animé : Batmobile (1:39), carte-titre « LEVEL ONE » (1:43), fin de niveau (14:37).
+## Passe à next_scene après « duration » secondes, ou sur Start.
+
+@export_file("*.tscn") var next_scene: String
+@export var duration := 3.0
+@export var music: AudioStream
+var _t := 0.0
+var _leaving := false
+
+
+func _ready() -> void:
+	if music:
+		Audio.play_music(music)
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	var skip := _t > 0.5 and Input.is_action_just_pressed("start")
+	if not _leaving and (_t >= duration or skip):
+		_leaving = true
+		SceneFlow.goto(next_scene)
+</script>
+<div class="table-wrap"><table>
+<tr><th>Scène</th><th>Contenu</th><th><code>next_scene</code></th></tr>
+<tr><td><code>res://screens/batmobile.tscn</code></td><td>La Batmobile file dans la nuit (ou un <code>Label</code> « BATMOBILE » en attendant)</td><td><code>res://screens/title_card.tscn</code></td></tr>
+<tr><td><code>res://screens/title_card.tscn</code></td><td>« LEVEL ONE / HAPPY BIRTHDAY TO ME! » (planche « Title Cards » du dépôt, via une <code>AtlasTexture</code>)</td><td><code>res://sections/s1_streets.tscn</code></td></tr>
+<tr><td><code>res://screens/level_end.tscn</code></td><td>Batmobile, puis « À suivre : niveau 2 »</td><td><code>res://screens/title.tscn</code></td></tr>
+</table></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://screens/continue.gd">
+extends Control
+## « CONTINUE ? 9… 0 ». Start : consomme un crédit et reprend la section en cours.
+
+@onready var label: Label = $Label
+var _count := 9.99
+
+
+func _process(delta: float) -> void:
+	_count -= delta
+	label.text = "CONTINUE ?  %d\nCREDIT %02d" % [maxi(int(_count), 0), Game.credits]
+	if _count <= 0.0:
+		set_process(false)
+		SceneFlow.to_title()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("start") and Game.continue_game():
+		set_process(false)
+		SceneFlow.goto(Game.current_section)
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée les trois scènes d'interlude : racine <code>Control</code> plein écran avec <code>interlude.gd</code>, un fond noir et un <code>Label</code> ou un <code>TextureRect</code> centré. Renseigne <strong>Next Scene</strong> selon le tableau.</li>
+  <li>Crée <code>res://screens/continue.tscn</code> : <code>Control</code> + fond noir + un <code>Label</code> nommé <code>Label</code>, centré.</li>
+  <li>Dans <code>s1_streets.tscn</code>, mets enfin <strong>Next Scene</strong> = <code>res://screens/level_end.tscn</code> : en attendant les sections 2 et 3, finir le boss termine le « niveau ».</li>
+</ol></div>
+<div class="callout warn"><span class="tag">Non observé</span><p>La partie analysée ne contient aucun game over : la présentation exacte de l'écran de continue est inconnue. Le décompte de 9 à 0 est une convention de l'époque, pas une observation.</p></div>
+
+<h3 class="step" id="e10-12">10.12 · Le jeu de bout en bout</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li><span class="menu">Projet → Paramètres du projet → Application → Exécuter → Scène principale</span> = <code>res://screens/intro.tscn</code>.</li>
+  <li><kbd>F5</kbd> et joue tout le parcours.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span>
+<ul>
+  <li>Intro (Start pour passer) → titre → START → sélection → Batmobile → carte-titre → section 1, avec des fondus en paliers partout.</li>
+  <li>Sans toucher au titre pendant 20 s, l'intro repart.</li>
+  <li>Options : passe les crédits à 3, sors avec Start, relance le jeu : le réglage est conservé. Lance une partie : « CREDIT 03 » dans la zone de droite du HUD.</li>
+  <li>Perds toutes tes vies : écran de continue ; Start reprend la section (crédit −1, score remis à zéro). Laisse le décompte finir : retour au titre.</li>
+  <li>Bats la machine d'Harley : Batmobile de fin, puis retour au titre.</li>
+</ul></div>
+<div class="callout method"><span class="tag">Méthode : la tranche verticale</span><p>Tu as maintenant une <strong>tranche verticale</strong> (<em>vertical slice</em>) : une petite partie du jeu, mais complète de haut en bas, de l'intro au générique, avec toutes ses couches (menus, HUD, gameplay, effets, son). C'est le jalon qu'un studio présente pour prouver qu'un jeu fonctionne. Les sections 2 et 3 ne sont plus « le jeu » : ce sont du contenu ajouté à un jeu qui marche déjà.</p></div>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>Au lancement : intro → titre → sélection → Batmobile → carte-titre → section 1, avec des fondus en paliers.</li>
+  <li>Le HUD affiche le portrait, l'anneau de vie, les vies, le score, la jauge colorée, et la pastille 99 → 00 pendant le boss.</li>
+  <li>Le réglage des crédits survit au redémarrage et s'applique à la partie suivante.</li>
+  <li>En perdant toutes les vies : écran de continue ; Start reprend la section tant qu'il reste des crédits.</li>
+  <li>Après le boss : écran de fin, puis retour au titre.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 10 : HUD, écrans, flux complet, audio"</div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Pourquoi le HUD attend-il une image avant de se brancher sur le joueur ?</summary><div><p>Le HUD et le joueur sont dans la même scène, et l'ordre de leurs <code>_ready()</code> dépend de leur place dans l'arbre. En attendant une image (<code>await get_tree().process_frame</code>), le HUD est sûr que le joueur a fini son <code>_ready()</code> (fiche du héros chargée, système d'armes en place).</p></div></details>
+<details class="quiz"><summary>Pourquoi le menu titre appelle-t-il <code>grab_focus()</code> ?</summary><div><p>Parce qu'un bouton ne réagit au clavier ou à la manette que s'il a le focus. Sans focus initial, aucune touche ne fait rien ; avec, les flèches naviguent et <code>ui_accept</code> valide.</p></div></details>
+<details class="quiz"><summary>Quelle différence entre <code>credits</code> et <code>credits_setting</code> ?</summary><div><p><code>credits_setting</code> est un réglage choisi dans les options et enregistré sur le disque. <code>credits</code> est l'état de la partie en cours, initialisé depuis le réglage par <code>new_game()</code> et consommé par les continues.</p></div></details>
+<details class="quiz"><summary>Qu'apporte une piste d'appel de méthode dans un <code>AnimationPlayer</code> ?</summary><div><p>Elle appelle une fonction à un instant précis de la frise (un flash, un son, un changement de plan). La cinématique entière se règle visuellement, sans minuteries dans le code.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Enrichis l'intro avec les plans du <a href="../batman-and-robin-godot-guide/10-ecrans-flux.html#intro">tome 10</a> : fourgon de police, façade en contre-plongée, moniteurs, main gelée.</li>
+  <li>Ajoute un bruitage aux tirs : un <code>@export var shot_sound: AudioStream</code> dans <code>WeaponSystem</code> et <code>Audio.sfx(shot_sound)</code> dans <code>try_fire()</code>.</li>
+  <li>Ajoute un écran de pause : <code>get_tree().paused = true</code>, et un menu dont le <code>process_mode</code> est <code>ALWAYS</code>.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

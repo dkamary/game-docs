@@ -411,10 +411,23 @@ class_name Fx
 const EXPLOSION := preload("res://fx/explosion.tscn")
 
 
-static func explosion(at: Vector2, parent: Node) -> void:
-	var e: Node2D = EXPLOSION.instantiate()
-	e.global_position = at
-	parent.add_child(e)
+## Ajoute « node » à la scène, à la position MONDE « at ». Parent par défaut : la scène courante.
+## deferred = true pendant un signal de collision (pas d'ajout physique à ce moment-là).
+static func spawn(node: Node2D, at: Vector2, parent: Node = null, deferred := false) -> void:
+	if parent == null:
+		parent = (Engine.get_main_loop() as SceneTree).current_scene
+	# Avant add_child(), le nœud n'a pas de parent : global_position serait pris pour une
+	# position LOCALE. On convertit donc nous-mêmes la position monde dans le repère du parent.
+	var parent_2d := parent as Node2D
+	node.position = parent_2d.to_local(at) if parent_2d else at
+	if deferred:
+		parent.add_child.call_deferred(node)
+	else:
+		parent.add_child(node)
+
+
+static func explosion(at: Vector2, parent: Node = null) -> void:
+	spawn(EXPLOSION.instantiate() as Node2D, at, parent)
 
 
 ## Flash plein écran : un rectangle de couleur au-dessus de tout, pendant quelques images.
@@ -430,6 +443,7 @@ static func flash_screen(tree: SceneTree, color := Color.WHITE, duration := 2.0 
 	await tree.create_timer(duration, true, false, true).timeout
 	layer.queue_free()
 </script>
+<div class="callout warn"><span class="tag">Piège classique : <code>global_position</code> avant <code>add_child()</code></span><p>Un nœud fraîchement instancié n'a pas encore de parent. Si on écrit <code>n.global_position = p</code> puis <code>parent.add_child(n)</code>, Godot range <code>p</code> dans <code>position</code> (local), et le nœud apparaît décalé de la position du parent. Tant que le parent est à l'origine, rien ne se voit ; avec un parent placé ailleurs (l'arène d'un boss, un <code>PathFollow2D</code>), l'objet surgit à des centaines de pixels. <code>Fx.spawn()</code> règle le problème une fois pour toutes. Tous les tomes suivants l'utilisent pour faire apparaître bombes, explosions, bonus et ennemis.</p></div>
 <script type="text/x-code" data-lang="gdscript" data-file="res://fx/explosion.gd  (racine AnimatedSprite2D de explosion.tscn)">
 extends AnimatedSprite2D
 ## Explosion « fire and forget » : joue son animation puis se détruit.
@@ -466,6 +480,10 @@ func collect(player: Player) -> void:
 		if view.has_point(enemy.global_position) and enemy.has_method("kill"):
 			enemy.kill()
 	for boss in get_tree().get_nodes_in_group("bosses"):
+		# Seul un boss en plein combat encaisse : celui de la section 1 est déjà dans la scène
+		# dès le départ. get() renvoie null si la propriété n'existe pas (pas de classe Boss avant le tome 07).
+		if not boss.get("active"):
+			continue
 		var h: Health = boss.get_node_or_null("Health")
 		if h:
 			h.damage(boss_damage)

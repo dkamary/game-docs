@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · Les fondations — Pas à pas</title>
+<meta name="description" content="Étape 2 : actions d'entrée, boucle à pas fixe, couches de collision, autoload Game, composants Health/Hitbox/Hurtbox avec banc d'essai, machine à états testée sur un feu tricolore, salle de test.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 02 / 13</div>
+  <h1>Les fondations</h1>
+  <p class="lead">Les briques que tout le reste du jeu utilisera : des entrées abstraites, des couches de collision nommées, un état de partie global, des composants de vie et de dégâts, et une machine à états. Chaque brique est testée seule avant de servir.</p>
+  <div class="meta"><span class="pill">⏱ ~3 h</span><span class="pill">Prérequis : étape 01</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/02-fondations.html">tome 02</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li>La carte des entrées et les scripts d'éditeur (<code>@tool</code>)</li>
+    <li><code>_physics_process</code> et les ticks physiques</li>
+    <li>Couches et masques de collision, <code>Area2D</code></li>
+    <li>Autoload, <code>class_name</code>, signaux typés</li>
+    <li><code>@onready</code>, <code>owner</code>, <code>await</code></li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>Séparer les touches et les actions</li>
+    <li>La boucle à pas fixe</li>
+    <li>La composition par composants</li>
+    <li>Hitbox et hurtbox</li>
+    <li>La machine à états finis</li>
+    <li>Le banc d'essai : tester une brique seule</li>
+  </ul></div>
+</div>
+
+<h2 id="entrees">Les entrées</h2>
+
+<h3 class="step" id="e02-1">2.1 · Créer une action à la main</h3>
+<div class="callout concept"><span class="tag">Concept : touches contre actions</span><p>Le code ne doit jamais demander « la touche K est-elle enfoncée ? », mais « le joueur veut-il sauter ? ». On déclare des <strong>actions</strong> (<code>jump</code>, <code>attack</code>…) et on leur associe des touches et des boutons de manette. Changer de clavier, brancher une manette ou laisser le joueur reconfigurer ne demande alors aucune modification du code.</p></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li><span class="menu">Projet → Paramètres du projet → Contrôles</span> (<em>Input Map</em>).</li>
+  <li>Dans le champ « Ajouter une nouvelle action », tape <code>jump</code>, puis <strong>Ajouter</strong>.</li>
+  <li>Clique sur le <strong>+</strong> à droite de <code>jump</code>, appuie sur <kbd>K</kbd>, valide. Recommence avec <kbd>Espace</kbd>.</li>
+  <li>Observe l'option « Physical Keycode » : elle désigne la <strong>position</strong> de la touche, pas la lettre imprimée dessus.</li>
+</ol></div>
+<p>Il faut ainsi sept actions, chacune avec plusieurs touches et boutons. Les saisir à la main est fastidieux et source d'oublis : on va l'automatiser.</p>
+
+<h3 class="step" id="e02-2">2.2 · Un script d'éditeur pour toutes les actions</h3>
+<div class="table-wrap"><table>
+<tr><th>Action</th><th>Clavier (position physique)</th><th>Manette</th><th>Mega Drive</th></tr>
+<tr><td><code>move_left</code> / <code>move_right</code> / <code>move_up</code> / <code>move_down</code></td><td>Flèches ou W A S D (= Z Q S D sur AZERTY)</td><td>Croix + stick gauche</td><td>Croix</td></tr>
+<tr><td><code>attack</code></td><td>J et L</td><td>X et B (Xbox)</td><td>A et C</td></tr>
+<tr><td><code>jump</code></td><td>K et Espace</td><td>A (Xbox)</td><td>B</td></tr>
+<tr><td><code>start</code></td><td>Entrée</td><td>Start / Menu</td><td>Start</td></tr>
+</table></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans le Système de fichiers, clic droit sur <code>res://tools/</code> → <strong>Nouveau script</strong>. Hérite de <code>EditorScript</code>, nom <code>setup_inputs.gd</code>.</li>
+  <li>Remplace son contenu par le code ci-dessous.</li>
+  <li>Script ouvert dans l'éditeur de script : <span class="menu">Fichier → Exécuter</span> (<kbd>Ctrl Maj X</kbd> / <kbd>⌘ Maj X</kbd>). La Sortie affiche « Actions créées : … ».</li>
+  <li><span class="menu">Projet → Recharger le projet actuel</span>, puis rouvre la carte des entrées : les sept actions y sont.</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://tools/setup_inputs.gd">
+@tool
+extends EditorScript
+## Crée les actions d'entrée du projet. À exécuter une seule fois (Fichier > Exécuter),
+## puis Projet > Recharger le projet en cours.
+
+func _run() -> void:
+	var actions := {
+		"move_left":  [_key(KEY_LEFT), _key(KEY_A), _pad(JOY_BUTTON_DPAD_LEFT), _axis(JOY_AXIS_LEFT_X, -1.0)],
+		"move_right": [_key(KEY_RIGHT), _key(KEY_D), _pad(JOY_BUTTON_DPAD_RIGHT), _axis(JOY_AXIS_LEFT_X, 1.0)],
+		"move_up":    [_key(KEY_UP), _key(KEY_W), _pad(JOY_BUTTON_DPAD_UP), _axis(JOY_AXIS_LEFT_Y, -1.0)],
+		"move_down":  [_key(KEY_DOWN), _key(KEY_S), _pad(JOY_BUTTON_DPAD_DOWN), _axis(JOY_AXIS_LEFT_Y, 1.0)],
+		"attack":     [_key(KEY_J), _key(KEY_L), _pad(JOY_BUTTON_X), _pad(JOY_BUTTON_B)],
+		"jump":       [_key(KEY_K), _key(KEY_SPACE), _pad(JOY_BUTTON_A)],
+		"start":      [_key(KEY_ENTER), _pad(JOY_BUTTON_START)],
+	}
+	for action_name: String in actions:
+		ProjectSettings.set_setting("input/" + action_name, {
+			"deadzone": 0.4,
+			"events": actions[action_name],
+		})
+	ProjectSettings.save()
+	print("Actions créées : ", actions.keys())
+
+func _key(code: Key) -> InputEventKey:
+	var e := InputEventKey.new()
+	e.physical_keycode = code   # position physique : WASD devient ZQSD sur AZERTY
+	return e
+
+func _pad(button: JoyButton) -> InputEventJoypadButton:
+	var e := InputEventJoypadButton.new()
+	e.button_index = button
+	return e
+
+func _axis(axis: JoyAxis, value: float) -> InputEventJoypadMotion:
+	var e := InputEventJoypadMotion.new()
+	e.axis = axis
+	e.axis_value = value
+	return e
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>@tool</code> + <code>extends EditorScript</code> : ce script ne tourne pas dans le jeu mais <strong>dans l'éditeur</strong>, quand tu demandes à l'exécuter. Sa fonction d'entrée est <code>_run()</code>.</li>
+  <li>Une action est enregistrée dans les paramètres du projet sous la clé <code>input/nom</code>, sous forme d'un dictionnaire : une zone morte et une liste d'événements. Le script écrit exactement ce que l'interface écrirait.</li>
+  <li><code>for action_name: String in actions</code> : on parcourt les clés du dictionnaire, en typant la variable de boucle.</li>
+  <li><code>physical_keycode</code> : la touche à l'emplacement de W sur un clavier QWERTY, c'est-à-dire Z sur un AZERTY. Les commandes restent bien placées quelle que soit la langue du clavier.</li>
+</ul>
+<div class="callout method"><span class="tag">Méthode : automatiser ce qui se répète</span><p>Dès qu'une manipulation de l'éditeur est longue, répétitive ou facile à rater, un petit script d'éditeur la rend fiable et reproductible. Tu en écriras un autre à l'étape 08, pour convertir des images en couleurs indexées.</p></div>
+
+<h2 id="boucle">La boucle à pas fixe</h2>
+
+<h3 class="step" id="e02-3">2.3 · <code>_process</code> ou <code>_physics_process</code> ?</h3>
+<div class="callout concept"><span class="tag">Concept : le pas de temps fixe</span><p><code>_process(delta)</code> suit l'écran : son <code>delta</code> varie (0,016 s à 60 Hz, 0,007 s à 144 Hz, 0,05 s si le jeu rame). <code>_physics_process(delta)</code> est appelé à <strong>intervalle fixe</strong> : 60 fois par seconde avec nos réglages, quoi qu'il arrive. Les collisions, les sauts et l'IA y sont reproductibles : un saut a toujours la même hauteur. La Mega Drive faisait pareil : un « pas » de jeu par image (interruption VBlank, 60 Hz).</p>
+<p><strong>Règle du parcours :</strong> tout le gameplay va dans <code>_physics_process()</code>. <code>_process()</code> ne sert qu'aux effets purement visuels (clignotements, interface).</p></div>
+<p>Les vitesses du jeu original se mesurent en <strong>pixels par image</strong>. Comme un tick physique dure une image, la conversion est directe :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="Conversion (exemple, à ne pas créer)">
+# Mesuré dans la vidéo : la caméra défile à ~1,95 px par image quand Batman court.
+const MD_FPS := 60.0
+const RUN_SPEED := 1.95 * MD_FPS   # ≈ 117 px/s
+
+func _physics_process(delta: float) -> void:
+	position.x += RUN_SPEED * delta   # 117 px/s × 1/60 s = 1,95 px par tick
+</script>
+<div class="callout do"><span class="tag">Exercice</span><ol>
+  <li>Dans <code>res://sandbox/box.gd</code>, renomme <code>_process</code> en <code>_physics_process</code>. Lance : rien ne change en apparence.</li>
+  <li>Ouvre le <strong>Débogueur → Moniteurs</strong> pendant que le jeu tourne et coche <strong>Time → Physics Process</strong> et <strong>Time → FPS</strong>. Les ticks physiques restent à 60 par seconde.</li>
+</ol></div>
+
+<h2 id="couches">Les couches de collision</h2>
+
+<h3 class="step" id="e02-4">2.4 · Nommer les couches</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t02-couches-collision.jpg" alt="Les couches de collision sur une image du jeu" loading="lazy"><figcaption><b>Les couches de collision, posées sur une vraie image du jeu.</b> Le sol (1), le balcon traversable (2), le rebord d'accroche (8), le corps de Batman (3), ceux des clowns (4) et un bonus (7).</figcaption></figure>
+<div class="callout concept"><span class="tag">Concept : couches et masques</span><p>Chaque objet physique <strong>est</strong> sur certaines couches (<code>collision_layer</code>) et <strong>regarde</strong> certaines couches (<code>collision_mask</code>). A détecte B si le masque de A contient une couche de B. Un batarang regarde seulement les zones vulnérables des ennemis : il ignore les murs, les autres batarangs et Batman. Bien régler les masques évite des bugs et des calculs inutiles.</p></div>
+<div class="table-wrap"><table>
+<tr><th>N°</th><th>Nom</th><th>Qui est dessus</th><th>Qui la regarde</th></tr>
+<tr><td>1</td><td>monde</td><td>Sols, murs</td><td>Corps du joueur et des ennemis</td></tr>
+<tr><td>2</td><td>plateformes</td><td>Balcon, plateaux de camions (traversables par-dessous)</td><td>Corps du joueur et des ennemis</td></tr>
+<tr><td>3</td><td>corps_joueur</td><td>Le corps de Batman</td><td>Bonus, déclencheurs, prise du costaud, zone de chute</td></tr>
+<tr><td>4</td><td>corps_ennemis</td><td>Le corps des ennemis</td><td>Personne dans le niveau 1</td></tr>
+<tr><td>5</td><td>hurtbox_joueur</td><td>Zone vulnérable de Batman</td><td>Coups, balles et bombes ennemis</td></tr>
+<tr><td>6</td><td>hurtbox_ennemis</td><td>Zones vulnérables des ennemis, boss, objets cassables</td><td>Poing et projectiles de Batman</td></tr>
+<tr><td>7</td><td>bonus</td><td>Zone de ramassage des bonus</td><td>Personne (c'est le bonus qui regarde la couche 3)</td></tr>
+<tr><td>8</td><td>rebords</td><td>Zones d'accroche sous le balcon</td><td>La sonde « mains » de Batman</td></tr>
+</table></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li><span class="menu">Projet → Paramètres du projet → Noms de calques → Physique 2D</span> (<em>Layer Names → 2D Physics</em>).</li>
+  <li>Saisis les huit noms du tableau (<code>monde</code>, <code>plateformes</code>…). Désormais, l'Inspecteur affiche ces noms au survol des cases de couche.</li>
+  <li>Crée <code>res://core/layers.gd</code> :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/layers.gd">
+class_name Layers
+## Masques de bits des couches physiques (couche n => bit n-1).
+
+const WORLD := 1 << 0
+const PLATFORMS := 1 << 1
+const PLAYER_BODY := 1 << 2
+const ENEMY_BODY := 1 << 3
+const PLAYER_HURTBOX := 1 << 4
+const ENEMY_HURTBOX := 1 << 5
+const PICKUPS := 1 << 6
+const LEDGES := 1 << 7
+</script>
+<div class="callout godot"><span class="tag"><code>class_name</code></span><p><code>class_name Layers</code> enregistre le script comme un <strong>type global</strong> : partout dans le projet, on peut écrire <code>Layers.PICKUPS</code> sans rien importer. Sur un script qui étend un nœud, <code>class_name</code> le fait aussi apparaître dans la fenêtre « Ajouter un nœud », comme un nœud natif. Un masque est un entier dont chaque bit vaut une couche : la couche 3 est le bit 2, soit <code>1 &lt;&lt; 2</code> = 4.</p></div>
+
+<h2 id="game">L'état de la partie</h2>
+
+<h3 class="step" id="e02-5">2.5 · L'autoload <code>Game</code></h3>
+<div class="callout godot"><span class="tag">Autoload</span><p>Quand on passe d'une scène à une autre, l'ancienne est détruite, avec toutes ses variables. Le score, les vies et l'arme en main doivent survivre : on les range dans un <strong>autoload</strong>, un nœud que Godot crée au démarrage, place à la racine, et ne détruit jamais. Son nom devient global : <code>Game.score</code> marche depuis n'importe quel script.</p></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée <code>res://autoload/game.gd</code> (hérite de <code>Node</code>) avec le code ci-dessous.</li>
+  <li><span class="menu">Projet → Paramètres du projet → Globals → Autoload</span> : chemin <code>res://autoload/game.gd</code>, nom <code>Game</code>, <strong>Ajouter</strong>. Vérifie que « Activer » est coché.</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://autoload/game.gd  (Autoload « Game »)">
+extends Node
+## État global de la partie. Le HUD l'écoute via ses signaux (patron Observateur).
+
+signal score_changed(score: int)
+signal lives_changed(lives: int)
+signal credits_changed(credits: int)
+signal weapon_changed(weapon_id: StringName, level: int)
+
+enum Hero { BATMAN, ROBIN }
+
+const START_LIVES := 2          # constaté : « 2 » dans le médaillon en début de partie
+const START_CREDITS := 6        # constaté : « CREDIT 06 »
+const MAX_WEAPON_LEVEL := 7     # TASVideos : niveau maximal 7
+
+## À CALIBRER : les vies montent à 3 puis 4 pendant la section 2 (palier de score ?).
+var extra_life_every := 20000
+
+var hero: Hero = Hero.BATMAN
+var score := 0
+var lives := START_LIVES
+var credits := START_CREDITS
+## Crédits accordés à chaque nouvelle partie. Réglé par l'écran OPTIONS (tome 10).
+var credits_setting := START_CREDITS
+var weapon_id: StringName = &"batarang"
+var weapon_level := 1
+var current_section := ""       ## chemin de la section en cours : point de reprise du « continue »
+var _next_extra_life := 0
+
+
+func new_game(selected: Hero) -> void:
+	hero = selected
+	credits = credits_setting
+	_reset_run()
+
+
+func continue_game() -> bool:
+	## Renvoie false s'il ne reste plus de crédit.
+	if credits <= 0:
+		return false
+	credits -= 1
+	credits_changed.emit(credits)
+	_reset_run()
+	return true
+
+
+func _reset_run() -> void:
+	score = 0
+	lives = START_LIVES
+	weapon_id = &"batarang"
+	weapon_level = 1
+	_next_extra_life = extra_life_every
+	score_changed.emit(score)
+	lives_changed.emit(lives)
+	weapon_changed.emit(weapon_id, weapon_level)
+
+
+func add_score(points: int) -> void:
+	score += points
+	score_changed.emit(score)
+	while extra_life_every > 0 and score >= _next_extra_life:
+		_next_extra_life += extra_life_every
+		add_life()
+
+
+func add_life() -> void:
+	lives += 1
+	lives_changed.emit(lives)
+
+
+## Appelé à la mort du joueur. Renvoie true s'il peut réapparaître.
+func lose_life() -> bool:
+	if lives <= 0:
+		return false
+	lives -= 1
+	lives_changed.emit(lives)
+	return true
+
+
+func set_weapon(id: StringName, level: int) -> void:
+	weapon_id = id
+	weapon_level = clampi(level, 1, MAX_WEAPON_LEVEL)
+	weapon_changed.emit(weapon_id, weapon_level)
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>signal score_changed(score: int)</code> : un signal déclaré dans le script, avec un paramètre typé. On l'émet avec <code>score_changed.emit(score)</code>.</li>
+  <li><code>enum Hero { BATMAN, ROBIN }</code> : des noms pour des entiers (0 et 1). <code>Game.Hero.ROBIN</code> se lit mieux que <code>1</code>.</li>
+  <li><code>&amp;"batarang"</code> : un <code>StringName</code>, une chaîne « internée » que Godot compare très vite. On l'utilise pour les identifiants (armes, états, animations).</li>
+  <li><code>credits</code> et <code>credits_setting</code> : le premier est l'<em>état</em> de la partie (consommé par les continues), le second un <em>réglage</em> (choisi dans les options). Les séparer évite qu'un nouveau départ efface le réglage.</li>
+  <li><code>while … add_life()</code> : un <code>while</code> plutôt qu'un <code>if</code>, au cas où un gros bonus franchirait deux paliers d'un coup.</li>
+  <li>Aucune fonction ne touche à l'affichage. <code>Game</code> annonce ce qui change ; c'est au HUD (étape 10) d'écouter.</li>
+</ul>
+
+<h3 class="step" id="e02-6">2.6 · Tester le patron Observateur</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans <code>res://sandbox/</code>, crée une scène 2D <code>observer_test.tscn</code> avec un script sur la racine :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sandbox/observer_test.gd">
+extends Node2D
+## Banc d'essai jetable : on écoute Game, puis on le fait changer.
+
+func _ready() -> void:
+	Game.score_changed.connect(func(s: int) -> void: print("Score : ", s))
+	Game.lives_changed.connect(func(l: int) -> void: print("Vies : ", l))
+	Game.add_score(15000)
+	Game.add_score(6000)    # franchit le palier de 20 000 : une vie de plus
+</script>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F6</kbd>. La Sortie affiche « Score : 15000 », puis « Score : 21000 » et « Vies : 3 ». Pendant que le jeu tourne, ouvre l'onglet <strong>Distant</strong> (<em>Remote</em>) au-dessus de l'arbre de scène : tu vois le nœud <code>Game</code> à la racine, à côté de ta scène. C'est l'arbre <em>réel</em> du jeu en cours ; clique sur <code>Game</code> pour lire ses variables en direct.</p></div>
+<div class="callout godot"><span class="tag">Les fonctions anonymes</span><p><code>func(s: int) -> void: print(...)</code> est une <strong>lambda</strong> : une fonction sans nom, définie sur place. Pratique pour une réaction d'une ligne. Pour plus long, on écrit une vraie méthode et on la passe : <code>Game.score_changed.connect(_on_score)</code>.</p></div>
+
+<h2 id="composants">Les composants</h2>
+<div class="callout concept"><span class="tag">Concept : composition plutôt qu'héritage</span><p>Batman, un clown, une poubelle et la montgolfière du Joker ont tous de la vie et peuvent être touchés. Plutôt que d'écrire quatre fois la même logique, ou d'imaginer une hiérarchie de classes géante, on fabrique de petits <strong>composants</strong> (un nœud, un rôle) qu'on assemble dans chaque scène, comme des pièces de Lego. Besoin de vie ? On ajoute un nœud <code>Health</code>.</p></div>
+
+<h3 class="step" id="e02-7">2.7 · <code>Health</code>, <code>Hurtbox</code>, <code>Hitbox</code></h3>
+<figure class="concept narrow"><img src="../batman-and-robin-godot-guide/img/concepts/t02-hitbox-hurtbox.jpg" alt="Hitbox du clown et hurtbox de Batman" loading="lazy"><figcaption><b>Hitbox contre Hurtbox.</b> L'aiguillon du clown (rouge) est une Hitbox ; il ne fait mal que s'il chevauche la Hurtbox de Batman (vert). Le corps qui sert à marcher est une troisième forme, séparée.</figcaption></figure>
+<p>Crée ces trois fichiers dans <code>res://core/</code>.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/health.gd">
+class_name Health
+extends Node
+## Points de vie génériques : joueur, ennemis et boss.
+
+signal changed(current: int, maximum: int)
+signal damaged(amount: int)
+signal died
+
+@export var max_health := 8
+var current := 0
+var invincible := false
+
+
+func _ready() -> void:
+	current = max_health
+
+
+func is_dead() -> bool:
+	return current <= 0
+
+
+func damage(amount: int) -> void:
+	if invincible or is_dead() or amount <= 0:
+		return
+	current = maxi(current - amount, 0)
+	damaged.emit(amount)
+	changed.emit(current, max_health)
+	if current == 0:
+		died.emit()
+
+
+func heal(amount: int) -> void:
+	if is_dead():
+		return
+	current = mini(current + amount, max_health)
+	changed.emit(current, max_health)
+
+
+func reset() -> void:
+	current = max_health
+	changed.emit(current, max_health)
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/hurtbox.gd">
+class_name Hurtbox
+extends Area2D
+## Zone vulnérable. Ne détecte rien elle-même : ce sont les Hitbox qui la trouvent.
+
+signal hurt(hitbox: Hitbox)
+
+@export var health: Health
+## Pendant l'invincibilité (clignotement), les coups sont ignorés.
+var invincible := false
+
+
+func _ready() -> void:
+	monitoring = false   # une Hurtbox est « vue », elle ne regarde pas
+
+
+func take_hit(hitbox: Hitbox) -> bool:
+	## Renvoie true si le coup a porté.
+	if invincible or (health != null and health.is_dead()):
+		return false
+	if health != null:
+		health.damage(hitbox.damage)
+	hurt.emit(hitbox)
+	return true
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/hitbox.gd">
+class_name Hitbox
+extends Area2D
+## Zone qui inflige des dégâts aux Hurtbox présentes dans son masque de collision.
+
+signal landed(hurtbox: Hurtbox)
+
+@export var damage := 1
+## Poussée appliquée à la cible (x orienté vers l'avant de l'attaquant).
+@export var knockback := Vector2(120, -80)
+## Pour un projectile : se désactive après le premier impact.
+@export var single_hit := false
+## Sens de l'attaquant : 1 vers la droite, -1 vers la gauche (mis à jour par le porteur).
+var facing := 1
+var _already_hit: Array[Hurtbox] = []
+
+
+func _ready() -> void:
+	monitorable = false   # personne n'a besoin de « voir » une hitbox
+	area_entered.connect(_on_area_entered)
+
+
+## À appeler à chaque nouvelle attaque (coup de poing suivant, projectile recyclé).
+func reset_hits() -> void:
+	_already_hit.clear()
+
+
+func _on_area_entered(area: Area2D) -> void:
+	var hurtbox := area as Hurtbox
+	if hurtbox == null or hurtbox in _already_hit:
+		return
+	_already_hit.append(hurtbox)
+	if hurtbox.take_hit(self):
+		landed.emit(hurtbox)
+		if single_hit:
+			set_deferred("monitoring", false)
+
+
+func get_knockback() -> Vector2:
+	return Vector2(knockback.x * facing, knockback.y)
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><strong>Qui regarde qui</strong> : une <code>Area2D</code> a deux interrupteurs. <code>monitoring</code> = « je détecte les autres », <code>monitorable</code> = « les autres peuvent me détecter ». La Hitbox détecte, la Hurtbox est détectée : chacun coupe l'interrupteur dont il n'a pas besoin.</li>
+  <li><code>@export var health: Health</code> : un <strong>export de nœud</strong>. Dans l'Inspecteur, tu désignes le nœud <code>Health</code> en cliquant ou en le glissant. Pas de chemin écrit en dur : renommer le nœud ne casse rien.</li>
+  <li><code>area as Hurtbox</code> : renvoie l'objet s'il est bien une <code>Hurtbox</code>, sinon <code>null</code>. On ignore ainsi toutes les autres zones.</li>
+  <li><code>_already_hit</code> : sans cette liste, un poing qui reste 10 images sur un ennemi le toucherait 10 fois. Chaque attaque touche une cible au plus une fois, jusqu'au prochain <code>reset_hits()</code>.</li>
+  <li><code>set_deferred("monitoring", false)</code> : pendant un signal de collision, Godot interdit de modifier l'état physique (erreur « Function blocked during in/out signal »). <code>set_deferred</code> reporte la modification à la fin de l'image.</li>
+</ul>
+
+<h3 class="step" id="e02-8">2.8 · Un banc d'essai pour les dégâts</h3>
+<div class="callout method"><span class="tag">Méthode : le banc d'essai</span><p>Avant d'utiliser une brique dans le vrai jeu, on la teste seule, dans une scène minuscule qui ne sert qu'à ça. Si quelque chose cloche plus tard, tu sauras que ce n'est pas elle. Les professionnels font la même chose avec des tests automatisés et des « niveaux de test » remplis de cas limites.</p></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène 2D <code>res://sandbox/hit_test.tscn</code>, racine <code>HitTest</code>. Construis cet arbre (les types <code>Health</code>, <code>Hurtbox</code>, <code>Hitbox</code> apparaissent dans « Ajouter un nœud » grâce à <code>class_name</code>) :</li>
+</ol>
+<pre class="tree">HitTest (Node2D, hit_test.gd)
+├── Target (Node2D)               position (200, 112)
+│   ├── Health                    max_health = 3
+│   ├── Hurtbox                   couche 6 seule · masque vide · health = Health
+│   │   └── CollisionShape2D      RectangleShape2D 16×32
+│   └── ColorRect                 16×32 · position (-8, -16) · rouge
+└── Fist (Hitbox)                 position (20, 112) · couche vide · masque 6 seul
+    └── CollisionShape2D          CircleShape2D rayon 6</pre>
+<ol start="2">
+  <li>Pour régler couches et masques : Inspecteur → <strong>Collision</strong> → clique sur les cases numérotées. Une case allumée = couche active.</li>
+  <li>Pour <code>health</code> sur la Hurtbox : clique sur « Assigner… » et choisis <code>Health</code>.</li>
+  <li>Attache ce script à <code>HitTest</code> :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sandbox/hit_test.gd">
+extends Node2D
+## Banc d'essai : un « poing » traverse une cible en boucle.
+
+@onready var fist: Hitbox = $Fist
+@onready var health: Health = $Target/Health
+
+
+func _ready() -> void:
+	health.damaged.connect(func(a: int) -> void: print("Touché ! -", a, " → reste ", health.current))
+	health.died.connect(func() -> void: print("Cible détruite"))
+
+
+func _physics_process(delta: float) -> void:
+	fist.position.x += 80.0 * delta
+	if fist.position.x > 300.0:
+		fist.position.x = 20.0
+		fist.reset_hits()   # nouvelle « attaque » : le poing peut retoucher
+</script>
+<div class="callout test"><span class="tag">Teste</span><p>Active <span class="menu">Déboguer → Formes de collision visibles</span> (<em>Debug → Visible Collision Shapes</em>), puis <kbd>F6</kbd>. Le cercle traverse la cible trois fois : « reste 2 », « reste 1 », « reste 0 » puis « Cible détruite ». Ensuite, plus rien : une cible morte n'encaisse plus.</p></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span>
+<ul>
+  <li><strong>Rien ne s'affiche</strong> : vérifie que le masque du <code>Fist</code> contient la couche 6 et que la <code>Hurtbox</code> est sur la couche 6. C'est l'erreur la plus fréquente de tout le projet.</li>
+  <li><strong>« Invalid get index 'damaged' (on base: 'null instance') »</strong> : <code>$Target/Health</code> ne trouve pas le nœud. Vérifie les noms exacts, majuscules comprises.</li>
+  <li><strong>Touché, mais « reste » ne baisse pas</strong> : le champ <code>health</code> de la Hurtbox n'est pas assigné.</li>
+</ul></div>
+<div class="callout godot"><span class="tag"><code>@onready</code></span><p>Une variable <code>@onready</code> est initialisée juste avant <code>_ready()</code>, quand les enfants existent. Écrire <code>var fist: Hitbox = $Fist</code> sans <code>@onready</code> échouerait : à la création du script, l'enfant n'est pas encore là.</p></div>
+
+<h2 id="fsm">La machine à états</h2>
+
+<h3 class="step" id="e02-9">2.9 · <code>State</code> et <code>StateMachine</code></h3>
+<div class="callout concept"><span class="tag">Concept : la machine à états finis</span><p>Un personnage est toujours dans <strong>un seul état</strong> à la fois : au sol, en l'air, suspendu, touché… Chaque état a son propre script avec trois moments : <code>enter()</code> à l'entrée, <code>physics_update()</code> à chaque tick, <code>exit()</code> à la sortie. Un état décide lui-même quand passer au suivant. On évite ainsi les forêts de <code>if is_jumping and not is_hurt and not is_hanging…</code>. Tu sentiras concrètement le problème à l'étape 03.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/state.gd">
+class_name State
+extends Node
+## Classe de base d'un état. Les états concrets surchargent les fonctions utiles.
+
+## Émis pour demander une transition. Toujours émis via transition_to().
+signal finished(next_state: StringName, data: Dictionary)
+
+
+func enter(_previous: StringName, _data: Dictionary) -> void:
+	pass
+
+
+func exit() -> void:
+	pass
+
+
+func update(_delta: float) -> void:
+	pass
+
+
+func physics_update(_delta: float) -> void:
+	pass
+
+
+func transition_to(next_state: StringName, data: Dictionary = {}) -> void:
+	finished.emit(next_state, data)
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://core/state_machine.gd">
+class_name StateMachine
+extends Node
+## Gère des états enfants. Le propriétaire appelle physics_update() depuis son _physics_process.
+
+signal state_changed(previous: StringName, current: StringName)
+
+@export var initial_state: State
+var state: State
+var _states: Dictionary = {}   # StringName -> State
+
+
+func _ready() -> void:
+	for child in get_children():
+		if child is State:
+			_states[child.name] = child
+			child.finished.connect(_on_state_finished)
+	if initial_state == null and get_child_count() > 0:
+		initial_state = get_child(0) as State
+	# On attend que le propriétaire soit prêt (ses @onready sont résolus après nous).
+	await owner.ready
+	state = initial_state
+	state.enter(&"", {})
+
+
+func physics_update(delta: float) -> void:
+	if state:
+		state.physics_update(delta)
+
+
+func update(delta: float) -> void:
+	if state:
+		state.update(delta)
+
+
+func force(next_state: StringName, data: Dictionary = {}) -> void:
+	## Transition imposée de l'extérieur (dégâts, mort, cinématique).
+	_on_state_finished(next_state, data)
+
+
+func current_name() -> StringName:
+	return state.name if state else &""
+
+
+func _on_state_finished(next_state: StringName, data: Dictionary) -> void:
+	if not _states.has(next_state):
+		push_error("État inconnu : %s" % next_state)
+		return
+	var previous: StringName = state.name if state else &""
+	if state:
+		state.exit()
+	state = _states[next_state]
+	state.enter(previous, data)
+	state_changed.emit(previous, next_state)
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li>Les états sont des <strong>nœuds enfants</strong> de la machine. Le <strong>nom du nœud</strong> sert d'identifiant : <code>transition_to(&amp;"Air")</code> active l'enfant nommé <code>Air</code>.</li>
+  <li>Un état ne change pas l'état lui-même : il <em>demande</em>, via le signal <code>finished</code>. Seule la machine fait <code>exit()</code> puis <code>enter()</code>, toujours dans cet ordre.</li>
+  <li><code>data</code> : un dictionnaire pour passer une information au prochain état (par exemple la hauteur du rebord auquel s'accrocher).</li>
+  <li><code>owner</code> : la racine de la scène enregistrée qui contient ce nœud. Pour un état de Batman, <code>owner</code> est Batman.</li>
+  <li><code>await owner.ready</code> : dans Godot, les enfants sont prêts <em>avant</em> leur parent. La machine suspend son <code>_ready()</code> jusqu'à ce que le propriétaire soit prêt, pour que le premier <code>enter()</code> trouve tout en place.</li>
+</ul>
+<div class="callout godot"><span class="tag"><code>await</code></span><p><code>await signal</code> met la fonction en pause jusqu'à l'émission du signal, sans bloquer le jeu : le reste continue de tourner. La fonction devient une <strong>coroutine</strong>. C'est très pratique, mais dangereux pour la logique de jeu : si l'objet change d'avis pendant l'attente, la fonction se réveille quand même. On l'utilisera surtout pour des séquences (cinématiques, transitions).</p></div>
+
+<h3 class="step" id="e02-10">2.10 · Tester la machine sur un feu tricolore</h3>
+<p>Une machine à états se teste mieux sur un objet trivial que sur un personnage. Un feu tricolore a trois états et une règle simple.</p>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée <code>res://sandbox/light_state.gd</code> :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sandbox/light_state.gd">
+extends State
+## Un état de feu tricolore : une couleur, une durée, l'état suivant.
+
+@export var color := Color.GREEN
+@export var duration := 2.0
+@export var next: StringName = &"Orange"
+var _t := 0.0
+
+
+func enter(previous: StringName, _data: Dictionary) -> void:
+	_t = 0.0
+	(owner.get_node("Lamp") as ColorRect).color = color
+	print("%s → %s" % [previous, name])
+
+
+func physics_update(delta: float) -> void:
+	_t += delta
+	if _t >= duration:
+		transition_to(next)
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sandbox/traffic_light.gd">
+extends Node2D
+## Le propriétaire fait avancer la machine à chaque tick.
+
+@onready var fsm: StateMachine = $StateMachine
+
+
+func _physics_process(delta: float) -> void:
+	fsm.physics_update(delta)
+</script>
+<div class="callout do"><span class="tag">À faire (suite)</span><ol start="2">
+  <li>Nouvelle scène <code>res://sandbox/traffic_light.tscn</code> :</li>
+</ol>
+<pre class="tree">TrafficLight (Node2D, traffic_light.gd)   position (160, 112)
+├── Lamp (ColorRect)                      24×24 · position (-12, -12)
+└── StateMachine (StateMachine)           initial_state = Green
+    ├── Green  (Node, light_state.gd)     color vert · duration 2 · next = Orange
+    ├── Orange (Node, light_state.gd)     color orange · duration 0.7 · next = Red
+    └── Red    (Node, light_state.gd)     color rouge · duration 2 · next = Green</pre>
+<ol start="3">
+  <li>Pour attacher le même script à trois nœuds : sélectionne-les tous (<kbd>Maj</kbd> + clic), puis glisse <code>light_state.gd</code> depuis le Système de fichiers sur la sélection. Règle ensuite chaque nœud dans l'Inspecteur.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F6</kbd>. Le carré passe vert → orange → rouge → vert… La Sortie affiche « → Green », « Green → Orange », « Orange → Red »… Change <code>next</code> de <code>Red</code> en <code>Blue</code> : au passage, la Sortie affiche « État inconnu : Blue » en rouge et le feu reste bloqué. Remets <code>Green</code>.</p></div>
+<div class="callout method"><span class="tag">Ce que montre cet exemple</span><p>Un seul script sert trois états, parce que ces états ne diffèrent que par des <strong>données</strong> (couleur, durée, suivant). Garde ce réflexe : avant d'écrire un nouveau script, demande-toi si ce n'est pas le même comportement avec d'autres chiffres.</p></div>
+
+<h2 id="salle">La salle de test</h2>
+
+<h3 class="step" id="e02-11">2.11 · Construire <code>test_room.tscn</code></h3>
+<p>Batman y fera ses premiers pas à l'étape suivante. Elle te servira jusqu'à l'étape 08.</p>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène 2D <code>res://level/test_room.tscn</code>, racine <code>TestRoom</code>.</li>
+  <li>Ajoute un <code>StaticBody2D</code> nommé <code>Floor</code> : couche 1 seule, masque vide. Enfants : un <code>CollisionShape2D</code> avec un <code>RectangleShape2D</code> de 320×16, et un <code>ColorRect</code> gris de 320×16 en position (-160, -8). Place <code>Floor</code> en (160, 208).</li>
+  <li>Ajoute un <code>StaticBody2D</code> nommé <code>Balcony</code> : couche 2 seule. Enfants : <code>CollisionShape2D</code> rectangle 200×8 avec <strong>One Way Collision</strong> coché, et un <code>ColorRect</code> brun 200×8 en (-100, -4). Place <code>Balcony</code> en (200, 112).</li>
+  <li>Ajoute une <code>Camera2D</code> en (160, 112).</li>
+</ol>
+<pre class="tree">TestRoom (Node2D)
+├── Floor (StaticBody2D)          couche 1 « monde » · (160, 208)
+│   ├── CollisionShape2D          rectangle 320×16
+│   └── ColorRect                 320×16, gris
+├── Balcony (StaticBody2D)        couche 2 « plateformes » · (200, 112)
+│   ├── CollisionShape2D          rectangle 200×8, One Way Collision activé
+│   └── ColorRect                 200×8, brun
+└── Camera2D                      (160, 112)</pre></div>
+<div class="callout godot"><span class="tag">Les corps physiques 2D</span>
+<ul>
+  <li><code>StaticBody2D</code> : ne bouge pas (sol, murs).</li>
+  <li><code>CharacterBody2D</code> : déplacé par ton code avec <code>move_and_slide()</code> (Batman, ennemis).</li>
+  <li><code>AnimatableBody2D</code> : déplacé par ton code ou une animation, et emporte ce qui est posé dessus (camions, étape 12).</li>
+  <li><code>RigidBody2D</code> : entièrement géré par la simulation physique. Jamais utilisé ici : un jeu d'arcade veut un contrôle exact, pas une simulation réaliste.</li>
+  <li><code>Area2D</code> : ne bloque rien, détecte seulement (hitbox, déclencheurs).</li>
+</ul></div>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F6</kbd> : un sol gris en bas et un balcon brun au milieu. Rien ne bouge, c'est normal.</p></div>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>Les actions <code>move_*</code>, <code>jump</code>, <code>attack</code> et <code>start</code> existent dans la carte des entrées.</li>
+  <li><code>Game</code> est accessible depuis n'importe quel script, et le banc d'essai observateur affiche le score et les vies.</li>
+  <li>Le banc d'essai des dégâts : trois coups puis « Cible détruite ».</li>
+  <li>Le feu tricolore change d'état en boucle.</li>
+  <li>Les scripts de <code>res://core/</code> se chargent sans erreur et la salle de test existe.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 02 : entrées, couches, Game, composants, machine à états"</div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Un batarang ne touche pas un clown. Quelles sont les deux premières choses à vérifier ?</summary><div><p>Que le <strong>masque</strong> du batarang contient la couche 6, et que la <strong>Hurtbox</strong> du clown est sur la couche 6. Ensuite seulement : que la Hitbox est bien <code>monitoring</code>, et que les formes de collision existent (Déboguer → Formes de collision visibles).</p></div></details>
+<details class="quiz"><summary>Pourquoi le gameplay dans <code>_physics_process</code> et pas dans <code>_process</code> ?</summary><div><p>Parce que <code>_physics_process</code> tourne à intervalle fixe (60 Hz). Les calculs de saut, de collision et d'IA donnent donc toujours le même résultat, quelle que soit la machine. <code>_process</code> suit l'affichage et son <code>delta</code> varie.</p></div></details>
+<details class="quiz"><summary>À quoi sert de séparer Hitbox, Hurtbox et forme de collision du corps ?</summary><div><p>Chacune a un rôle différent : le corps sert à marcher et à buter contre les murs, la Hurtbox à encaisser, la Hitbox à frapper. On peut ainsi rendre Batman invincible (Hurtbox ignorée) sans qu'il traverse le sol, ou faire un poing qui dépasse du corps.</p></div></details>
+<details class="quiz"><summary>Dans une machine à états, qui a le droit d'appeler <code>enter()</code> et <code>exit()</code> ?</summary><div><p>Uniquement la machine. Les états demandent une transition (<code>transition_to</code>) ; l'extérieur peut l'imposer (<code>force</code>). Ainsi, la sortie de l'ancien état précède toujours l'entrée du nouveau.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Ajoute au feu tricolore un état <code>Blink</code> (orange clignotant) atteint quand on appuie sur <code>start</code>. Indice : la touche se lit dans <code>physics_update</code> d'un état, ou le propriétaire appelle <code>fsm.force(&amp;"Blink")</code>.</li>
+  <li>Dans le banc d'essai des dégâts, connecte <code>Hitbox.landed</code> pour afficher le nom de la cible touchée.</li>
+  <li>Lis le tome 02 du guide, section <a href="../batman-and-robin-godot-guide/02-fondations.html#matrice">« De la Mega Drive à Godot »</a> : quelle pièce de la console correspond à quel outil de Godot.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

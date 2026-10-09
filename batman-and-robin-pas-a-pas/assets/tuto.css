@@ -1,0 +1,64 @@
+/* Pas-à-pas Godot — The Adventures of Batman & Robin — compléments au style du guide.
+   Chargé APRÈS ../batman-and-robin-godot-guide/assets/guide.css, dont il réutilise les variables. */
+:root {
+  --teal: #2fd4c4;
+  --cyan: #36c5f0;
+  --pink: #ff6b8a;
+  --godot: #6aa9e9;
+}
+
+/* ---------- Nouveaux encadrés ---------- */
+.callout.do      { border-left-color: var(--teal); }  .callout.do      > .tag { color: var(--teal); }
+.callout.test    { border-left-color: var(--cyan); background: linear-gradient(90deg, rgba(54, 197, 240, .08), var(--panel) 40%); } .callout.test > .tag { color: var(--cyan); }
+.callout.debug   { border-left-color: var(--pink); }  .callout.debug   > .tag { color: var(--pink); }
+.callout.method  { border-left-color: var(--gold); background: linear-gradient(90deg, rgba(244, 197, 66, .09), var(--panel) 40%); } .callout.method > .tag { color: var(--gold); }
+.callout.godot   { border-left-color: var(--godot); } .callout.godot   > .tag { color: var(--godot); }
+.callout ol:last-child { margin-bottom: 0; }
+.callout.do ol > li { margin: 6px 0; }
+
+/* ---------- Titres d'étape avec case « fait » ---------- */
+h3.step { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; margin-top: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+h3.step .done-toggle { margin-left: auto; font: 600 12px/1 var(--font-body); color: var(--muted); background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+h3.step .done-toggle:hover { color: var(--green); border-color: var(--green); }
+h3.step.is-done { border-color: rgba(67, 209, 143, .55); background: linear-gradient(90deg, rgba(67, 209, 143, .10), var(--panel) 50%); }
+h3.step.is-done .done-toggle { color: #0b0d1a; background: var(--green); border-color: var(--green); }
+
+/* ---------- Touches et menus ---------- */
+kbd { font: 600 .82em/1 var(--font-mono); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+.menu { font-weight: 600; color: var(--ink); white-space: nowrap; }
+.menu::before { content: "☰ "; color: var(--muted); font-weight: 400; }
+
+/* ---------- Commit Git ---------- */
+.commit { display: flex; align-items: center; gap: 10px; margin: 16px 0; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 10px; font: 13px/1.4 var(--font-mono); color: var(--ink-soft); background: var(--code-bg); overflow-x: auto; }
+.commit::before { content: "git"; flex: none; font-weight: 700; color: #0b0d1a; background: var(--orange); border-radius: 5px; padding: 2px 7px; }
+
+/* ---------- Quiz ---------- */
+details.quiz { margin: 10px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+details.quiz summary { cursor: pointer; padding: 10px 14px; font-weight: 600; color: var(--ink); list-style: none; }
+details.quiz summary::-webkit-details-marker { display: none; }
+details.quiz summary::before { content: "?"; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 10px; border-radius: 50%; background: var(--purple); color: #0b0d1a; font-size: 12px; font-weight: 800; }
+details.quiz[open] summary { border-bottom: 1px solid var(--line); }
+details.quiz > div { padding: 10px 14px 12px; color: var(--ink-soft); }
+details.quiz > div p:last-child { margin-bottom: 0; }
+
+/* ---------- Deux colonnes « tu vas apprendre » ---------- */
+.learn { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 14px 0 20px; }
+.learn > div { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.learn h4 { margin: 0 0 8px; font-size: 15px; letter-spacing: .06em; text-transform: uppercase; }
+.learn .gd h4 { color: var(--godot); }
+.learn .dev h4 { color: var(--gold); }
+.learn ul { margin: 0; }
+
+/* ---------- Progression sur les cartes de l'accueil ---------- */
+.card .progress { margin-top: 12px; height: 6px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+.card .progress > i { display: block; height: 100%; width: 0; background: var(--green); transition: width .3s; }
+.card .progress-label { margin-top: 6px; font: 12px/1 var(--font-mono); color: var(--muted); }
+.card .dur { float: right; font: 12px/1 var(--font-mono); color: var(--muted); }
+.reset-progress { font: 600 13px/1 var(--font-body); color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.reset-progress:hover { color: var(--red); border-color: var(--red); }
+
+/* ---------- Méthode en étapes ---------- */
+ol.loop { counter-reset: loop; list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+ol.loop li { counter-increment: loop; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 14px; color: var(--ink-soft); }
+ol.loop li::before { content: counter(loop); display: block; font: 700 22px/1 var(--font-head); color: var(--gold); margin-bottom: 6px; }
+ol.loop li strong { display: block; color: var(--ink); margin-bottom: 2px; }

@@ -70,6 +70,8 @@ var _dead := false
 @onready var sprite: AnimatedSprite2D = $Sprite
 @onready var health: Health = $Health
 @onready var hurtbox: Hurtbox = $Hurtbox
+## Facultative : tous les ennemis n'en ont pas.
+@onready var contact_hitbox: Hitbox = get_node_or_null("ContactHitbox")
 
 
 func _ready() -> void:
@@ -84,6 +86,9 @@ func _physics_process(delta: float) -> void:
 		velocity.y = minf(velocity.y + gravity * delta, 400.0)
 	think(delta)
 	move_and_slide()
+	# Toucher le corps repousse Batman À L'OPPOSÉ de l'ennemi, quel que soit son regard.
+	if contact_hitbox and player:
+		contact_hitbox.facing = 1 if player.global_position.x >= global_position.x else -1
 	if _flash_left > 0.0:
 		_flash_left -= delta
 		if _flash_left <= 0.0:
@@ -136,11 +141,12 @@ func kill() -> void:
 		return
 	_dead = true
 	Game.add_score(score_value)
-	Fx.explosion(global_position + Vector2(0, -16), get_parent())
+	# Explosion et butin vont dans la scène courante, pas sous notre parent : un membre de
+	# Formation a pour parent un PathFollow2D, qui emporterait l'explosion sur sa trajectoire.
+	Fx.explosion(global_position + Vector2(0, -16))
 	if not drops.is_empty() and randf() < drop_chance:
 		var item: Node2D = drops.pick_random().instantiate()
-		item.global_position = global_position + Vector2(0, -12)
-		get_parent().add_child.call_deferred(item)   # pas d'ajout physique pendant une collision
+		Fx.spawn(item, global_position + Vector2(0, -12), null, true)   # différé : pas d'ajout physique pendant une collision
 	killed.emit(self)
 	queue_free()
 
@@ -422,9 +428,7 @@ func think(delta: float) -> void:
 	_next -= delta
 	if _next <= 0.0 and bomb_scene:
 		_next = randf_range(bomb_interval.x, bomb_interval.y)
-		var b: Node2D = bomb_scene.instantiate()
-		b.global_position = global_position + Vector2(0, 8)
-		get_tree().current_scene.add_child(b)
+		Fx.spawn(bomb_scene.instantiate() as Node2D, global_position + Vector2(0, 8))
 	play_anim(&"fly")
 </script>
 
@@ -471,7 +475,7 @@ func _physics_process(delta: float) -> void:
 func explode() -> void:
 	if is_queued_for_deletion():
 		return
-	Fx.explosion(global_position, get_parent())
+	Fx.explosion(global_position)
 	queue_free()
 </script>
 
@@ -530,7 +534,7 @@ func _ready() -> void:
 
 func _break() -> void:
 	Game.add_score(score_value)
-	Fx.explosion(global_position, get_parent())
+	Fx.explosion(global_position)
 	for scene in drops:
 		_spawn(scene, Vector2(randf_range(-6, 6), -10))
 	if spawn_enemy:
@@ -543,9 +547,8 @@ func _break() -> void:
 
 
 func _spawn(scene: PackedScene, offset: Vector2) -> void:
-	var n: Node2D = scene.instantiate()
-	n.global_position = global_position + offset
-	get_parent().add_child.call_deferred(n)
+	# Différé : _break() est appelé pendant un signal de collision.
+	Fx.spawn(scene.instantiate() as Node2D, global_position + offset, null, true)
 </script>
 
 <h2 id="arene">L'arène à vagues</h2>
@@ -591,12 +594,18 @@ func _ready() -> void:
 
 
 func _on_body_entered(body: Node2D) -> void:
-	if body is Player and not _running and not _done:
+	if body is Player and _player == null and not _done:
 		_player = body
-		_running = true
-		_player.camera.lock_on(global_position.x)
-		started.emit()
-		_next_wave()
+		# Différé : la première vague peut lancer une Formation, donc ajouter des corps
+		# physiques. C'est interdit pendant un signal de collision comme body_entered.
+		_begin.call_deferred()
+
+
+func _begin() -> void:
+	_running = true
+	_player.camera.lock_on(global_position.x)
+	started.emit()
+	_next_wave()
 
 
 func _next_wave() -> void:
@@ -631,10 +640,10 @@ func _spawn(w: WaveData) -> void:
 		return
 	var scene := w.enemies[(_killed + _alive) % w.enemies.size()]
 	var e := scene.instantiate() as Enemy
-	e.global_position = _origin_point(w.origins[randi() % w.origins.size()])
 	e.killed.connect(func(_e: Enemy) -> void: _killed += 1)
 	e.tree_exiting.connect(func() -> void: _alive -= 1)   # tué OU sorti de l'écran
-	get_parent().add_child(e)
+	# Position fixée AVANT l'entrée dans l'arbre : le _ready() du ballon-mine la lit.
+	Fx.spawn(e, _origin_point(w.origins[randi() % w.origins.size()]))
 	_alive += 1
 
 

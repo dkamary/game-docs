@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 · Section 1 : rue, banque et premier boss — Pas à pas</title>
+<meta name="description" content="Étape 9 : classe Section et SceneFlow minimal, construction de la rue à balcon avec ses arènes, explosion scriptée de la banque, base commune des boss et machine d'Harley en trois phases.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 09 / 13</div>
+  <h1>Section 1 : rue, banque et premier boss</h1>
+  <p class="lead">Toutes les briques sont prêtes : on assemble enfin un vrai morceau du niveau. La rue à balcon et ses quatre arènes, l'explosion scriptée de la banque qui fait basculer l'ambiance, puis la machine d'Harley Quinn en trois phases.</p>
+  <div class="meta"><span class="pill">⏱ ~6 h</span><span class="pill">Prérequis : étape 08</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/07-section-1-rues.html">tome 07</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li><code>change_scene_to_file()</code>, <code>@export_file</code></li>
+    <li><code>call_group()</code>, <code>Tween</code></li>
+    <li>Scènes héritées</li>
+    <li><code>CPUParticles2D</code>, <code>Marker2D</code></li>
+    <li>La scène principale du projet</li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>L'assemblage de niveau</li>
+    <li>L'événement scripté et le changement caché sous un flash</li>
+    <li>La grammaire d'un boss : phases, télégraphie, point faible</li>
+    <li>Le tir balistique</li>
+    <li>Le playtest et l'accessibilité</li>
+  </ul></div>
+</div>
+
+<h2 id="section">Le squelette d'une section</h2>
+
+<h3 class="step" id="e09-1">9.1 · La classe <code>Section</code> et <code>SceneFlow</code></h3>
+<p>Les trois sections partagent la même mécanique : gérer la mort du joueur, finir sur un boss, passer à la suite. On la factorise.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/section.gd">
+class_name Section
+extends Node2D
+## Base commune des 3 sections du niveau 1.
+
+@export_file("*.tscn") var next_scene: String
+@export var player: Player
+@export var victory_delay := 3.0     ## durée de la pose de victoire (vidéo : ~3 s)
+
+
+func _ready() -> void:
+	Game.current_section = scene_file_path   # point de reprise du « continue »
+	player.died.connect(_on_player_died)
+
+
+func _on_player_died() -> void:
+	if Game.lose_life():
+		player.respawn()
+	else:
+		SceneFlow.game_over()
+
+
+## Appelé par l'arène du boss quand il est vaincu.
+func boss_defeated(points: int) -> void:
+	Game.add_score(points)
+	player.celebrate()
+	await get_tree().create_timer(victory_delay).timeout
+	SceneFlow.goto(next_scene)   # SceneFlow s'occupe du fondu au noir puis du fondu d'entrée
+</script>
+<p><code>SceneFlow</code> sera complet à l'étape 10. Cette version minimale suffit pour l'instant :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://autoload/scene_flow.gd  (version minimale)">
+extends Node
+## Change de scène entre deux fondus Mega Drive.
+
+func goto(path: String) -> void:
+	if path.is_empty():
+		push_warning("SceneFlow.goto : aucune scène indiquée (next_scene vide ?)")
+		return
+	await PaletteFx.fade_out()
+	get_tree().change_scene_to_file(path)
+	await get_tree().process_frame   # le changement de scène a lieu en fin d'image
+	await get_tree().process_frame
+	await PaletteFx.fade_in()
+
+
+func game_over() -> void:
+	goto(Game.current_section)   # remplacé au tome 10 par l'écran de continue
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée les deux scripts.</li>
+  <li>Ajoute <code>res://autoload/scene_flow.gd</code> en autoload sous le nom <code>SceneFlow</code>, <strong>après</strong> <code>PaletteFx</code>.</li>
+</ol></div>
+<div class="callout concept"><span class="tag">Une seule autorité pour les transitions</span><p>Les fondus sont gérés à <strong>un seul endroit</strong> : <code>SceneFlow</code>. Si chaque section faisait aussi les siens, on obtiendrait des doubles fondus ou des écrans qui « reclignotent ». Règle générale : un effet global appartient à un seul propriétaire.</p></div>
+<div class="callout godot"><span class="tag"><code>@export_file</code> et <code>scene_file_path</code></span><p><code>@export_file("*.tscn")</code> affiche un sélecteur de fichier dans l'Inspecteur, filtré sur les scènes. <code>scene_file_path</code> est le chemin du fichier <code>.tscn</code> dont la racine a été chargée : c'est ce qu'on mémorise pour reprendre la section après un « continue ».</p></div>
+
+<h2 id="rue">La rue</h2>
+
+<h3 class="step" id="e09-2">9.2 · Monter la scène <code>s1_streets.tscn</code></h3>
+<div class="shots">
+  <figure class="shot"><img src="../batman-and-robin-godot-guide/img/s11-start.jpg" alt="Début de la rue"><figcaption>Début de la section. <a class="tc" href="#">1:50</a></figcaption></figure>
+  <figure class="shot"><img src="../batman-and-robin-godot-guide/img/s11-hang.jpg" alt="Batman sous le balcon"><figcaption>Le balcon praticable. <a class="tc" href="#">3:30</a></figcaption></figure>
+  <figure class="shot"><img src="../batman-and-robin-godot-guide/img/s11-bank-fire.jpg" alt="Rue en feu"><figcaption>Après l'explosion de la banque. <a class="tc" href="#">2:52</a></figcaption></figure>
+</div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène 2D, racine <code>S1Streets</code>, script <code>section.gd</code>. Enregistre en <code>res://sections/s1_streets.tscn</code>. Laisse la racine en (0, 0) : tout le niveau se repère par rapport à elle.</li>
+  <li>Construis l'arbre ci-dessous. Les éléments marqués ◇ viennent plus loin dans cette étape.</li>
+</ol>
+<pre class="tree">S1Streets (Node2D, section.gd)        next_scene = (provisoirement) s1_streets.tscn · player = Player
+├── Background (CanvasLayer, layer = -10)
+│   └── Facade (ColorRect)            facade_raster.gd + raster_plane.gdshader (comme à l'étape 08)
+├── World (Node2D)
+│   ├── Ground (StaticBody2D)         couche 1 · rectangle 3000×16 · en (1500, 208)
+│   ├── Balcony (StaticBody2D)        couche 2 · plusieurs CollisionShape2D one-way de 8 px de haut, y = 112
+│   ├── Ledges (Node2D)               une Area2D couche 8 sous chaque tronçon de balcon, y = 108
+│   ├── Props (Node2D)                poubelles, crânes
+│   ├── Fires (Node2D, caché)         ◇ foyers fire.gd devant les fenêtres de la banque
+│   ├── ArenaA … ArenaD (WaveArena)   ◇
+│   ├── BankEvent (Area2D)            ◇
+│   └── BossArena (Area2D)            ◇ → HarleyMachine
+├── EnemyBullets (Pool)               groupe « enemy_bullets » · scene = enemy_bullet.tscn
+├── Player (player.tscn)              en (40, 200)
+└── Camera (Camera2D, camera_rig.gd)  target = Player
+    └── Debris (CPUParticles2D)       ◇ papiers et billets, émis après l'explosion</pre>
+<ol start="3">
+  <li><strong>Le balcon à trous</strong> : sous <code>Balcony</code>, un <code>CollisionShape2D</code> par tronçon, par exemple de x = 200 à 900, de 1 000 à 1 800 et de 1 900 à 2 600. Chaque forme : rectangle de (longueur)×8, One Way Collision coché, position y = 112. Ajoute des <code>ColorRect</code> semi-transparents pour les voir.</li>
+  <li><strong>Les rebords</strong> : pour chaque tronçon, une <code>Area2D</code> (couche 8) positionnée en y = 108, avec une forme de (longueur)×4 en (0, 2).</li>
+  <li>Pour <code>Facade</code>, réutilise la façade de test et la courbe de l'étape 08. Astuce : copie le nœud <code>Background</code> de la salle de test (<kbd>Ctrl C</kbd>) et colle-le ici (<kbd>Ctrl V</kbd>).</li>
+  <li>Sélectionne la racine et renseigne <strong>Player</strong> et <strong>Next Scene</strong> (provisoirement la section elle-même : elle bouclera sur elle-même tant que la section 2 n'existe pas).</li>
+</ol></div>
+<div class="callout method"><span class="tag">Méthode : le « greybox »</span><p>On construit le niveau en formes grises (ou semi-transparentes) avant tout décor définitif. On peut ainsi régler les distances, la hauteur du balcon, la place des arènes et le rythme, et tout déplacer en quelques secondes. Le décor est la dernière couche, posée quand le niveau est amusant.</p></div>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F6</kbd> : Batman parcourt une rue de 3 000 px avec un balcon à trous, sur lequel il peut monter en s'accrochant. La façade défile derrière. Pour mourir, provisoirement, place un piège <code>spikes</code> : Batman perd une vie et réapparaît ; à la troisième mort, la section recommence (version minimale du game over).</p></div>
+
+<h3 class="step" id="e09-3">9.3 · Placer les arènes</h3>
+<p>À ~117 px/s, chaque seconde de vidéo représente environ 117 px de rue. Ce découpage est donc approximatif : ajuste-le en jouant.</p>
+<div class="table-wrap"><table>
+<tr><th>Repère vidéo</th><th>X approx.</th><th>Contenu</th></tr>
+<tr><td><a class="tc" href="#">1:46</a></td><td>0–320</td><td>Départ, poubelles, premier bonus d'arme</td></tr>
+<tr><td><a class="tc" href="#">1:52</a>–<a class="tc" href="#">2:25</a></td><td>~480</td><td><strong>Arène A</strong> : clowns du balcon et de la rue (2 vagues) → GO!</td></tr>
+<tr><td><a class="tc" href="#">2:27</a></td><td>~700–1000</td><td>Couloir : tireurs, crâne ; la façade de la banque apparaît</td></tr>
+<tr><td><a class="tc" href="#">2:44</a></td><td>~1100</td><td><strong>Événement de la banque</strong></td></tr>
+<tr><td><a class="tc" href="#">2:51</a>–<a class="tc" href="#">3:18</a></td><td>~1300</td><td><strong>Arène B</strong> : costauds, sbires armés → GO!</td></tr>
+<tr><td><a class="tc" href="#">3:20</a>–<a class="tc" href="#">3:37</a></td><td>~1650</td><td><strong>Arène C</strong> : mélange, tireurs sur le balcon → GO!</td></tr>
+<tr><td><a class="tc" href="#">4:06</a>–<a class="tc" href="#">4:42</a></td><td>~2200</td><td><strong>Arène D</strong> : tireurs, clowns → GO!</td></tr>
+<tr><td><a class="tc" href="#">4:44</a></td><td>~2500–2700</td><td>Rue vide, puis <strong>BossArena</strong></td></tr>
+</table></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Place quatre <code>WaveArena</code> aux X du tableau (forme 8×224, masque 3, <strong>Go Sign Scene</strong> renseignée).</li>
+  <li>Remplis leurs vagues. Une proposition de départ :
+    <ul>
+      <li><strong>A</strong> : [clown] quota 4, max 2, origines top + balcony ; puis [clown] quota 5, max 3.</li>
+      <li><strong>B</strong> : [clown, thug] quota 5, max 3 ; puis [thug, gunner] quota 4, max 2.</li>
+      <li><strong>C</strong> : [gunner] quota 3, origine balcony ; puis [clown, gunner, thug] quota 6, max 3.</li>
+      <li><strong>D</strong> : [clown, gunner] quota 8, max 4 ; puis [thug] quota 3, max 2.</li>
+    </ul></li>
+  <li>Dans <code>Props</code>, place quelques <code>trash_can.tscn</code> (avec un <code>WeaponPickup</code>) dans les couloirs, et un <code>skull_bomb.tscn</code> vers x = 800.</li>
+  <li>Dans le couloir entre A et la banque, pose deux <code>gunner.tscn</code> à la main sur le balcon.</li>
+</ol></div>
+<div class="callout concept"><span class="tag">Concept : le rythme tension / détente</span><p>Arène (tension, écran figé) → couloir (détente, on avance) → arène… Le joueur respire entre deux combats, et un nouvel ennemi ou un bonus dans un couloir se remarque d'autant mieux. Quand tu places tes arènes, garde cette alternance, et fais monter la difficulté d'une arène à l'autre.</p></div>
+<div class="callout test"><span class="tag">Teste</span><p>Joue la rue entière. Note dans ton journal chaque moment où tu t'ennuies (trop long, trop facile) et chaque moment où tu meurs sans comprendre pourquoi. Ce sont tes deux listes de réglages.</p></div>
+
+<h2 id="banque">L'explosion de la banque</h2>
+
+<h3 class="step" id="e09-4">9.4 · Observer l'événement</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t07-banque-sequence.jpg" alt="Séquence de l'explosion de la banque" loading="lazy"><figcaption><b>La séquence, image par image.</b> Avant ; un flash de 3 images ; des explosions entre deux flashs ; le flash pendant lequel la palette bascule ; la rue en feu.</figcaption></figure>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>De <a class="tc" href="#">2:43.9</a> à <a class="tc" href="#">2:50.4</a> : des explosions en chaîne à l'étage, et environ 24 flashs blancs de 3 images chacun, à intervalles irréguliers (un toutes les 0,27 s en moyenne). La palette bascule vers le violet et l'ocre à <a class="tc" href="#">2:49.6</a>, pendant un flash. Ensuite, des flammes sortent des fenêtres et des papiers tombent en continu.</p></div>
+<div class="callout concept"><span class="tag">Concept : cacher un changement sous un flash</span><p>Changer tout le décor d'un coup serait brutal. Les flashs servent de <strong>rideau</strong> : c'est pendant l'un d'eux qu'on change la palette, qu'on allume les feux et qu'on lance les débris. Quand le blanc retombe, le monde a changé, et le joueur l'accepte comme la conséquence de l'explosion.</p></div>
+
+<h3 class="step" id="e09-5">9.5 · Préparer la façade « incendie »</h3>
+<p>Version simple : une seconde texture de façade, aux couleurs de l'incendie, qu'on échangera pendant un flash. Avec la façade de test, il suffit de relancer le générateur avec d'autres teintes.</p>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans <code>make_debug_facade.gd</code>, change deux lignes : <code>const PATH := "res://art/s1/facade_debug_fire.png"</code> et <code>var hue := Color.from_hsv(0.75 + (band % 6) / 6.0 * 0.2, 0.6, 0.55)</code> (des violets vers le rose).</li>
+  <li>Exécute-le, puis remets les deux lignes d'origine.</li>
+  <li>Avec de vrais décors, ce serait la même façade repeinte en violet et ocre ; la version fidèle est la bascule indexée de l'étape 08.</li>
+</ol></div>
+
+<h3 class="step" id="e09-6">9.6 · <code>bank_event.gd</code></h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sections/s1/bank_event.gd">
+extends Area2D
+## Déclencheur (masque 3) : explosion de la Bank of Gotham City.
+
+@export var blast_points: Array[Marker2D] = []   ## fenêtres de l'étage
+@export var facade: ColorRect                     ## le plan raster
+@export var fire_texture: Texture2D               ## la même façade, palette « incendie »
+@export var fires: Node2D                         ## foyers fire.gd, cachés au départ
+@export var debris: CPUParticles2D
+var _done := false
+
+
+func _ready() -> void:
+	body_entered.connect(_on_body_entered)
+	fires.hide()
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if _done or not body is Player:
+		return
+	_done = true
+	_run()
+
+
+@export var duration := 6.5           ## mesuré : 2:43.9 → 2:50.4
+@export var switch_at := 5.7          ## mesuré : la palette bascule à 2:49.6
+## Intervalle aléatoire entre deux flashs. Moyenne 0,225 s + 3 images de flash ≈ 0,27 s :
+## environ 24 flashs en 6,5 s, comme mesuré.
+@export var flash_gap := Vector2(0.1, 0.35)
+
+
+func _run() -> void:
+	var t := 0.0
+	var switched := false
+	while t < duration:
+		# Un flash blanc de 3 images exactement, comme mesuré dans la vidéo.
+		# C'est pendant un flash, quand on ne voit rien, qu'on change le monde.
+		PaletteFx.set_flash(7)
+		if not switched and t >= switch_at:
+			switched = true
+			_switch_to_fire()
+		await PaletteFx.flash_white(3, 7)
+		t += 3.0 / 60.0
+		# Entre deux flashs : des explosions à l'étage.
+		var m: Marker2D = blast_points.pick_random()
+		Fx.explosion(m.global_position + Vector2(randf_range(-16, 16), randf_range(-8, 8)))
+		var gap := randf_range(flash_gap.x, flash_gap.y)
+		await get_tree().create_timer(gap).timeout
+		t += gap
+	if not switched:
+		_switch_to_fire()
+
+
+func _switch_to_fire() -> void:
+	facade.material.set_shader_parameter("plane", fire_texture)
+	fires.show()
+	debris.emitting = true
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li>Ici, <code>await</code> est le bon outil : c'est une <strong>séquence scriptée</strong>, linéaire, qui ne dépend d'aucun état de jeu. Une boucle <code>while</code> avec des pauses se lit comme un scénario.</li>
+  <li>Les exports déclarés au milieu du fichier sont permis en GDScript, mais on les met d'habitude en haut. Déplace-les si tu préfères : c'est un bon exercice de lecture.</li>
+  <li><code>facade.material.set_shader_parameter("plane", …)</code> : le plan raster a dupliqué son matériau dans <code>_ready()</code> ; <code>facade.material</code> désigne bien cette copie.</li>
+</ul>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Sous <code>World</code>, ajoute <code>BankEvent</code> (<code>Area2D</code>, masque 3, forme 8×224) en x ≈ 1 100, avec ce script.</li>
+  <li>Enfants de <code>BankEvent</code> : trois ou quatre <code>Marker2D</code> à la hauteur des fenêtres de l'étage (y ≈ 60). Glisse-les dans le tableau <strong>Blast Points</strong>.</li>
+  <li><code>Fires</code> : trois instances du foyer de l'étape 08 (<code>Sprite2D</code> + <code>fire.gd</code>) à la hauteur des fenêtres. Le script les cache au démarrage.</li>
+  <li><code>Debris</code> (enfant de la caméra) : <code>CPUParticles2D</code>, <strong>Emitting</strong> décoché, <strong>Amount</strong> 30, <strong>Lifetime</strong> 6, <strong>Emission Shape</strong> = Rectangle avec <strong>Rect Extents</strong> = (160, 2) (ce sont des demi-tailles : la zone fait 320×4), position (0, -120), <strong>Gravity</strong> (0, 30), <strong>Angle</strong> aléatoire, une petite texture (un rectangle blanc de 3×2 fait l'affaire).</li>
+  <li>Renseigne les exports de <code>BankEvent</code> : <strong>Facade</strong>, <strong>Fire Texture</strong> (<code>facade_debug_fire.png</code>), <strong>Fires</strong>, <strong>Debris</strong>.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>En passant x ≈ 1 100 : des explosions à l'étage et des flashs blancs stroboscopiques pendant 6,5 s. Pendant l'un des derniers flashs, la façade change de couleurs, les feux apparaissent et les papiers commencent à tomber. Ils continuent jusqu'au boss.</p></div>
+<div class="callout warn"><span class="tag">Accessibilité</span><p>24 flashs blancs en 6 s forment un stroboscope qui peut gêner les personnes photosensibles. C'est fidèle à l'original, mais un jeu moderne propose une option : remplace <code>flash_white(3, 7)</code> par <code>flash_white(3, 3)</code> (flash atténué) quand l'option est active. Penser à l'accessibilité fait partie du métier.</p></div>
+
+<h2 id="boss">Le premier boss</h2>
+
+<h3 class="step" id="e09-7">9.7 · La base commune des boss</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t07-vitalite.jpg" alt="La pastille de vitalité du boss" loading="lazy"><figcaption><b>La pastille centrale.</b> Elle descend au rythme des impacts et tombe à 00 à la destruction : c'est la vitalité du boss que renvoie <code>Boss.vitality()</code>.</figcaption></figure>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/boss.gd">
+class_name Boss
+extends Node2D
+## Base des boss : vitalité 99 → 00 (pastille du HUD), démarrage, mort, points.
+
+signal vitality_changed(value: int)
+signal defeated
+
+@export var score_value := 5000
+@onready var health: Health = $Health
+var active := false
+var player: Player
+
+
+func _ready() -> void:
+	add_to_group("bosses")
+	player = get_tree().get_first_node_in_group("player") as Player
+	health.changed.connect(func(_c: int, _m: int) -> void: vitality_changed.emit(vitality()))
+	health.died.connect(_on_died)
+
+
+## Valeur affichée dans la pastille : 99 à pleine vie, 00 à la mort (vidéo 6:16, 10:34, 14:23).
+func vitality() -> int:
+	return ceili(99.0 * health.current / health.max_health)
+
+
+func start() -> void:
+	active = true
+	get_tree().call_group("hud", "show_boss", self)   # le HUD (tome 10) s'abonne
+	vitality_changed.emit(vitality())
+
+
+func _on_died() -> void:
+	active = false
+	await die_sequence()
+	get_tree().call_group("hud", "hide_boss")
+	defeated.emit()
+
+
+## À surcharger : explosions, chute du pilote…
+func die_sequence() -> void:
+	await get_tree().create_timer(1.0).timeout
+
+
+## Utilitaire : chapelet d'explosions aléatoires dans un rectangle local.
+func explode_area(area: Rect2, count: int, interval: float) -> void:
+	for i in count:
+		var p := Vector2(randf_range(area.position.x, area.end.x), randf_range(area.position.y, area.end.y))
+		Fx.explosion(to_global(p))   # dans la scène courante, pas sous la BossArena
+		await get_tree().create_timer(interval).timeout
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/boss_arena.gd">
+class_name BossArena
+extends Area2D
+## Déclencheur (masque 3) : fige la caméra, lance le boss, prévient la section à sa mort.
+
+@export var boss: Boss
+@export var section: Section
+@export var intro_delay := 1.0
+var _done := false
+
+
+func _ready() -> void:
+	body_entered.connect(_on_body_entered)
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if _done or not body is Player:
+		return
+	_done = true
+	(body as Player).camera.lock_on(global_position.x)
+	boss.defeated.connect(func() -> void: section.boss_defeated(boss.score_value), CONNECT_ONE_SHOT)
+	await get_tree().create_timer(intro_delay).timeout
+	boss.start()
+</script>
+<p>Et la fonction de tir balistique, à ajouter à <code>fx.gd</code> :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/fx.gd  (ajout)">
+## Vitesse initiale pour qu'un projectile soumis à « gravity » aille de « from » à « to »
+## en « time » secondes. Physique de lycée : y(t) = y0 + vy*t + g*t²/2.
+static func ballistic(from: Vector2, to: Vector2, gravity: float, time: float) -> Vector2:
+	var d := to - from
+	return Vector2(d.x / time, d.y / time - 0.5 * gravity * time)
+</script>
+<div class="callout concept"><span class="tag">Concept : <code>call_group</code>, le message à qui veut l'entendre</span><p>Le boss ne sait pas si un HUD existe. Il « crie » <code>show_boss</code> à tous les nœuds du groupe <code>hud</code>. S'il n'y en a aucun (comme maintenant, avant l'étape 10), rien ne se passe et rien ne plante. C'est un découplage encore plus fort que les signaux.</p></div>
+<div class="callout concept"><span class="tag">Concept : viser avec la physique</span><p>Pour qu'une bombe lobée tombe sur Batman, on fixe la <strong>durée du vol</strong> et on résout l'équation du mouvement pour trouver la vitesse de départ. Changer <code>time</code> donne des lobes plus tendus ou plus hauts, sans toucher au reste.</p></div>
+
+<h3 class="step" id="e09-8">9.8 · La machine d'Harley : le plan du combat</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t07-boss1-phases.jpg" alt="Les trois phases de la machine d'Harley" loading="lazy"><figcaption><b>Les trois phases de la machine d'Harley.</b> A : canon rotatif et salves en arc · B : socle détruit, bombes éjectées · C : mât télescopique, Harley exposée au niveau du balcon.</figcaption></figure>
+<div class="table-wrap"><table>
+<tr><th>Phase</th><th>Vitalité</th><th>Partie vulnérable</th><th>Attaque</th><th>Mouvement</th></tr>
+<tr><td>A · complète</td><td>99 → 66</td><td>Capsule</td><td>Salves de 4 boules en arc, canon qui balaie de l'horizontale à la verticale</td><td>Glisse de gauche à droite</td></tr>
+<tr><td>B · capsule</td><td>66 → 33</td><td>Capsule</td><td>Canon qui tourne à 360°, salves plus fréquentes</td><td>Plus rapide</td></tr>
+<tr><td>C · Harley</td><td>33 → 0</td><td><strong>Harley seule</strong></td><td>Bombes lobées sur Batman</td><td>Mât télescopique qui monte au niveau du balcon</td></tr>
+</table></div>
+<div class="callout concept"><span class="tag">Concept : la grammaire d'un boss</span>
+<ul>
+  <li><strong>Des phases</strong> liées à des seuils de vie : le combat évolue, et le joueur sent qu'il progresse.</li>
+  <li><strong>Une transition spectaculaire</strong> (explosion, pièce qui saute), avec une <strong>brève invincibilité</strong> pendant laquelle le joueur souffle.</li>
+  <li><strong>Un point faible qui se déplace</strong> : en phase C, il faut monter sur le balcon pour atteindre Harley. Le décor devient un élément du combat.</li>
+  <li><strong>La télégraphie</strong> : le canon pointe là où il va tirer.</li>
+</ul></div>
+
+<h3 class="step" id="e09-9">9.9 · La machine d'Harley : le code</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://bosses/harley_machine/harley_machine.gd">
+class_name HarleyMachine
+extends Boss
+## Boss de la section 1 (vidéo 4:46–6:21).
+
+enum Phase { A, B, C }
+
+@export var ball_scene: PackedScene          ## bomb.tscn : bounces = 1, fall_gravity = 300
+@export var harley_bomb_scene: PackedScene   ## bomb.tscn : bounces = 0
+@export var arena_half_width := 110.0
+@export var slide_speed := 45.0
+@export var base_height := 24.0              ## de combien la capsule descend en phase B
+@export var mast_min := 16.0
+@export var mast_max := 80.0                 ## jusqu'au niveau du balcon
+@export var transition_time := 1.2
+
+var phase := Phase.A
+var _t := 0.0
+var _dir := 1
+var _center_x := 0.0
+var _fire_t := 1.5
+var _angle := 0.0                            ## angle du canon (radians)
+var _transitioning := false
+
+@onready var base: Node2D = $Base
+@onready var capsule: Node2D = $Capsule
+@onready var cannon: Node2D = $Capsule/Cannon
+@onready var muzzle: Marker2D = $Capsule/Cannon/Muzzle
+@onready var crown: Node2D = $Crown
+@onready var mast: Node2D = $Mast
+@onready var pole: Sprite2D = $Mast/Pole
+@onready var harley: Node2D = $Mast/Harley
+@onready var hurt_capsule: Hurtbox = $Capsule/Hurtbox
+@onready var hurt_harley: Hurtbox = $Mast/Harley/Hurtbox
+
+
+func _ready() -> void:
+	super._ready()
+	_center_x = global_position.x
+	crown.hide()
+	mast.hide()
+	hurt_harley.monitorable = false
+	health.changed.connect(_check_phase)
+
+
+func _physics_process(delta: float) -> void:
+	if not active or _transitioning:
+		return
+	_t += delta
+	match phase:
+		Phase.A:
+			_slide(delta, slide_speed)
+			# Balaye de l'horizontale (0) à la verticale (PI/2), côté joueur.
+			_angle = (sin(_t * 0.9) * 0.5 + 0.5) * PI / 2.0
+			_aim_towards_player()
+			_volley(delta, 1.6, 4)
+		Phase.B:
+			_slide(delta, slide_speed * 1.4)
+			_angle = fposmod(_angle + 1.8 * delta, TAU)   # tours complets
+			cannon.rotation = -_angle
+			_volley(delta, 1.1, 4)
+		Phase.C:
+			_slide(delta, slide_speed * 0.6)
+			_update_mast()
+			_harley_attack(delta)
+
+
+func _slide(delta: float, speed: float) -> void:
+	global_position.x += _dir * speed * delta
+	var offset := global_position.x - _center_x
+	if absf(offset) > arena_half_width:
+		global_position.x = _center_x + signf(offset) * arena_half_width
+		_dir = -_dir
+
+
+func _aim_towards_player() -> void:
+	var side := signf(player.global_position.x - global_position.x) if player else -1.0
+	# side = 1 : le canon part vers la droite et monte ; side = -1 : vers la gauche.
+	cannon.rotation = -_angle if side > 0.0 else PI + _angle
+
+
+func _volley(delta: float, interval: float, count: int) -> void:
+	_fire_t -= delta
+	if _fire_t > 0.0 or ball_scene == null:
+		return
+	_fire_t = interval
+	var dir := Vector2.RIGHT.rotated(cannon.rotation)
+	for i in count:
+		var b := ball_scene.instantiate() as Bomb
+		b.velocity = dir * (110.0 + i * 35.0)   # vitesses étagées : les boules forment un arc
+		Fx.spawn(b, muzzle.global_position)
+
+
+func _update_mast() -> void:
+	var k := sin(_t * 0.8) * 0.5 + 0.5
+	var length := lerpf(mast_min, mast_max, k)
+	harley.position.y = -length
+	pole.scale.y = length / pole.texture.get_height() if pole.texture else 1.0
+	pole.position.y = -length / 2.0
+
+
+func _harley_attack(delta: float) -> void:
+	_fire_t -= delta
+	if _fire_t > 0.0 or harley_bomb_scene == null or player == null:
+		return
+	_fire_t = 1.3
+	var b := harley_bomb_scene.instantiate() as Bomb
+	b.velocity = Fx.ballistic(harley.global_position, player.global_position + Vector2(0, -16), b.fall_gravity, 0.9)
+	Fx.spawn(b, harley.global_position)
+
+
+func _check_phase(current: int, maximum: int) -> void:
+	if phase == Phase.A and current <= maximum * 66 / 99:
+		_go_phase(Phase.B)
+	elif phase == Phase.B and current <= maximum * 33 / 99:
+		_go_phase(Phase.C)
+
+
+func _go_phase(next: Phase) -> void:
+	_transitioning = true
+	health.invincible = true
+	match next:
+		Phase.B:
+			await explode_area(Rect2(-32, -base_height, 64, base_height), 6, 0.08)
+			base.hide()
+			_eject_ring(4)
+			var tw := create_tween()
+			tw.tween_property(capsule, "position:y", capsule.position.y + base_height, 0.4)
+		Phase.C:
+			await explode_area(Rect2(-36, -96, 72, 48), 8, 0.07)
+			capsule.hide()
+			hurt_capsule.set_deferred("monitorable", false)
+			crown.show()
+			mast.show()
+			hurt_harley.set_deferred("monitorable", true)
+	await get_tree().create_timer(transition_time).timeout
+	phase = next
+	_fire_t = 1.0
+	health.invincible = false
+	_transitioning = false
+
+
+func _eject_ring(count: int) -> void:
+	## Le socle détruit projette des bombes en couronne (vidéo 5:23).
+	for i in count:
+		var b := ball_scene.instantiate() as Bomb
+		b.velocity = Vector2.UP.rotated(lerpf(-1.0, 1.0, i / float(count - 1))) * 180.0
+		Fx.spawn(b, capsule.global_position)
+
+
+func die_sequence() -> void:
+	# Anneau d'explosions plein écran (vidéo 6:16–6:18).
+	for i in 3:
+		PaletteFx.flash_white(2, 4)
+		await explode_area(Rect2(-120, -110, 240, 120), 6, 0.06)
+	hide()
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>_check_phase</code> est branché sur <code>health.changed</code> : c'est la <strong>vie</strong> qui pilote les phases, pas le temps. <code>maximum * 66 / 99</code> donne le seuil quelle que soit la vie maximale choisie.</li>
+  <li><code>_transitioning</code> + <code>health.invincible</code> : pendant la transition, le boss ne bouge plus, ne tire plus et n'encaisse plus. Le joueur voit la pièce exploser et souffle.</li>
+  <li><code>_go_phase</code> utilise <code>await</code> : c'est une séquence scriptée (explosions, puis pièce qui disparaît, puis pause). Pendant ce temps, <code>_physics_process</code> est bloqué par <code>_transitioning</code>.</li>
+  <li>Changer de partie vulnérable revient à basculer <code>monitorable</code> sur deux Hurtbox : la capsule cesse d'être visible pour les tirs, Harley le devient.</li>
+  <li>Toutes les bombes passent par <code>Fx.spawn()</code> : le boss est l'enfant de la <code>BossArena</code>, placée loin de l'origine. Avec l'ancien schéma (<code>global_position</code> puis <code>add_child</code> sous le parent), les bombes apparaîtraient à des milliers de pixels.</li>
+</ul>
+
+<h3 class="step" id="e09-10">9.10 · Monter la machine dans la rue</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li><strong>Deux variantes de bombe</strong> : clic droit sur <code>bomb.tscn</code> → <strong>Nouvelle scène héritée</strong>. Dans la copie, <strong>Fall Gravity</strong> = 300 : enregistre en <code>res://bosses/harley_machine/harley_ball.tscn</code>. Recommence avec <strong>Bounces</strong> = 0 : <code>harley_bomb.tscn</code>.</li>
+  <li><strong>La scène du boss</strong> : nouvelle scène, racine <code>Node2D</code> nommée <code>HarleyMachine</code>, script <code>harley_machine.gd</code>, enregistrée dans <code>res://bosses/harley_machine/</code>. Construis l'arbre ci-dessous ; chaque <code>Sprite2D</code> utilise <code>white.png</code> avec une échelle et une couleur (socle rose 64×24, capsule rayée rouge 56×48, canon gris 24×6 dont le pivot est à gauche, couronne bleue 60×12, mât gris, Harley 16×20).</li>
+</ol>
+<pre class="tree">HarleyMachine (Node2D, harley_machine.gd)     score_value = 5000
+├── Health                     max_health = 99 (À CALIBRER)
+├── Base (Node2D)              socle rose à pointes
+│   └── Sprite2D
+├── Capsule (Node2D)           position (0, -24) : posée sur le socle
+│   ├── Sprite2D               matériau hit_flash (Local To Scene)
+│   ├── Hurtbox                couche 6 · health = Health
+│   │   └── CollisionShape2D
+│   └── Cannon (Node2D)        pivot du canon, sur le côté du dôme
+│       ├── Sprite2D           décalé de +12 en x : le canon part du pivot
+│       └── Muzzle (Marker2D)  bout du canon, en (24, 0)
+├── Crown (Sprite2D, caché)    couronne bleue « en pétales »
+├── Mast (Node2D, caché)
+│   ├── Pole (Sprite2D)        texture white.png : sa hauteur est étirée par le code
+│   └── Harley (Node2D)
+│       ├── Sprite2D           Harley dans son fauteuil
+│       └── Hurtbox            couche 6 · health = Health
+└── HitFlash (HitFlash)        target = Capsule/Sprite2D · hurtbox = Capsule/Hurtbox</pre>
+<ol start="3">
+  <li>Exports du boss : <strong>Ball Scene</strong> = <code>harley_ball.tscn</code>, <strong>Harley Bomb Scene</strong> = <code>harley_bomb.tscn</code>.</li>
+  <li><strong>L'arène du boss</strong> : sous <code>World</code>, une <code>Area2D</code> nommée <code>BossArena</code>, script <code>boss_arena.gd</code>, masque 3, forme 8×224, en (2 700, 112). Instancie <code>HarleyMachine</code> comme <strong>enfant</strong> de <code>BossArena</code>, en position locale (0, 96) : son origine est au sol (y = 208).</li>
+  <li>Exports de <code>BossArena</code> : <strong>Boss</strong> = <code>HarleyMachine</code>, <strong>Section</strong> = <code>S1Streets</code>.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span>
+<ul>
+  <li>Pour aller vite, déplace temporairement <code>Player</code> à x = 2 550. En entrant dans l'arène, la caméra se fige et la machine démarre une seconde plus tard.</li>
+  <li>Phase A : elle glisse, le canon balaie, des salves de 4 boules partent en arc et rebondissent. Les boules naissent bien au bout du canon.</li>
+  <li>Accroupi, Batman esquive les boules basses. Les tirs sur la capsule la font clignoter.</li>
+  <li>Au tiers de la vie : explosions, le socle disparaît, 4 bombes en couronne, la capsule descend. Phase B : le canon tourne en continu.</li>
+  <li>Aux deux tiers : le dôme explose, Harley monte sur son mât jusqu'au niveau du balcon et lobe des bombes là où se trouvait Batman. Monte sur le balcon pour la toucher.</li>
+  <li>À 0 : explosions en anneau, la machine disparaît, Batman prend la pose de victoire, et 3 s plus tard la section recommence par un fondu (en attendant la section 2).</li>
+</ul></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span>
+<ul>
+  <li><strong>Le boss ne démarre pas</strong> : vérifie le masque 3 de <code>BossArena</code> et ses exports.</li>
+  <li><strong>« Invalid get index 'score_value' » à la mort du boss</strong> : l'export <strong>Boss</strong> de l'arène est vide.</li>
+  <li><strong>Le boss perd de la vie avant le combat</strong> : as-tu bien la version de <code>skull_bomb.gd</code> qui vérifie <code>boss.get("active")</code> ?</li>
+  <li><strong>Harley est intouchable en phase C</strong> : sa Hurtbox doit être sur la couche 6 et désigner le même <code>Health</code> que la capsule.</li>
+</ul></div>
+<div class="callout warn"><span class="tag">À calibrer</span><p>Vitalité (99 points, donc 99 batarangs de niveau 1), cadence des salves et vitesses des boules sont des hypothèses. Les seuils 66 et 33 découpent le combat en trois tiers, ce qui correspond aux durées observées dans la vidéo (~35 s, ~38 s, ~18 s). Chronomètre ton combat et compare.</p></div>
+
+<h3 class="step" id="e09-11">9.11 · Jouer la section de bout en bout</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Remets <code>Player</code> au départ, en (40, 200).</li>
+  <li><span class="menu">Projet → Paramètres du projet → Application → Exécuter → Scène principale</span> = <code>s1_streets.tscn</code>. Désormais <kbd>F5</kbd> lance la section. (L'étape 10 remplacera par l'intro.)</li>
+  <li>Joue la section entière trois fois, sans rien modifier entre deux parties. Note tout dans ton journal.</li>
+  <li>Puis règle : position des arènes, contenu des vagues, vie du boss.</li>
+</ol></div>
+<div class="callout method"><span class="tag">Méthode : le playtest</span><p>Jouer pour tester n'est pas jouer pour s'amuser : on note ce qu'on ressent au moment où on le ressent, sans corriger en cours de partie. Ensuite seulement, on trie et on règle. Mieux encore : fais jouer quelqu'un d'autre et regarde-le sans rien dire. Tout ce qu'il ne comprend pas est un problème de ton jeu, pas de lui.</p></div>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>La section apparaît par un fondu en 8 paliers ; les arènes s'enchaînent avec leurs « GO! ».</li>
+  <li>À la banque : explosions et flashs stroboscopiques de 3 images, puis rue en feu, flammes ondulantes, papiers qui tombent.</li>
+  <li>Le boss glisse, tire des arcs de boules, perd son socle à 66, son dôme à 33, puis Harley monte sur son mât.</li>
+  <li>À 00 : explosions, pose de victoire, +5 000, fondu, et la scène suivante se charge.</li>
+  <li>Mourir fait perdre une vie et réapparaître ; sans vie, la section recommence.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 09 : section 1 complète avec la machine d'Harley"</div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Pourquoi la banque utilise-t-elle <code>await</code> alors que Batman n'en utilise pas ?</summary><div><p>La banque est une séquence linéaire, qui ne peut pas être interrompue par une décision de jeu : <code>await</code> la rend lisible comme un scénario. La logique de Batman, elle, peut être interrompue à tout moment (coup reçu, mort) : des compteurs dans les états évitent les minuteries fantômes.</p></div></details>
+<details class="quiz"><summary>Qu'est-ce qui déclenche les changements de phase du boss ?</summary><div><p>Le signal <code>health.changed</code>, comparé à des seuils (66 % et 33 % de la vie). Les phases suivent donc les dégâts infligés par le joueur, quel que soit le temps passé.</p></div></details>
+<details class="quiz"><summary>Pourquoi le boss « crie » au HUD par <code>call_group</code> au lieu de l'appeler directement ?</summary><div><p>Pour ne pas dépendre de son existence. S'il n'y a pas de HUD (scène de test, HUD pas encore écrit), l'appel ne touche personne et rien ne plante. Le boss n'a besoin de connaître ni la place ni le type du HUD.</p></div></details>
+<details class="quiz"><summary>Comment calcule-t-on la vitesse de départ d'une bombe qui doit atterrir sur Batman ?</summary><div><p>On choisit la durée du vol t. Horizontalement, vx = dx / t. Verticalement, y(t) = y0 + vy·t + g·t²/2, donc vy = dy / t − g·t / 2.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Ajoute l'option d'accessibilité : une variable <code>Game.reduce_flashes</code> lue par <code>bank_event.gd</code>.</li>
+  <li>Ajoute à la machine une <code>Hitbox</code> de contact (masque 5) : toucher la machine fait mal.</li>
+  <li>Lis le tome 07 du guide et compare ta section à la frise du <a href="../batman-and-robin-godot-guide/01-niveau-1.html#frise">tome 01</a>.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

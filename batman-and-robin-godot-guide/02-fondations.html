@@ -141,20 +141,25 @@ func _axis(axis: JoyAxis, value: float) -> InputEventJoypadMotion:
 <p>Elle est fixée dès maintenant : tous les chemins <code>res://</code> des tomes suivants s'y réfèrent.</p>
 <pre class="tree">res://
 ├── autoload/          game.gd, scene_flow.gd, audio.gd          (singletons)
-├── core/              state.gd, state_machine.gd, health.gd,
+├── core/              layers.gd, state.gd, state_machine.gd, health.gd,
 │                      hitbox.gd, hurtbox.gd, pool.gd             (briques génériques)
-├── player/            player.tscn, player.gd, hero_data.gd, states/*.gd
-├── weapons/           weapon_data.gd, weapon_system.gd, projectile.tscn/.gd,
+├── player/            player.tscn, player.gd, hero_data.gd, batman.tres, robin.tres,
+│                      states/*.gd
+├── weapons/           weapons.gd, weapon_data.gd, weapon_system.gd, projectile.tscn/.gd,
 │                      data/batarang.tres, bolas.tres, shuriken.tres
-├── pickups/           weapon_pickup.tscn, skull_bomb.tscn, ...
-├── enemies/           enemy.gd, clown.tscn, thug.tscn, gunner.tscn,
-│                      propeller_head.tscn, balloon_mine.tscn
-├── level/             wave_arena.gd, wave_data.gd, camera_rig.gd, go_sign.tscn
-├── fx/                raster_plane.gd, *.gdshader, explosion.tscn
-├── bosses/            boss_vitality.gd, harley_machine/, crane_harley/, joker_balloon/
-├── sections/          s1_streets.tscn, s2_gem_expo.tscn, s3_convoy.tscn
-├── screens/           intro, title, options, player_select, title_card, game_over
-├── ui/                hud.tscn, hud.gd
+├── pickups/           pickup.gd, weapon_pickup, skull_bomb, charge_pickup (.tscn/.gd)
+├── enemies/           enemy.gd, clown, thug, gunner, propeller_head, balloon_mine,
+│                      bomb, formation.gd, enemy_bullet.tscn
+├── level/             camera_rig.gd, wave_arena.gd, wave_data.gd, breakable.gd,
+│                      go_sign.tscn, test_room.tscn
+├── fx/                fx.gd, explosion.tscn, palette_fx.tscn, raster_plane.gd,
+│                      facade_raster.gd, fire.gd, hit_flash.gd, *.gdshader
+├── bosses/            boss.gd, boss_arena.gd, harley_machine/, crane_harley/, joker_balloon/
+├── sections/          section.gd, s1_streets.tscn, s2_gem_expo.tscn, s3_convoy.tscn,
+│                      s1/, s2/, s3/                               (scripts propres à chaque section)
+├── screens/           intro, title, options, player_select, continue,
+│                      interlude.gd (batmobile, title_card, level_end)
+├── ui/                hud.tscn, hud.gd, life_medallion.gd, charge_bar.gd
 ├── art/  audio/  fonts/
 └── tools/             setup_inputs.gd, indexer.gd                 (scripts d'éditeur)</pre>
 
@@ -165,11 +170,11 @@ func _axis(axis: JoyAxis, value: float) -> InputEventJoypadMotion:
 <tr><th>N°</th><th>Nom</th><th>Qui est dessus</th><th>Qui la regarde</th></tr>
 <tr><td>1</td><td>monde</td><td>Sols, murs (StaticBody, TileMapLayer)</td><td>Corps du joueur et des ennemis, projectiles qui s'écrasent</td></tr>
 <tr><td>2</td><td>plateformes</td><td>Balcon, caisses, plateaux de camions (collision « one-way »)</td><td>Corps du joueur et des ennemis</td></tr>
-<tr><td>3</td><td>corps_joueur</td><td>CharacterBody2D de Batman</td><td>Bonus</td></tr>
-<tr><td>4</td><td>corps_ennemis</td><td>CharacterBody2D des ennemis</td><td>Zone de mêlée du joueur (détection de proximité)</td></tr>
+<tr><td>3</td><td>corps_joueur</td><td>CharacterBody2D de Batman</td><td>Zones des bonus, déclencheurs (arènes, boss, banque), prise du costaud, zone de chute</td></tr>
+<tr><td>4</td><td>corps_ennemis</td><td>CharacterBody2D des ennemis</td><td>Personne dans le niveau 1 (couche réservée : les attaques visent la couche 6)</td></tr>
 <tr><td>5</td><td>hurtbox_joueur</td><td>Hurtbox de Batman</td><td>Hitbox ennemies (coups, balles, bombes)</td></tr>
-<tr><td>6</td><td>hurtbox_ennemis</td><td>Hurtbox des ennemis et des boss</td><td>Hitbox du joueur (poing, projectiles)</td></tr>
-<tr><td>7</td><td>bonus</td><td>Objets à ramasser</td><td>Corps du joueur</td></tr>
+<tr><td>6</td><td>hurtbox_ennemis</td><td>Hurtbox des ennemis, des boss et des objets cassables</td><td>Hitbox du joueur (poing, projectiles) et sa zone <code>MeleeSense</code> (« un ennemi est-il à portée de poing ? »)</td></tr>
+<tr><td>7</td><td>bonus</td><td>Zone de ramassage des objets</td><td>Personne : c'est la zone du bonus qui regarde la couche 3, pas l'inverse</td></tr>
 <tr><td>8</td><td>rebords</td><td>Zones d'accroche sous le balcon</td><td>Sonde « mains » de Batman</td></tr>
 </table></div>
 <script type="text/x-code" data-lang="ini" data-file="project.godot (extrait)">
@@ -222,6 +227,8 @@ var hero: Hero = Hero.BATMAN
 var score := 0
 var lives := START_LIVES
 var credits := START_CREDITS
+## Crédits accordés à chaque nouvelle partie. Réglé par l'écran OPTIONS (tome 10).
+var credits_setting := START_CREDITS
 var weapon_id: StringName = &"batarang"
 var weapon_level := 1
 var current_section := ""       ## chemin de la section en cours : point de reprise du « continue »
@@ -230,7 +237,7 @@ var _next_extra_life := 0
 
 func new_game(selected: Hero) -> void:
 	hero = selected
-	credits = START_CREDITS
+	credits = credits_setting
 	_reset_run()
 
 

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 · Finitions, export et suite — Pas à pas</title>
+<meta name="description" content="Étape 13 : tremblement de caméra et hit stop, passe de fidélité, nettoyage, profilage, export, rétrospective, puis annexes : boîte à outils de débogage, erreurs fréquentes, aide-mémoire GDScript et récapitulatif des méthodes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 13 / 13</div>
+  <h1>Finitions, export et suite</h1>
+  <p class="lead">Le jeu est complet. Il reste ce qui sépare un projet d'un jeu fini : le ressenti, la comparaison méthodique avec l'original, le ménage, la mesure des performances, l'export. Puis un regard en arrière sur ce que tu as appris, et des aide-mémoires à garder sous la main.</p>
+  <div class="meta"><span class="pill">⏱ ~3 h</span><span class="pill">Prérequis : étape 12</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/11-finitions.html">tome 11</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li><code>Camera2D.offset</code>, <code>Engine.time_scale</code></li>
+    <li>Le profileur et les moniteurs</li>
+    <li>Les modèles d'exportation et les préréglages</li>
+    <li>Les filtres d'export</li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>Le ressenti (<em>game feel</em>) et sa mesure</li>
+    <li>La passe de fidélité</li>
+    <li>Le profilage avant l'optimisation</li>
+    <li>La rétrospective (<em>post-mortem</em>)</li>
+  </ul></div>
+</div>
+
+<h2 id="juice">Le ressenti</h2>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t11-explosions.jpg" alt="Le ressenti du jeu original" loading="lazy"><figcaption><b>Le ressenti du jeu original.</b> Pas de tremblement d'écran ni de hit stop visibles : l'impact passe par la quantité d'explosions et les flashs de palette.</figcaption></figure>
+
+<h3 class="step" id="e13-1">13.1 · Le tremblement de caméra</h3>
+<div class="callout concept"><span class="tag">Concept : le « trauma »</span><p>Une valeur de 0 à 1 qui augmente à chaque choc et décroît avec le temps ; l'amplitude du tremblement est proportionnelle à son <strong>carré</strong> : fort au début, il s'éteint en douceur. En 320×224, 4 à 6 pixels suffisent. On décale <code>offset</code> plutôt que la position, pour ne pas perturber le suivi du joueur.</p></div>
+<p>Ajoute à <code>camera_rig.gd</code> :</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/camera_rig.gd  (ajouts)">
+@export var max_shake := Vector2(5, 4)   ## pixels
+@export var shake_decay := 1.6           ## trauma perdu par seconde
+var trauma := 0.0
+
+# Dans _ready(), ajoute : add_to_group("camera")
+
+
+## Appelée par call_group("camera", "shake", 0.35) : grappin, explosions de boss…
+func shake(amount: float) -> void:
+	trauma = minf(trauma + amount, 1.0)
+
+
+func _process(delta: float) -> void:
+	trauma = maxf(trauma - shake_decay * delta, 0.0)
+	var k := trauma * trauma   # le carré : fort au début, s'éteint en douceur
+	offset = Vector2(roundf(max_shake.x * k * randf_range(-1, 1)), roundf(max_shake.y * k * randf_range(-1, 1)))
+</script>
+<div class="callout test"><span class="tag">Teste</span><p>Le grappin de la section 2 appelait déjà <code>call_group("camera", "shake", 0.35)</code> : maintenant que la caméra est dans le groupe, chaque impact secoue l'écran. Aucune autre ligne à changer. Ajoute aussi un <code>shake(0.6)</code> dans les <code>die_sequence()</code> des boss si tu veux.</p></div>
+
+<h3 class="step" id="e13-2">13.2 · Le hit stop</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://fx/fx.gd  (ajout)">
+## Fige le jeu un instant pour donner du poids à un impact.
+## Le 4e argument de create_timer (ignore_time_scale = true) est indispensable :
+## sans lui, la minuterie est figée elle aussi et le jeu ne repart jamais.
+static func hit_stop(tree: SceneTree, duration := 0.05) -> void:
+	Engine.time_scale = 0.0
+	await tree.create_timer(duration, true, false, true).timeout
+	Engine.time_scale = 1.0
+</script>
+<div class="callout do"><span class="tag">Exercice</span><ol>
+  <li>Au début de <code>HarleyMachine._go_phase()</code>, ajoute <code>Fx.hit_stop(get_tree(), 0.1)</code>.</li>
+  <li>Joue la transition de phase avec et sans. Puis essaie 0,3 s : trop long, le jeu paraît planté.</li>
+</ol></div>
+<div class="callout warn"><span class="tag">Fidélité</span><p>La vidéo ne montre ni tremblement d'écran évident ni hit stop : ce sont des ajouts modernes. Utilise-les avec parcimonie, ou désactive-les pour un remake strict. C'est un choix de direction artistique : note-le dans ton journal, avec ta raison.</p></div>
+<div class="callout method"><span class="tag">Méthode : régler le ressenti par comparaison</span><p>Le ressenti ne se juge pas en lisant du code. Enregistre deux courtes vidéos de ton jeu (avec et sans l'effet), regarde-les côte à côte, et compare-les à la vidéo de référence. L'œil voit tout de suite ce qui « tombe juste ».</p></div>
+
+<h2 id="fidelite">La passe de fidélité</h2>
+
+<h3 class="step" id="e13-3">13.3 · Comparer à l'original, section par section</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t11-planche-reference.jpg" alt="Planche de référence" loading="lazy"><figcaption><b>Planche de référence</b> pour comparer ton remake à l'original, section par section.</figcaption></figure>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Ouvre la <a href="../batman-and-robin-godot-guide/11-finitions.html#fidelite">checklist de fidélité du tome 11</a> dans un onglet, et la vidéo dans un autre.</li>
+  <li>Joue une section, puis regarde la même section dans la vidéo. Coche ce qui est conforme, note ce qui ne l'est pas.</li>
+  <li>Classe tes notes en trois colonnes : <strong>à corriger</strong> (bug ou écart gênant), <strong>à calibrer</strong> (un chiffre à ajuster), <strong>assumé</strong> (un écart volontaire, avec sa raison).</li>
+  <li>Traite d'abord la colonne « à corriger », puis les réglages les plus visibles.</li>
+</ol></div>
+<div class="callout method"><span class="tag">Méthode : la liste priorisée</span><p>À la fin d'un projet, la liste des améliorations possibles est infinie. On n'essaie pas de tout faire : on trie par impact sur le joueur, et on s'arrête quand le reste ne se remarque plus. Un jeu n'est jamais terminé, il est publié.</p></div>
+
+<h2 id="menage">Le ménage</h2>
+
+<h3 class="step" id="e13-4">13.4 · Ranger les outils de débogage</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans <code>player.tscn</code>, cache le <code>StateDebug</code> (icône d'œil). Ne le supprime pas : il resservira.</li>
+  <li>Cache le <code>Placeholder</code> si tu as des sprites.</li>
+  <li>Retire les raccourcis de test de <code>test_room.gd</code> du jeu final : ils ne sont que dans la salle de test, qui n'est jamais chargée par le flux du jeu. Vérifie-le.</li>
+  <li>Cherche les <code>print(</code> restants : <span class="menu">Script → Rechercher dans les fichiers</span> (<kbd>Ctrl Maj F</kbd> / <kbd>⌘ Maj F</kbd>). Garde ceux des scripts d'éditeur, retire les autres.</li>
+  <li>Lance le jeu complet et vérifie que le panneau <strong>Débogueur → Erreurs</strong> reste vide. Chaque avertissement est un bug en attente.</li>
+</ol></div>
+
+<h3 class="step" id="e13-5">13.5 · Mesurer les performances</h3>
+<div class="callout concept"><span class="tag">Concept : mesurer avant d'optimiser</span><p>On n'optimise jamais « au feeling ». On mesure, on trouve le vrai goulot, on corrige celui-là, et on remesure. Le niveau 1 est très léger pour une machine moderne ; l'exercice sert surtout à apprendre les outils.</p></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Pendant une arène chargée, ouvre <strong>Débogueur → Moniteurs</strong> : <strong>Object → Nodes</strong>, <strong>Time → FPS</strong>, <strong>Time → Physics Process</strong>. Le nombre de nœuds doit revenir au même niveau après chaque vague. S'il grimpe sans cesse, quelque chose n'est jamais libéré (une fuite).</li>
+  <li><strong>Débogueur → Profileur</strong> → <strong>Démarrer</strong>, joue 30 s, <strong>Arrêter</strong>. Trie par temps : quelles fonctions coûtent le plus ? Normalement, aucune de tes fonctions ne dépasse quelques dixièmes de milliseconde.</li>
+  <li>Si tu veux retrouver la vraie limite de la console, plafonne le nombre total d'ennemis actifs vers 60. Au-delà, le jeu original aurait fait clignoter des sprites.</li>
+</ol></div>
+
+<h2 id="export">L'export</h2>
+
+<h3 class="step" id="e13-6">13.6 · Exporter ton jeu</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li><span class="menu">Éditeur → Gérer les modèles d'exportation</span> → <strong>Télécharger et installer</strong> (une seule fois par version de Godot).</li>
+  <li><span class="menu">Projet → Exporter</span> → <strong>Ajouter…</strong> → choisis ta plateforme (macOS, Windows Desktop, Linux, Web).</li>
+  <li>Onglet <strong>Ressources</strong> : dans « Filtres pour exclure des fichiers », saisis <code>tools/*, sandbox/*</code>. Les scripts d'éditeur et les essais jetables ne doivent pas partir avec le jeu.</li>
+  <li><span class="menu">Projet → Paramètres du projet → Application → Boot Splash</span> : fond noir, ton propre logo, filtre désactivé.</li>
+  <li><strong>Exporter le projet</strong>, choisis un dossier hors du projet, lance l'exécutable obtenu.</li>
+</ol></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span>
+<ul>
+  <li><strong>Le jeu exporté plante au chargement d'une image</strong> : un script charge un fichier par <code>Image.load_from_file("res://…")</code> au lieu de <code>load()</code>. Seuls les scripts d'éditeur (exclus) le font ici.</li>
+  <li><strong>Les options ne sont pas sauvegardées</strong> : vérifie que tu écris dans <code>user://</code> et non dans <code>res://</code> (en lecture seule une fois exporté).</li>
+  <li><strong>macOS refuse de lancer l'application</strong> : clic droit → Ouvrir, comme pour Godot lui-même.</li>
+</ul></div>
+<div class="callout warn"><span class="tag">Rappel</span><p>Un build qui contient les sprites, la musique ou les logos originaux ne doit pas être publié. Avec tes formes de substitution et tes propres dessins, en revanche, tout t'appartient.</p></div>
+
+<h2 id="retro">Regarder en arrière</h2>
+
+<h3 class="step" id="e13-7">13.7 · Ta rétrospective</h3>
+<div class="callout method"><span class="tag">Méthode : le <em>post-mortem</em></span><p>Les studios terminent chaque projet par une rétrospective écrite. Elle transforme une expérience en connaissance réutilisable. Prends une heure, relis ton journal de bord, et réponds par écrit :</p>
+<ol>
+  <li>Quelles sont les trois choses qui ont <strong>bien marché</strong> dans ta façon de travailler ?</li>
+  <li>Quelles sont les trois choses qui t'ont <strong>coûté le plus de temps</strong> ? Auraient-elles pu être évitées ?</li>
+  <li>Quelle erreur as-tu rencontrée le plus souvent ? Que vérifies-tu maintenant en premier ?</li>
+  <li>Quel concept te semblait obscur au début et te paraît évident maintenant ?</li>
+  <li>Si tu recommençais demain, que ferais-tu différemment ?</li>
+</ol></div>
+
+<h3 class="step" id="e13-8">13.8 · Et après ?</h3>
+<ul>
+  <li><strong>Le mode deux joueurs</strong> : le jeu original se joue à deux. Le <a href="../batman-and-robin-godot-guide/11-finitions.html#coop">tome 11</a> décrit la marche à suivre (actions préfixées <code>p1_</code>/<code>p2_</code>, caméra entre les deux joueurs, arrivée en cours de partie). C'est un excellent exercice : il touche les entrées, la caméra, le HUD et les sections.</li>
+  <li><strong>Le niveau 2</strong> : tu as tous les outils. Regarde la suite de la vidéo, découpe le niveau comme le tome 01 l'a fait pour le niveau 1, puis construis-le avec ta méthode.</li>
+  <li><strong>Ton propre jeu</strong> : prends un concept simple, tiens-toi aux six principes, et fais d'abord une tranche verticale. Tu sais désormais construire un jeu de bout en bout.</li>
+  <li><strong>Le filtre CRT</strong> (optionnel) : le shader de l'ancienne doc B (tome 4) fonctionne tel quel, dans un <code>CanvasLayer</code> de couche 101, donc au-dessus de <code>PaletteFx</code>.</li>
+</ul>
+
+<h2 id="controle">Point de contrôle final</h2>
+<div class="callout goal"><span class="tag">Tu as fini le parcours quand</span>
+<ul class="check">
+  <li>Le jeu se lance depuis un exécutable exporté et se joue de l'intro à la Batmobile finale.</li>
+  <li>Le panneau des erreurs reste vide pendant toute une partie.</li>
+  <li>Ta checklist de fidélité est passée, avec ses écarts assumés.</li>
+  <li>Ta rétrospective est écrite.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 13 : finitions, export" &amp;&amp; git tag v1.0-niveau-1</div>
+
+<h2 id="annexe-debug">Annexe A · La boîte à outils de débogage</h2>
+<div class="table-wrap"><table>
+<tr><th>Outil</th><th>Où</th><th>Quand s'en servir</th></tr>
+<tr><td><code>print()</code>, <code>print_debug()</code></td><td>dans le code</td><td>Savoir si une ligne est atteinte et avec quelles valeurs. <code>print_debug</code> ajoute le fichier et la ligne.</td></tr>
+<tr><td>Point d'arrêt</td><td>clic dans la marge du script (point rouge), ou <code>breakpoint</code></td><td>Figer le jeu sur une ligne et inspecter toutes les variables, puis avancer pas à pas (<kbd>F10</kbd>, <kbd>F11</kbd>).</td></tr>
+<tr><td>Arbre distant</td><td>onglet <strong>Distant</strong> au-dessus de l'arbre de scène, jeu lancé</td><td>Voir l'arbre réel du jeu en cours, et modifier les propriétés en direct.</td></tr>
+<tr><td>Formes de collision visibles</td><td><span class="menu">Déboguer → Formes de collision visibles</span></td><td>Toute question « pourquoi ça ne touche pas ? ».</td></tr>
+<tr><td>Moniteurs</td><td>Débogueur → Moniteurs</td><td>FPS, nombre de nœuds, mémoire, temps physique.</td></tr>
+<tr><td>Profileur</td><td>Débogueur → Profileur</td><td>Trouver la fonction qui coûte cher.</td></tr>
+<tr><td>Affichage de débogage</td><td>un <code>Label</code> au-dessus d'un personnage (étape 04)</td><td>Voir un état interne (état de la machine, vitesse) en jouant.</td></tr>
+<tr><td>Raccourcis de test</td><td><code>_unhandled_input</code> de la salle de test (étape 05)</td><td>Provoquer un cas rare à volonté.</td></tr>
+<tr><td>Salle de test et bancs d'essai</td><td><code>sandbox/</code>, <code>test_room.tscn</code></td><td>Isoler une brique pour savoir si c'est elle qui est en cause.</td></tr>
+<tr><td><code>git diff</code>, <code>git stash</code></td><td>terminal</td><td>« Ça marchait hier » : voir ce qui a changé, ou mettre les changements de côté pour vérifier.</td></tr>
+</table></div>
+
+<h2 id="annexe-erreurs">Annexe B · Les erreurs fréquentes</h2>
+<div class="table-wrap"><table>
+<tr><th>Message</th><th>Cause habituelle</th><th>Correction</th></tr>
+<tr><td>Invalid get index 'x' (on base: 'null instance')</td><td>Un <code>$Chemin</code> ou un <code>@export</code> de nœud ne désigne rien</td><td>Vérifier le nom exact du nœud, la place dans l'arbre, ou assigner l'export dans l'Inspecteur</td></tr>
+<tr><td>Could not find type "X" in the current scope</td><td>Le fichier de la classe n'existe pas encore, n'est pas enregistré, ou contient une erreur</td><td>Créer et enregistrer le fichier ; corriger l'erreur dans l'autre script</td></tr>
+<tr><td>Function blocked during in/out signal</td><td>Modifier <code>monitoring</code> ou une forme pendant un signal de collision</td><td><code>set_deferred("monitoring", …)</code></td></tr>
+<tr><td>Can't change this state while flushing queries</td><td>Ajouter un corps physique ou une zone pendant un signal de collision</td><td><code>add_child.call_deferred()</code>, <code>Fx.spawn(…, true)</code>, ou différer la fonction</td></tr>
+<tr><td>État inconnu : X (message du parcours)</td><td>Le nœud d'état ne s'appelle pas exactement X</td><td>Renommer le nœud (majuscules comprises)</td></tr>
+<tr><td>Un objet apparaît à des centaines de pixels de sa place</td><td><code>global_position</code> réglé avant <code>add_child()</code> sous un parent décalé</td><td><code>Fx.spawn()</code></td></tr>
+<tr><td>Rien ne touche rien</td><td>Couches et masques</td><td>Relire le tableau des couches (étape 02), afficher les formes de collision</td></tr>
+<tr><td>Une ressource modifiée change partout</td><td>Les ressources sont partagées entre instances</td><td>« Rendre unique », ou « Local To Scene », ou <code>duplicate()</code> dans le code</td></tr>
+<tr><td>Le personnage tombe à travers le sol</td><td>Masque sans la couche 1, ou sol sans forme</td><td>Vérifier le masque du corps et la forme du sol</td></tr>
+<tr><td>Le jeu se fige après un hit stop</td><td>Minuterie soumise à <code>time_scale = 0</code></td><td><code>create_timer(d, true, false, true)</code></td></tr>
+</table></div>
+
+<h2 id="annexe-gdscript">Annexe C · Aide-mémoire GDScript</h2>
+<script type="text/x-code" data-lang="gdscript" data-file="Aide-mémoire (à ne pas créer)">
+class_name MonType            # type global, visible partout
+extends CharacterBody2D       # hérite d'un nœud
+
+signal touche(degats: int)    # déclarer un signal…
+# …l'émettre : touche.emit(3) ; l'écouter : noeud.touche.connect(ma_fonction)
+
+enum Etat { REPOS, COURSE }   # Etat.COURSE vaut 1
+const VITESSE := 117.0        # constante, type déduit
+
+@export var vie := 8                          # réglable dans l'Inspecteur
+@export_range(0.0, 1.0) var ratio := 0.5      # avec un curseur
+@export var cible: Node2D                     # désigner un nœud dans l'Inspecteur
+@export_file("*.tscn") var scene_suivante: String
+@onready var sprite: Sprite2D = $Sprite2D     # récupéré juste avant _ready()
+
+var etat := Etat.REPOS
+var points: int = 0                           # type explicite
+var _prive := 0.0                             # convention : _ = interne
+
+var vies := 2:                                # propriété avec setter
+	set(v):
+		vies = v
+		queue_redraw()
+
+
+func _ready() -> void:            # une fois, quand le nœud et ses enfants sont prêts
+	add_to_group("ennemis")
+
+
+func _physics_process(delta: float) -> void:   # 60 fois par seconde, à pas fixe
+	match etat:
+		Etat.REPOS:
+			pass
+		Etat.COURSE:
+			velocity.x = VITESSE
+	move_and_slide()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("jump"):
+		pass
+
+
+static func utilitaire(a: float) -> float:     # appelée par MonType.utilitaire(…)
+	return a * 2.0
+
+
+func sequence() -> void:                       # une coroutine
+	await get_tree().create_timer(1.0).timeout
+	var t := create_tween()
+	t.tween_property(self, "modulate:a", 0.0, 0.5)
+	await t.finished
+	queue_free()
+</script>
+
+<h2 id="annexe-methodes">Annexe D · Ce que tu as appris</h2>
+<div class="table-wrap"><table>
+<tr><th>Concept</th><th>Où tu l'as pratiqué</th></tr>
+<tr><td>Boucle de jeu, pas de temps fixe, <code>delta</code></td><td>Étapes 01, 02</td></tr>
+<tr><td>Résolution virtuelle, pixel net</td><td>Étape 01</td></tr>
+<tr><td>Touches contre actions</td><td>Étape 02</td></tr>
+<tr><td>Couches et masques de collision</td><td>Étape 02, puis partout</td></tr>
+<tr><td>Composition par composants (<code>Health</code>, <code>Hitbox</code>, <code>Hurtbox</code>, <code>HitFlash</code>)</td><td>Étapes 02, 05, 08</td></tr>
+<tr><td>Patron Observateur (signaux), découplage</td><td>Étapes 01, 02, 06, 10</td></tr>
+<tr><td>Machine à états finis (par nœuds, par <code>enum</code>, à l'échelle du jeu)</td><td>Étapes 02, 04, 05, 07, 10</td></tr>
+<tr><td>Prototype jetable, observer et mesurer la référence</td><td>Étape 03</td></tr>
+<tr><td>Physique arcade, saut variable, coyote time</td><td>Étapes 03, 04</td></tr>
+<tr><td>Caméra lissée, lissage exponentiel</td><td>Étape 04</td></tr>
+<tr><td>Préparation, images actives, récupération ; télégraphie</td><td>Étapes 05, 07, 09</td></tr>
+<tr><td>Conception pilotée par les données (<code>Resource</code>)</td><td>Étapes 05, 06, 07</td></tr>
+<tr><td>Réserve d'objets (<em>pooling</em>)</td><td>Étape 06</td></tr>
+<tr><td>Directeur de vagues, tension et détente</td><td>Étapes 07, 09</td></tr>
+<tr><td>Shaders, effets raster, couleurs indexées</td><td>Étape 08</td></tr>
+<tr><td>Événement scripté, coroutines</td><td>Étape 09</td></tr>
+<tr><td>Grammaire d'un boss (phases, point faible, transitions)</td><td>Étapes 09, 11, 12</td></tr>
+<tr><td>Interfaces, focus, thème, dessin personnalisé</td><td>Étape 10</td></tr>
+<tr><td>Modules de niveau, tuiles</td><td>Étape 11</td></tr>
+<tr><td>Pseudo-3D : projection perspective, algorithme du peintre, échelle par paliers</td><td>Étapes 11, 12</td></tr>
+<tr><td>Plateformes mobiles, référentiel</td><td>Étape 12</td></tr>
+<tr><td>Ressenti, profilage, export, rétrospective</td><td>Étape 13</td></tr>
+</table></div>
+<div class="callout method"><span class="tag">Les six principes, une dernière fois</span><ol>
+  <li>Toujours avoir un jeu qui tourne.</li>
+  <li>Des formes de substitution d'abord.</li>
+  <li>Mesurer la référence avant de coder.</li>
+  <li>Un nœud, une responsabilité.</li>
+  <li>Les réglages dans des données, pas dans le code.</li>
+  <li>Des petits pas vérifiés.</li>
+</ol></div>
+
+<h2 id="sources">Sources</h2>
+<ul>
+  <li><a href="../batman-and-robin-godot-guide/">Le guide vérifié</a>, référence de tout le code de ce parcours.</li>
+  <li><a href="https://youtu.be/EDaIlrfxRnE" target="_blank" rel="noopener">The Adventures of Batman &amp; Robin (Genesis) Playthrough — NintendoComplete</a>.</li>
+  <li>Jon Burton, <em>Coding Secrets</em> : <a href="https://youtu.be/Z0S92Fs5gOg" target="_blank" rel="noopener">partie 1</a> et <a href="https://youtu.be/M7b0uUEl5hc" target="_blank" rel="noopener">partie 2</a>.</li>
+  <li><a href="https://docs.godotengine.org/fr/4.x/" target="_blank" rel="noopener">Documentation officielle de Godot 4</a> (en français).</li>
+</ul>
+<p class="footer-note">The Adventures of Batman &amp; Robin © DC Comics / Warner Bros. / Sega, 1995. Ce parcours est un support d'apprentissage personnel.</p>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

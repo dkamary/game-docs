@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Batman &amp; Robin × Godot 4.5 — Le pas-à-pas</title>
+<meta name="description" content="Parcours guidé, étape par étape, pour construire soi-même le niveau 1 de The Adventures of Batman &amp; Robin (Mega Drive) dans Godot 4.5, en apprenant les méthodes du développement de jeu et le moteur Godot.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Quatrième document · le parcours</div>
+  <h1>Construire le niveau 1, de zéro, de tes propres mains</h1>
+  <p class="lead">Le <a href="../batman-and-robin-godot-guide/">guide vérifié</a> explique <em>ce que fait le jeu</em> et <em>pourquoi</em>. Ce pas-à-pas te dit <strong>quoi faire, dans quel ordre, et comment vérifier que ça marche</strong>. En 13 étapes, tu passes d'un projet vide au niveau 1 complet, et tu apprends en chemin les méthodes du développement de jeu et le moteur Godot 4.</p>
+  <div class="meta">
+    <span class="pill gold">Godot 4.5+ · GDScript typé</span>
+    <span class="pill">13 étapes · ~50 h</span>
+    <span class="pill">Aucune expérience de Godot requise</span>
+    <span class="pill">Tout se fait à la main</span>
+  </div>
+</section>
+
+<h2 id="pour-qui">À qui s'adresse ce parcours</h2>
+<p>À quelqu'un qui sait déjà programmer (variables, fonctions, conditions, boucles, classes), mais qui n'a jamais fait de jeu, ou jamais utilisé Godot. Tu n'as pas besoin de connaître la Mega Drive : on l'explique quand elle sert.</p>
+<p>Les quatre documents du dépôt se complètent :</p>
+<div class="table-wrap"><table>
+<tr><th>Document</th><th>Rôle</th><th>Quand l'ouvrir</th></tr>
+<tr><td><a href="../batman-and-robin/">Secrets de programmation</a></td><td>Première doc, conservée telle quelle</td><td>Par curiosité historique</td></tr>
+<tr><td><a href="../adventure-of-batman-and-robin-tuto/tome-01.html">Tutoriel en 7 tomes</a></td><td>Deuxième doc, conservée telle quelle</td><td>Par curiosité historique</td></tr>
+<tr><td><a href="../batman-and-robin-godot-guide/">Guide vérifié</a> (12 tomes)</td><td><strong>La référence</strong> : ce que montre la vidéo, comment faisait la console, le code complet commenté</td><td>Quand tu veux comprendre le « pourquoi » d'une mécanique, ou revoir la version de référence d'un script</td></tr>
+<tr><td><strong>Ce pas-à-pas</strong></td><td><strong>Le parcours</strong> : l'ordre des manipulations, les tests, les erreurs fréquentes, les exercices</td><td>Tout le temps, en travaillant</td></tr>
+</table></div>
+<div class="callout godot"><span class="tag">Un seul code</span><p>Les scripts finaux de ce parcours sont <strong>identiques</strong> à ceux du guide. Quand le pas-à-pas fait d'abord une version simplifiée (pour apprendre), il le dit, puis la remplace par la version de référence. Chaque étape renvoie au tome du guide correspondant.</p></div>
+
+<h2 id="methode">La méthode</h2>
+<p>Chaque étape suit la même boucle. C'est la boucle de travail d'un développeur de jeu, à toutes les échelles : d'un saut de personnage à un jeu entier.</p>
+<ol class="loop">
+  <li><strong>Comprendre</strong>Lire le concept : quel problème on résout, quelle idée générale on applique.</li>
+  <li><strong>Construire</strong>Créer les nœuds et les scènes dans l'éditeur.</li>
+  <li><strong>Coder</strong>Taper le script, puis lire « Comprendre le code ».</li>
+  <li><strong>Tester</strong>Lancer, observer, comparer au résultat attendu.</li>
+  <li><strong>Déboguer</strong>Si ça coince : l'encadré « Si ça ne marche pas ».</li>
+  <li><strong>Valider</strong>Cocher l'étape, faire un commit Git.</li>
+</ol>
+<p>Six principes reviennent dans tout le parcours. Ce sont eux que tu emporteras sur tes propres jeux :</p>
+<ol>
+  <li><strong>Toujours avoir un jeu qui tourne.</strong> Chaque étape se termine sur quelque chose de jouable. On n'écrit jamais deux heures de code sans lancer le jeu.</li>
+  <li><strong>Des formes de substitution d'abord.</strong> Un rectangle bleu suffit pour régler un saut. Les sprites viennent quand la mécanique est bonne.</li>
+  <li><strong>Mesurer la référence avant de coder.</strong> Ici, la vidéo du jeu original : vitesse, durées, comportements. Un chiffre mesuré vaut mieux qu'une impression.</li>
+  <li><strong>Un nœud, une responsabilité.</strong> La vie, les dégâts, le déplacement, la caméra : chacun dans son coin, reliés par des signaux.</li>
+  <li><strong>Les réglages dans des données, pas dans le code.</strong> <code>@export</code> et les <code>Resource</code> permettent d'ajuster sans réécrire.</li>
+  <li><strong>Des petits pas vérifiés.</strong> Un bug trouvé cinq minutes après l'avoir écrit se corrige en une minute ; trouvé trois semaines plus tard, il coûte une soirée.</li>
+</ol>
+
+<h2 id="legende">Les encadrés</h2>
+<div class="callout concept"><span class="tag">Concept</span><p>L'idée générale de développement de jeu, réutilisable dans n'importe quel moteur.</p></div>
+<div class="callout godot"><span class="tag">Godot 4</span><p>Une notion propre au moteur : nœud, signal, ressource, réglage de l'éditeur…</p></div>
+<div class="callout do"><span class="tag">À faire dans l'éditeur</span><ol><li>Les manipulations, dans l'ordre, avec les menus : <span class="menu">Scène → Nouvelle scène</span>, les touches : <kbd>F6</kbd>.</li></ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Ce que tu dois voir en lançant le jeu. Si tu ne le vois pas, ne passe pas à la suite.</p></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span><p>Les erreurs les plus fréquentes à cet endroit, et comment les corriger.</p></div>
+<div class="callout method"><span class="tag">Méthode</span><p>Une habitude de travail de développeur de jeu.</p></div>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>Un moment du jeu original à regarder : <a class="tc" href="#">2:52</a>.</p></div>
+<p>Chaque titre d'étape a un bouton <strong>« Marquer comme fait »</strong>. Ta progression est mémorisée dans ce navigateur et s'affiche sur les cartes ci-dessous.</p>
+
+<h2 id="parcours">Le parcours</h2>
+<div class="cards">
+  <a class="card" href="etape-01-decouvrir-godot.html" data-page="etape-01-decouvrir-godot.html"><span class="num">01</span><span class="dur">~2 h</span><h3>Découvrir Godot</h3><p>Installer, comprendre nœuds, scènes, scripts et signaux. Créer et régler le projet 320×224.</p></a>
+  <a class="card" href="etape-02-fondations.html" data-page="etape-02-fondations.html"><span class="num">02</span><span class="dur">~3 h</span><h3>Les fondations</h3><p>Entrées, couches de collision, autoload, composants de vie et de dégâts, première machine à états.</p></a>
+  <a class="card" href="etape-03-prototype.html" data-page="etape-03-prototype.html"><span class="num">03</span><span class="dur">~1 h 30</span><h3>Prototype</h3><p>Batman en un seul script, pour sentir le personnage, puis comprendre pourquoi il faut mieux.</p></a>
+  <a class="card" href="etape-04-machine-a-etats.html" data-page="etape-04-machine-a-etats.html"><span class="num">04</span><span class="dur">~3 h</span><h3>Machine à états &amp; caméra</h3><p>Réécrire Batman proprement : un état par fichier. Caméra lissée qui anticipe.</p></a>
+  <a class="card" href="etape-05-combat.html" data-page="etape-05-combat.html"><span class="num">05</span><span class="dur">~3 h</span><h3>Combat &amp; accroche</h3><p>Coup de poing, coup de pied sauté, accroche au balcon, dégâts, invincibilité, mort, victoire.</p></a>
+  <a class="card" href="etape-06-armes.html" data-page="etape-06-armes.html"><span class="num">06</span><span class="dur">~3 h</span><h3>Armes &amp; bonus</h3><p>Armes en données, réserve de projectiles, jauge de charge, bonus cycliques, crâne.</p></a>
+  <a class="card" href="etape-07-ennemis.html" data-page="etape-07-ennemis.html"><span class="num">07</span><span class="dur">~5 h</span><h3>Ennemis &amp; arènes</h3><p>Classe de base, clowns, costauds, tireurs, formations, arènes à vagues et « GO! ».</p></a>
+  <a class="card" href="etape-08-effets.html" data-page="etape-08-effets.html"><span class="num">08</span><span class="dur">~4 h</span><h3>Effets Mega Drive</h3><p>Fondus par paliers, façade raster, feu ondulant, flash de dégâts, couleurs indexées.</p></a>
+  <a class="card" href="etape-09-section-1.html" data-page="etape-09-section-1.html"><span class="num">09</span><span class="dur">~6 h</span><h3>Section 1</h3><p>La rue complète, l'explosion de la banque et la machine d'Harley en trois phases.</p></a>
+  <a class="card" href="etape-10-hud-ecrans.html" data-page="etape-10-hud-ecrans.html"><span class="num">10</span><span class="dur">~5 h</span><h3>HUD, écrans &amp; flux</h3><p>HUD fidèle, intro, titre, options, sélection, continue, audio, enchaînement des scènes.</p></a>
+  <a class="card" href="etape-11-section-2.html" data-page="etape-11-section-2.html"><span class="num">11</span><span class="dur">~5 h</span><h3>Section 2</h3><p>Salles réutilisables, TileMapLayer de caisses, et le grappin en sphères pseudo-3D.</p></a>
+  <a class="card" href="etape-12-section-3.html" data-page="etape-12-section-3.html"><span class="num">12</span><span class="dur">~4 h</span><h3>Section 3</h3><p>Le convoi en plateformes mobiles, les ballons-mines et la montgolfière du Joker.</p></a>
+  <a class="card" href="etape-13-finitions.html" data-page="etape-13-finitions.html"><span class="num">13</span><span class="dur">~3 h</span><h3>Finitions &amp; suite</h3><p>Ressenti, fidélité, profilage, export, boîte à outils de débogage, et la suite.</p></a>
+</div>
+<p><button type="button" class="reset-progress" id="reset-progress">Effacer ma progression</button></p>
+<div class="callout method"><span class="tag">Pourquoi cet ordre</span><p>On construit <strong>du bas vers le haut</strong> : d'abord les briques que tout le monde utilise (02), puis le héros (03–05), ce qu'il tire (06), ce qu'il combat (07), l'habillage (08), et seulement ensuite les vrais niveaux (09–12). Chaque étape n'utilise que ce qui existe déjà. Les étapes 11 et 12 sont indépendantes l'une de l'autre : tu peux les inverser. Le HUD et les écrans (10) viennent juste après la première section, pour que ton jeu ressemble vite à un jeu complet.</p></div>
+
+<h2 id="prerequis">Avant de commencer</h2>
+<ul>
+  <li><strong>Godot 4.5 ou plus récent</strong>, version standard (pas la version .NET) : <a href="https://godotengine.org/download" target="_blank" rel="noopener">godotengine.org/download</a>. L'étape 01 détaille l'installation.</li>
+  <li><strong>Git</strong>, pour sauvegarder chaque étape validée. Si tu ne l'as jamais utilisé, les commandes sont données.</li>
+  <li>Un éditeur d'images simple (Aseprite, LibreSprite, Krita, Paint.NET, GIMP…) pour les formes de substitution et les découpes de sprites.</li>
+  <li>La <a href="https://youtu.be/EDaIlrfxRnE" target="_blank" rel="noopener">vidéo de référence</a> dans un onglet : on y revient souvent.</li>
+  <li>Les planches de sprites du dépôt : <code>batman-and-robin/spritesheets/</code>. Elles ne sont pas obligatoires pour avancer.</li>
+</ul>
+<div class="callout warn"><span class="tag">Droits sur les ressources</span><p>Sprites, musique et logos appartiennent à DC Comics, Warner Bros. et Sega. Ton projet est un exercice personnel : ne publie pas de build qui les contient.</p></div>
+
+<h2 id="assimiler">Comment vraiment assimiler</h2>
+<ul>
+  <li><strong>Tape le code, ne le colle pas.</strong> Le bouton « Copier » existe pour dépanner. Taper force à lire chaque ligne, et l'autocomplétion de Godot t'apprend l'API au passage.</li>
+  <li><strong>Lis « Comprendre le code » après avoir tapé</strong>, pas avant : tu sauras quelles lignes t'ont posé question.</li>
+  <li><strong>Fais les expériences « Et si… ».</strong> Changer une valeur et observer le résultat est la façon la plus rapide de comprendre un système.</li>
+  <li><strong>Réponds aux questions de fin d'étape</strong> avant d'ouvrir la réponse.</li>
+  <li><strong>Tiens un journal de bord</strong> : un fichier texte où tu notes les erreurs rencontrées et leur solution. Au bout de quelques étapes, c'est ton aide-mémoire personnel.</li>
+  <li><strong>Refais de mémoire.</strong> Une fois une étape finie, recrée une petite partie (par exemple l'état <code>Run</code>) sans regarder. Ce qui bloque, c'est ce qu'il reste à apprendre.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

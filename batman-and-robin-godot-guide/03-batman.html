@@ -724,7 +724,9 @@ extends Camera2D
 @export var forward_only := true   ## l'écran ne recule pas
 @export var fixed_y := 112.0       ## les sections du niveau 1 ne défilent pas verticalement
 
-var autoscroll_speed := 0.0        ## px/s, utilisé par le convoi (tome 09)
+## px/s : défilement forcé de l'écran. Non utilisé dans le niveau 1 (au convoi, c'est la rue
+## qui défile derrière un convoi immobile, tome 09), mais prêt pour un niveau à défilement imposé.
+var autoscroll_speed := 0.0
 var _locked := false
 var _lock_center_x := 0.0
 

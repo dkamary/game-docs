@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 · Découvrir Godot et créer le projet — Pas à pas</title>
+<meta name="description" content="Étape 1 : installer Godot 4.5, comprendre nœuds, scènes, scripts et signaux par un petit bac à sable, puis créer et régler le projet en 320x224 avec Git.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 01 / 13</div>
+  <h1>Découvrir Godot et créer le projet</h1>
+  <p class="lead">Avant Batman, un bac à sable : un carré qui bouge et change de couleur. Il suffit à comprendre les quatre idées sur lesquelles repose tout Godot. Ensuite, on crée le vrai projet et on le règle comme une Mega Drive.</p>
+  <div class="meta"><span class="pill">⏱ ~2 h</span><span class="pill">Prérequis : aucun</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/02-fondations.html">tome 02</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li>Nœud, scène, script, signal</li>
+    <li>L'éditeur : arbre de scène, inspecteur, système de fichiers</li>
+    <li><code>_ready()</code>, <code>_process()</code>, <code>delta</code>, <code>@export</code></li>
+    <li>Les paramètres du projet</li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>La boucle de jeu</li>
+    <li>La résolution virtuelle et le pixel net</li>
+    <li>Le bac à sable pour apprendre sans risque</li>
+    <li>Le versionnage dès la première minute</li>
+  </ul></div>
+</div>
+
+<h2 id="installer">Installer</h2>
+
+<h3 class="step" id="e01-1">1.1 · Installer Godot et Git</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Télécharge <strong>Godot 4.5</strong> (ou plus récent) sur <a href="https://godotengine.org/download" target="_blank" rel="noopener">godotengine.org/download</a>, version <strong>standard</strong>. Sur macOS, glisse <code>Godot.app</code> dans <code>Applications</code>. Godot n'a pas d'installateur : c'est un seul exécutable.</li>
+  <li>Vérifie que Git est installé : dans un terminal, <code>git --version</code>. Sinon : <a href="https://git-scm.com/downloads" target="_blank" rel="noopener">git-scm.com</a> (sur macOS, <code>xcode-select --install</code> l'installe aussi).</li>
+  <li>Crée un dossier pour tes projets Godot, par exemple <code>~/Godot/</code>.</li>
+</ol></div>
+<div class="callout godot"><span class="tag">Godot 4</span><p>Godot est un moteur libre (licence MIT) : pas de compte, pas de redevance, et le jeu t'appartient entièrement. Son langage, <strong>GDScript</strong>, ressemble à Python : indentation significative, pas d'accolades. Ce parcours utilise le <strong>GDScript typé</strong> (<code>var vitesse: float</code>, <code>func f() -> void</code>) : l'éditeur détecte plus d'erreurs avant même de lancer le jeu, et l'autocomplétion est meilleure.</p></div>
+
+<h3 class="step" id="e01-2">1.2 · Créer le projet</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Lance Godot. Le <strong>gestionnaire de projets</strong> s'ouvre. Clique sur <strong>Créer</strong> (<em>Create</em>).</li>
+  <li>Nom : <code>batman-robin-l1</code>. Chemin : ton dossier <code>~/Godot/</code>. Coche « Créer un dossier ».</li>
+  <li>Moteur de rendu : <strong>Compatibilité</strong> (<em>Compatibility</em>). C'est le plus léger, il suffit largement à un jeu 2D en pixel art, et il tourne partout.</li>
+  <li>Métadonnées de contrôle de version : <strong>Git</strong>. Godot crée alors un <code>.gitignore</code> adapté.</li>
+  <li>Clique sur <strong>Créer et modifier</strong>.</li>
+</ol></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span><p>Sur macOS, si le système refuse d'ouvrir Godot (« développeur non identifié ») : clic droit sur <code>Godot.app</code> → <strong>Ouvrir</strong>, puis confirme. Il ne le redemandera plus.</p></div>
+
+<h3 class="step" id="e01-3">1.3 · Faire le tour de l'éditeur</h3>
+<p>Prends cinq minutes pour repérer les zones. Tu y passeras des dizaines d'heures.</p>
+<div class="table-wrap"><table>
+<tr><th>Zone</th><th>Où</th><th>À quoi elle sert</th></tr>
+<tr><td><strong>Scène</strong></td><td>en haut à gauche</td><td>L'arbre des nœuds de la scène ouverte. On y ajoute (<kbd>Ctrl A</kbd> / <kbd>⌘ A</kbd>), renomme (<kbd>F2</kbd>), déplace et supprime des nœuds.</td></tr>
+<tr><td><strong>Système de fichiers</strong></td><td>en bas à gauche</td><td>Les fichiers du projet. Tout chemin commence par <code>res://</code>, la racine du projet.</td></tr>
+<tr><td><strong>Vue 2D</strong></td><td>au centre</td><td>Pour placer les nœuds à la souris. Onglets en haut : 2D, 3D, Script, AssetLib.</td></tr>
+<tr><td><strong>Inspecteur</strong></td><td>à droite</td><td>Les propriétés du nœud sélectionné. Onglet voisin : <strong>Nœud</strong> (signaux et groupes).</td></tr>
+<tr><td><strong>Panneau du bas</strong></td><td>en bas</td><td>Sortie (les <code>print</code>), Débogueur (erreurs, moniteurs), Audio, Animation.</td></tr>
+<tr><td><strong>Lancement</strong></td><td>en haut à droite</td><td>Lancer le projet <kbd>F5</kbd> (<kbd>⌘ B</kbd> sur Mac), <strong>lancer la scène ouverte</strong> <kbd>F6</kbd> (<kbd>⌘ R</kbd>), arrêter <kbd>F8</kbd> (<kbd>⌘ .</kbd>).</td></tr>
+</table></div>
+<div class="callout godot"><span class="tag">Langue de l'éditeur</span><p>Ce parcours donne les menus en français, avec l'anglais entre parenthèses quand c'est utile. Pour changer la langue : <span class="menu">Éditeur → Paramètres de l'éditeur → Interface → Éditeur → Langue de l'éditeur</span>. Beaucoup de tutoriels en ligne sont en anglais : savoir lire les deux t'aidera.</p></div>
+
+<h2 id="bac-a-sable">Le bac à sable : les quatre idées de Godot</h2>
+<div class="callout concept"><span class="tag">Concept : les quatre idées</span>
+<ul>
+  <li><strong>Nœud</strong> : la brique de base. Chaque nœud a <em>un</em> rôle : afficher une image (<code>Sprite2D</code>), détecter un contact (<code>Area2D</code>), jouer un son, compter le temps (<code>Timer</code>)…</li>
+  <li><strong>Scène</strong> : un arbre de nœuds enregistré dans un fichier <code>.tscn</code>. Une scène peut être <em>instanciée</em> dans une autre, autant de fois qu'on veut : Batman est une scène, chaque clown est une instance de la scène « clown ».</li>
+  <li><strong>Script</strong> : du code attaché à un nœud, qui en étend le comportement.</li>
+  <li><strong>Signal</strong> : un message qu'un nœud émet (« j'ai été touché », « le temps est écoulé ») et que d'autres reçoivent, sans se connaître.</li>
+</ul></div>
+
+<h3 class="step" id="e01-4">1.4 · Une scène, deux nœuds</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans le Système de fichiers, clic droit sur <code>res://</code> → <strong>Nouveau dossier</strong> → <code>sandbox</code>. Ce dossier contiendra tous les essais jetables.</li>
+  <li><span class="menu">Scène → Nouvelle scène</span>. Dans le panneau Scène, choisis <strong>Scène 2D</strong> : la racine est un <code>Node2D</code>. Renomme-le <code>Box</code> (double-clic ou <kbd>F2</kbd>).</li>
+  <li>Sélectionne <code>Box</code>, puis <kbd>Ctrl A</kbd> (<kbd>⌘ A</kbd>) : cherche <code>ColorRect</code> et ajoute-le comme enfant.</li>
+  <li>Dans l'Inspecteur du <code>ColorRect</code> : <strong>Color</strong> = un rouge vif ; dans <strong>Layout → Transform</strong>, <strong>Size</strong> = (16, 16) et <strong>Position</strong> = (-8, -8) pour que le carré soit centré sur son parent.</li>
+  <li>Sélectionne <code>Box</code> et, dans l'Inspecteur, <strong>Transform → Position</strong> = (160, 112).</li>
+  <li><kbd>Ctrl S</kbd> (<kbd>⌘ S</kbd>) : enregistre sous <code>res://sandbox/box.tscn</code>.</li>
+</ol></div>
+<div class="callout godot"><span class="tag">Position relative au parent</span><p>La position d'un nœud est <strong>relative à son parent</strong>. Le carré est à (-8, -8) <em>par rapport à</em> <code>Box</code> : quand <code>Box</code> bouge, le carré suit. Toute la hiérarchie fonctionne ainsi. C'est ce qui permet de déplacer Batman d'un bloc avec son sprite, ses zones de collision et ses effets.</p></div>
+
+<h3 class="step" id="e01-5">1.5 · Un premier script</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Sélectionne <code>Box</code>, clique sur l'icône de parchemin « + » en haut du panneau Scène (<strong>Attacher un script</strong>).</li>
+  <li>Langage GDScript, hérite de <code>Node2D</code>, chemin <code>res://sandbox/box.gd</code>, modèle « Object: Empty » si proposé. <strong>Créer</strong>.</li>
+  <li>L'éditeur de script s'ouvre. Tape ce code (sans le coller) :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sandbox/box.gd">
+extends Node2D
+## Mon premier script : un carré qui se déplace avec les flèches.
+
+@export var speed := 120.0   # pixels par seconde, modifiable dans l'inspecteur
+
+
+func _ready() -> void:
+	print("Bonjour depuis ", name)
+
+
+func _process(delta: float) -> void:
+	var dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	position += dir * speed * delta
+</script>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F6</kbd> (<kbd>⌘ R</kbd>) lance la scène ouverte. Une fenêtre grise s'ouvre avec le carré ; les flèches le déplacent. Dans le panneau <strong>Sortie</strong>, en bas : « Bonjour depuis Box ». Ferme la fenêtre ou <kbd>F8</kbd>.</p></div>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>extends Node2D</code> : le script <em>est</em> un <code>Node2D</code> amélioré. Il a donc accès à <code>position</code>, <code>rotation</code>, <code>name</code>…</li>
+  <li><code>## …</code> : un commentaire de documentation, affiché dans l'aide de l'éditeur. <code># …</code> est un commentaire ordinaire.</li>
+  <li><code>@export</code> : la variable apparaît dans l'Inspecteur. Sélectionne <code>Box</code> : tu y vois <strong>Speed</strong>. On peut régler un objet sans toucher au code.</li>
+  <li><code>:=</code> : déclare la variable et <em>déduit</em> son type de la valeur (ici <code>float</code>). Équivaut à <code>var speed: float = 120.0</code>.</li>
+  <li><code>_ready()</code> : appelée une fois, quand le nœud entre dans la scène et que ses enfants sont prêts.</li>
+  <li><code>_process(delta)</code> : appelée <strong>à chaque image affichée</strong>. <code>delta</code> est la durée écoulée depuis l'image précédente, en secondes (≈ 0,0167 à 60 i/s).</li>
+  <li><code>Input.get_vector(...)</code> : renvoie un <code>Vector2</code> de longueur ≤ 1 selon les touches enfoncées. Les actions <code>ui_*</code> existent par défaut dans tout projet.</li>
+  <li><code>position += dir * speed * delta</code> : vitesse × temps = distance. C'est la ligne la plus importante de la page.</li>
+</ul>
+<div class="callout concept"><span class="tag">Concept : la boucle de jeu</span><p>Un jeu est une boucle infinie : <em>lire les entrées → mettre à jour le monde → dessiner</em>, environ 60 fois par seconde. Godot fait tourner la boucle pour toi et appelle <code>_process()</code> à chaque tour. Ton travail se résume souvent à répondre à une question : « que fait cet objet pendant ce petit instant <code>delta</code> ? ».</p></div>
+<div class="callout method"><span class="tag">Et si…</span>
+<ul>
+  <li>…tu enlèves <code>* delta</code> ? Le carré part à 120 pixels <em>par image</em>, soit 7 200 px/s : il disparaît. Et sa vitesse dépendrait de l'écran (un écran 144 Hz le ferait aller 2,4 fois plus vite). <code>delta</code> rend la vitesse indépendante de la machine.</li>
+  <li>…tu mets <strong>Speed</strong> à 400 dans l'Inspecteur sans toucher au script ? Relance : c'est pris en compte.</li>
+  <li>…tu tapes <code>positon</code> au lieu de <code>position</code> ? L'éditeur souligne en rouge avant même de lancer. C'est l'intérêt du typage.</li>
+</ul></div>
+
+<h3 class="step" id="e01-6">1.6 · Un premier signal</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Ajoute à <code>Box</code> un enfant <code>Timer</code>. Dans l'Inspecteur : <strong>Wait Time</strong> = 1, <strong>Autostart</strong> coché.</li>
+  <li>Avec le <code>Timer</code> sélectionné, ouvre l'onglet <strong>Nœud</strong> (à côté d'Inspecteur) → <strong>Signaux</strong>. Double-clique sur <code>timeout()</code>.</li>
+  <li>Dans la fenêtre, choisis <code>Box</code> comme destinataire. La méthode proposée s'appelle <code>_on_timer_timeout</code>. <strong>Connecter</strong>.</li>
+  <li>Godot ajoute la fonction au script, avec une icône verte dans la marge (connexion faite dans l'éditeur). Complète-la :</li>
+</ol></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://sandbox/box.gd  (ajout en bas du fichier)">
+func _on_timer_timeout() -> void:
+	$ColorRect.color = Color(randf(), randf(), randf())
+</script>
+<div class="callout test"><span class="tag">Teste</span><p><kbd>F6</kbd> : le carré change de couleur chaque seconde, et bouge toujours avec les flèches.</p></div>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>$ColorRect</code> : raccourci de <code>get_node("ColorRect")</code>. Le chemin est relatif au nœud qui porte le script. Si tu renommes le nœud, le chemin casse : on verra comment s'en protéger.</li>
+  <li>Le <code>Timer</code> ne sait pas qui l'écoute. Il « crie » <code>timeout</code>, et <code>Box</code> a choisi d'écouter. C'est le <strong>patron Observateur</strong>. On peut aussi connecter en code : <code>$Timer.timeout.connect(_on_timer_timeout)</code>. Ce parcours utilise surtout cette forme, plus visible quand on relit le script.</li>
+</ul>
+<div class="callout concept"><span class="tag">Concept : le découplage</span><p>Grâce aux signaux, un émetteur n'a pas besoin de connaître ses récepteurs. Plus tard, quand Batman perd de la vie, il émettra un signal : le HUD, le son et l'effet de clignotement réagiront chacun de leur côté. On pourra supprimer le HUD sans que Batman plante.</p></div>
+
+<h3 class="step" id="e01-7">1.7 · Instancier une scène</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène 2D, racine renommée <code>Sandbox</code>, enregistrée en <code>res://sandbox/sandbox.tscn</code>.</li>
+  <li>Glisse <code>box.tscn</code> depuis le Système de fichiers vers la vue 2D, deux fois. Tu obtiens <code>Box</code> et <code>Box2</code>, placés où tu as lâché la souris.</li>
+  <li>Sélectionne <code>Box2</code> et mets sa <strong>Speed</strong> à 40.</li>
+  <li><kbd>F6</kbd>.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Deux carrés bougent ensemble, l'un trois fois plus lentement, et changent de couleur chacun de leur côté. Ouvre maintenant <code>box.tscn</code>, agrandis le <code>ColorRect</code> à 24×24, enregistre, relance <code>sandbox.tscn</code> : <strong>les deux</strong> instances ont changé.</p></div>
+<div class="callout godot"><span class="tag">Instance et surcharge</span><p>Une instance reprend tout de sa scène d'origine. Ce que tu modifies sur l'instance (ici la vitesse de <code>Box2</code>) est une <strong>surcharge</strong>, marquée d'une flèche circulaire dans l'Inspecteur ; un clic dessus revient à la valeur de la scène. C'est exactement ainsi qu'on fera un clown « rapide » à partir du clown de base.</p></div>
+
+<h2 id="projet">Le vrai projet</h2>
+
+<h3 class="step" id="e01-8">1.8 · Régler le projet comme une Mega Drive</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t02-resolution.jpg" alt="Écran du jeu en 320×224 et loupe sur les pixels" loading="lazy"><figcaption><b>320 × 224 pixels.</b> Le jeu original affiche cette grille. On veut la même dans Godot : chaque pixel du jeu devient un carré net de 4×4 pixels de ton écran.</figcaption></figure>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li><span class="menu">Projet → Paramètres du projet</span> (<em>Project → Project Settings</em>). En haut à droite, active <strong>Paramètres avancés</strong> (<em>Advanced Settings</em>).</li>
+  <li>Section <strong>Affichage → Fenêtre</strong> (<em>Display → Window</em>) :
+    <ul>
+      <li><strong>Size → Viewport Width</strong> = 320, <strong>Viewport Height</strong> = 224</li>
+      <li><strong>Size → Window Width Override</strong> = 1280, <strong>Window Height Override</strong> = 896</li>
+      <li><strong>Stretch → Mode</strong> = <code>viewport</code>, <strong>Aspect</strong> = <code>keep</code>, <strong>Scale Mode</strong> = <code>integer</code></li>
+    </ul></li>
+  <li><strong>Rendu → Textures → Canvas Textures → Default Texture Filter</strong> = <code>Nearest</code>.</li>
+  <li><strong>Rendu → 2D → Snap</strong> : coche <strong>Snap 2D Transforms to Pixel</strong> et <strong>Snap 2D Vertices to Pixel</strong>.</li>
+  <li><strong>Physique → Commun</strong> : <strong>Physics Ticks per Second</strong> = 60, <strong>Max Physics Steps per Frame</strong> = 8 (valeurs par défaut, vérifie-les).</li>
+  <li><strong>Physique → 2D → Default Gravity</strong> = 900.</li>
+  <li>Ferme la fenêtre : c'est enregistré automatiquement dans <code>project.godot</code>.</li>
+</ol></div>
+<p>Pour vérifier, ouvre <code>project.godot</code> avec un éditeur de texte : tu dois y trouver ces lignes.</p>
+<script type="text/x-code" data-lang="ini" data-file="project.godot (extrait)">
+[display]
+window/size/viewport_width=320
+window/size/viewport_height=224
+window/size/window_width_override=1280
+window/size/window_height_override=896
+window/stretch/mode="viewport"
+window/stretch/aspect="keep"
+window/stretch/scale_mode="integer"
+
+[physics]
+2d/default_gravity=900.0
+
+[rendering]
+textures/canvas_textures/default_texture_filter=0
+2d/snap/snap_2d_transforms_to_pixel=true
+2d/snap/snap_2d_vertices_to_pixel=true
+</script>
+<p>Les valeurs restées par défaut (ici les 60 ticks et les 8 pas) n'y figurent pas : Godot n'écrit que ce qui diffère du réglage standard.</p>
+<div class="callout concept"><span class="tag">Concept : la résolution virtuelle</span><p>Le jeu est <strong>calculé et dessiné en 320×224</strong>, puis l'image entière est agrandie ×4. Un sprite ne peut jamais tomber entre deux pixels, et un effet qui travaille « ligne par ligne » (étape 08) voit exactement 224 lignes, comme la console. Le mode <code>viewport</code> fait ça ; le mode <code>canvas_items</code> dessinerait en haute résolution et lisserait les pixels. L'échelle <code>integer</code> interdit les agrandissements non entiers (×3,5), qui déforment les pixels.</p></div>
+<div class="callout test"><span class="tag">Teste</span><p>Relance <code>sandbox.tscn</code> : la fenêtre fait 1280×896, et les carrés sont énormes, aux bords parfaitement nets. Agrandis la fenêtre : l'image passe à ×5 seulement quand la place le permet, avec des bandes noires autour.</p></div>
+
+<h3 class="step" id="e01-9">1.9 · Créer l'arborescence</h3>
+<p>Tous les chemins <code>res://</code> du parcours s'y réfèrent. Crée maintenant ces dossiers vides (clic droit → Nouveau dossier) :</p>
+<pre class="tree">res://
+├── autoload/     les singletons (état de la partie, transitions, audio)
+├── core/         les briques génériques réutilisables
+├── player/       Batman et Robin
+│   └── states/
+├── weapons/
+│   └── data/
+├── pickups/      les bonus
+├── enemies/
+├── level/        caméra, arènes, objets de décor
+├── fx/           effets visuels et shaders
+├── bosses/
+├── sections/     les trois sections du niveau
+├── screens/      intro, titre, menus…
+├── ui/           le HUD
+├── art/          tes images
+├── audio/
+├── tools/        scripts d'éditeur
+└── sandbox/      les essais jetables</pre>
+<div class="callout method"><span class="tag">Méthode : ranger par fonction</span><p>On range par <em>ce que fait</em> un fichier (ennemis, armes), pas par <em>type</em> (tous les scripts ensemble, toutes les scènes ensemble). Quand tu travailles sur les ennemis, tout ce qu'il te faut est au même endroit.</p></div>
+
+<h3 class="step" id="e01-10">1.10 · Le premier commit</h3>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Ouvre un terminal dans le dossier du projet (celui qui contient <code>project.godot</code>).</li>
+  <li>Si Godot ne l'a pas fait : <code>git init</code>.</li>
+  <li>Regarde ce qui va être enregistré : <code>git status</code>. Le dossier <code>.godot/</code> ne doit pas apparaître (c'est un cache que Godot reconstruit ; le <code>.gitignore</code> l'exclut).</li>
+  <li>Enregistre :</li>
+</ol></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 01 : projet 320x224, bac à sable"</div>
+<div class="callout method"><span class="tag">Méthode : un commit par étape validée</span><p>Un commit est un point de sauvegarde. Si une modification casse tout, <code>git diff</code> montre ce qui a changé depuis le dernier point qui marchait, et <code>git restore .</code> y revient. Ce parcours te propose un commit à la fin de chaque étape. Prends l'habitude d'en faire aussi entre deux, dès que quelque chose marche.</p></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span><p>Les dossiers vides n'existent pas pour Git : ils n'apparaîtront dans tes commits que quand ils contiendront un fichier. Ce n'est pas grave.</p></div>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>Le bac à sable fonctionne : deux carrés qui bougent et changent de couleur.</li>
+  <li>La fenêtre du jeu s'ouvre en 1280×896, avec des pixels nets.</li>
+  <li>L'arborescence existe et le premier commit est fait.</li>
+  <li>Tu sais expliquer avec tes mots : nœud, scène, instance, script, signal, <code>delta</code>.</li>
+</ul></div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Quelle différence entre une scène et une instance ?</summary><div><p>La scène est le modèle, enregistré dans un fichier <code>.tscn</code>. Une instance est un exemplaire de ce modèle placé dans une autre scène. Modifier la scène modifie toutes ses instances ; modifier une instance (surcharge) ne touche qu'elle.</p></div></details>
+<details class="quiz"><summary>Pourquoi multiplier une vitesse par <code>delta</code> ?</summary><div><p>Pour exprimer la vitesse en unités par <strong>seconde</strong> et non par image. Sans <code>delta</code>, l'objet irait plus vite sur un écran à haute fréquence et ralentirait quand le jeu rame.</p></div></details>
+<details class="quiz"><summary>Que se passe-t-il si tu renommes <code>ColorRect</code> en <code>Square</code> sans changer le script ?</summary><div><p><code>$ColorRect</code> ne trouve plus rien et renvoie <code>null</code>. Au premier <code>timeout</code>, le jeu s'arrête sur l'erreur « Invalid set index 'color' (on base: 'null instance') ». Retiens ce message : c'est presque toujours un chemin de nœud faux.</p></div></details>
+<details class="quiz"><summary>Pourquoi le mode d'étirement <code>viewport</code> plutôt que <code>canvas_items</code> ?</summary><div><p>Avec <code>viewport</code>, le jeu est réellement rendu en 320×224 puis agrandi : pixels nets, positions toujours entières, et des effets par ligne exacts. <code>canvas_items</code> dessine en haute résolution et casserait ces trois propriétés.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Empêche le carré de sortir de l'écran avec <code>position = position.clamp(Vector2.ZERO, Vector2(320, 224))</code>.</li>
+  <li>Ajoute un <code>@export var color_period := 1.0</code> et applique-le au <code>Timer</code> dans <code>_ready()</code> (<code>$Timer.wait_time = color_period</code>).</li>
+  <li>Lis la page <a href="https://docs.godotengine.org/fr/4.x/getting_started/step_by_step/nodes_and_scenes.html" target="_blank" rel="noopener">Nœuds et scènes</a> de la documentation officielle (en français).</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>

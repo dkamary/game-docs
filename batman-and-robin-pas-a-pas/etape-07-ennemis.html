@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 · Ennemis et arènes à vagues — Pas à pas</title>
+<meta name="description" content="Étape 7 : classe de base Enemy, clown, arène à vagues avec quota et GO!, costaud qui empoigne, tireur, bombe, formations de têtes à hélice, ballons-mines et objets destructibles.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Oswald:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="../batman-and-robin-godot-guide/assets/guide.css">
+<link rel="stylesheet" href="assets/tuto.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="index.html">🦇 Batman &amp; Robin <span>× Godot · pas à pas</span></a><select id="tome-select" aria-label="Aller à une étape"></select></header>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Sommaire de la page"></nav>
+<main class="content">
+
+<section class="hero">
+  <div class="kicker">Étape 07 / 13</div>
+  <h1>Ennemis et arènes à vagues</h1>
+  <p class="lead">Le cœur du rythme de Batman &amp; Robin : la caméra se fige, des vagues d'ennemis arrivent jusqu'à un quota, « GO! » s'affiche, on avance. On écrit une classe de base commune, six ennemis qui n'en écrivent que le comportement, et un « directeur » qui orchestre les vagues.</p>
+  <div class="meta"><span class="pill">⏱ ~5 h</span><span class="pill">Prérequis : étape 06</span><span class="pill gold">Guide : <a href="../batman-and-robin-godot-guide/05-ennemis-vagues.html">tome 05</a></span></div>
+</section>
+
+<h2 id="apprendre">Ce que tu vas apprendre</h2>
+<div class="learn">
+  <div class="gd"><h4>Godot 4</h4><ul>
+    <li>Hériter d'une classe à soi (<code>extends Enemy</code>)</li>
+    <li><code>enum</code> + <code>match</code></li>
+    <li><code>Path2D</code>, <code>PathFollow2D</code></li>
+    <li><code>RayCast2D</code>, <code>tree_exiting</code></li>
+    <li>Tableaux de ressources dans l'Inspecteur</li>
+  </ul></div>
+  <div class="dev"><h4>Développement de jeu</h4><ul>
+    <li>Héritage <em>et</em> composition</li>
+    <li>L'IA par états simples</li>
+    <li>Le « directeur » de rencontres</li>
+    <li>Tension et détente</li>
+    <li>Les tables de butin</li>
+    <li>Les trajectoires dessinées</li>
+  </ul></div>
+</div>
+
+<h2 id="rythme">Le rythme</h2>
+
+<h3 class="step" id="e07-1">7.1 · Observer une arène</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t05-arene-go.jpg" alt="Le cycle d'une arène" loading="lazy"><figcaption><b>Le cycle d'une arène.</b> La caméra est figée pendant la vague ; une fois l'écran nettoyé, la bulle « GO! » apparaît ; la caméra repart.</figcaption></figure>
+<div class="callout video"><span class="tag">Dans la vidéo</span><p>Regarde <a class="tc" href="#">1:52</a>–<a class="tc" href="#">2:27</a> : la caméra s'arrête, les clowns tombent du haut, sautent du balcon ou arrivent par les côtés. Jamais plus de trois ou quatre à la fois. Quand l'écran est vide, « GO! » clignote à droite et la caméra repart. Même chose à <a class="tc" href="#">3:18</a>, <a class="tc" href="#">7:49</a>, <a class="tc" href="#">11:41</a>.</p></div>
+<div class="callout concept"><span class="tag">Concept : tension et détente</span><p>Arène (tension : l'écran est figé, il faut survivre) → couloir (détente : on avance, on ramasse des bonus) → arène… Ce rythme est le squelette du level design de presque tous les jeux d'action. Le joueur respire entre deux combats, et chaque nouvelle arène est un petit événement.</p></div>
+
+<h2 id="base">La base commune</h2>
+
+<h3 class="step" id="e07-2">7.2 · Atelier : des formes de substitution pour les ennemis</h3>
+<p>Les ennemis utilisent un <code>AnimatedSprite2D</code> nommé <code>Sprite</code>, dont le code change la teinte (flash quand on les touche, couleur des ballons). Un rectangle enfant ne suivrait pas ces teintes : il faut que le sprite affiche lui-même quelque chose.</p>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Dans un logiciel de dessin, crée une image <strong>blanche</strong> de 16×16 pixels et enregistre-la en <code>res://art/placeholder/white.png</code>.</li>
+  <li>Crée une ressource <code>SpriteFrames</code> (clic droit → Nouveau → Ressource → SpriteFrames) : <code>res://art/placeholder/placeholder_frames.tres</code>. Ouvre-la, et ajoute <code>white.png</code> comme unique image de l'animation <code>default</code>.</li>
+  <li>Pour chaque ennemi, le <code>Sprite</code> recevra ce <code>SpriteFrames</code>, une <strong>Scale</strong> qui donne sa taille (16×32 = scale (1, 2)), un <strong>Offset</strong> y = -8 pour que le bas touche l'origine, et une couleur via <strong>Modulate</strong>.</li>
+</ol></div>
+<div class="callout godot"><span class="tag"><code>modulate</code> et <code>self_modulate</code></span><p>Deux teintes se multiplient : <code>modulate</code> s'applique au nœud <strong>et à ses enfants</strong>, <code>self_modulate</code> au nœud seul. Le code des ennemis utilise <code>self_modulate</code> pour le flash et la couleur des ballons ; on réserve donc <code>modulate</code> à la couleur de base de la forme de substitution.</p></div>
+
+<h3 class="step" id="e07-3">7.3 · La classe <code>Enemy</code></h3>
+<div class="callout concept"><span class="tag">Concept : héritage <em>et</em> composition</span><p>Tous les ennemis ont une vie, une hurtbox, un score, un butin et une mort spectaculaire. On met ce socle dans une classe <code>Enemy</code>, qui s'appuie sur les composants de l'étape 02 (composition). Chaque ennemi concret hérite d'<code>Enemy</code> (héritage) et n'écrit qu'une fonction : <code>think()</code>, son comportement. On combine les deux approches, chacune là où elle est la plus simple.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://enemies/enemy.gd">
+class_name Enemy
+extends CharacterBody2D
+## Base de tous les ennemis : vie, flash de dégâts, score, butin, mort.
+## Les classes filles écrivent think(delta) et règlent velocity.
+
+signal killed(enemy: Enemy)
+
+@export var score_value := 100
+@export var gravity := 900.0
+@export var uses_gravity := true
+@export var drops: Array[PackedScene] = []
+@export_range(0.0, 1.0) var drop_chance := 0.0
+@export var knockback_scale := 0.4
+
+var facing := -1
+var player: Player
+var _flash_left := 0.0
+var _drop_left := 0.0
+var _dead := false
+
+@onready var sprite: AnimatedSprite2D = $Sprite
+@onready var health: Health = $Health
+@onready var hurtbox: Hurtbox = $Hurtbox
+## Facultative : tous les ennemis n'en ont pas.
+@onready var contact_hitbox: Hitbox = get_node_or_null("ContactHitbox")
+
+
+func _ready() -> void:
+	add_to_group("enemies")
+	player = get_tree().get_first_node_in_group("player") as Player
+	hurtbox.hurt.connect(_on_hurt)
+	health.died.connect(kill)
+
+
+func _physics_process(delta: float) -> void:
+	if uses_gravity and not is_on_floor():
+		velocity.y = minf(velocity.y + gravity * delta, 400.0)
+	think(delta)
+	move_and_slide()
+	# Toucher le corps repousse Batman À L'OPPOSÉ de l'ennemi, quel que soit son regard.
+	if contact_hitbox and player:
+		contact_hitbox.facing = 1 if player.global_position.x >= global_position.x else -1
+	if _flash_left > 0.0:
+		_flash_left -= delta
+		if _flash_left <= 0.0:
+			sprite.self_modulate = Color.WHITE
+	if _drop_left > 0.0:
+		_drop_left -= delta
+		if _drop_left <= 0.0:
+			set_collision_mask_value(2, true)
+
+
+## Comportement propre à chaque ennemi.
+func think(_delta: float) -> void:
+	pass
+
+
+## Comme Player.play_anim : ne fait rien si l'animation n'existe pas encore.
+func play_anim(anim: StringName) -> void:
+	if sprite.sprite_frames and sprite.sprite_frames.has_animation(anim) and sprite.animation != anim:
+		sprite.play(anim)
+
+
+func face_player() -> void:
+	if player:
+		set_facing(int(signf(player.global_position.x - global_position.x)))
+
+
+func set_facing(dir: int) -> void:
+	if dir != 0:
+		facing = dir
+		sprite.flip_h = facing < 0   # sprites dessinés regardant vers la droite
+
+
+func dx_to_player() -> float:
+	return player.global_position.x - global_position.x if player else INF
+
+
+func dy_to_player() -> float:
+	return player.global_position.y - global_position.y if player else INF
+
+
+func drop_down() -> void:
+	## Saute du balcon : ignore les plateformes traversables un instant.
+	## Un compteur plutôt qu'un await : rien ne reste en suspens si l'ennemi meurt entre-temps.
+	set_collision_mask_value(2, false)
+	_drop_left = 0.3
+
+
+func kill() -> void:
+	if _dead:
+		return
+	_dead = true
+	Game.add_score(score_value)
+	# Explosion et butin vont dans la scène courante, pas sous notre parent : un membre de
+	# Formation a pour parent un PathFollow2D, qui emporterait l'explosion sur sa trajectoire.
+	Fx.explosion(global_position + Vector2(0, -16))
+	if not drops.is_empty() and randf() < drop_chance:
+		var item: Node2D = drops.pick_random().instantiate()
+		Fx.spawn(item, global_position + Vector2(0, -12), null, true)   # différé : pas d'ajout physique pendant une collision
+	killed.emit(self)
+	queue_free()
+
+
+func _on_hurt(hitbox: Hitbox) -> void:
+	sprite.self_modulate = Color(4, 4, 4)   # flash blanc rapide ; version palette au tome 06
+	_flash_left = 0.06
+	velocity.x = hitbox.get_knockback().x * knockback_scale
+</script>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><code>_physics_process</code> est écrit une fois pour tous : gravité, puis <code>think()</code> (le comportement propre), puis <code>move_and_slide()</code>, puis les minuteries. Les classes filles ne réécrivent pas <code>_physics_process</code>.</li>
+  <li><code>health.died.connect(kill)</code> : la mort passe toujours par <code>kill()</code>, que l'ennemi meure de ses blessures ou par le crâne. <code>_dead</code> empêche de mourir deux fois (deux balles dans la même image).</li>
+  <li><code>drops</code> + <code>drop_chance</code> : une <strong>table de butin</strong> minimale. On règle dans l'Inspecteur ce que lâche un ennemi et avec quelle probabilité.</li>
+  <li><code>Color(4, 4, 4)</code> : une teinte supérieure à 1 éclaircit, d'où le flash blanc.</li>
+  <li><code>contact_hitbox.facing</code> : le recul dû au contact pousse Batman à l'opposé de l'ennemi, de quelque côté qu'il arrive.</li>
+</ul>
+
+<h2 id="bestiaire">Le bestiaire</h2>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t05-bestiaire.jpg" alt="Le bestiaire du niveau 1" loading="lazy"><figcaption><b>Le bestiaire du niveau 1, extrait de la vidéo.</b> Chaque ennemi a son script, qui hérite d'<code>Enemy</code>.</figcaption></figure>
+
+<h3 class="step" id="e07-4">7.4 · Le clown</h3>
+<p>Il arrive en tombant ou en marchant, s'approche, prépare son coup, frappe avec son aiguillon, recule et recommence. Sur le balcon, il saute quand Batman passe dessous.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://enemies/clown.gd">
+class_name Clown
+extends Enemy
+
+enum S { ENTER, APPROACH, WINDUP, STRIKE, RECOVER }
+
+@export var walk_speed := 55.0
+@export var attack_range := 28.0
+@export var windup_time := 0.25
+@export var strike_time := 0.15
+@export var recover_time := 0.45
+
+var _s := S.ENTER
+var _t := 0.0
+@onready var poke: Hitbox = $PokeHitbox
+
+
+func _ready() -> void:
+	super._ready()
+	poke.monitoring = false
+
+
+func think(delta: float) -> void:
+	_t += delta
+	match _s:
+		S.ENTER:
+			velocity.x = 0.0
+			if is_on_floor():
+				_go(S.APPROACH)
+		S.APPROACH:
+			face_player()
+			velocity.x = facing * walk_speed
+			# Sur le balcon, Batman juste en dessous : on saute.
+			if is_on_floor() and dy_to_player() > 40.0 and absf(dx_to_player()) < 48.0:
+				drop_down()
+			elif absf(dx_to_player()) < attack_range and absf(dy_to_player()) < 24.0:
+				_go(S.WINDUP)
+		S.WINDUP:
+			velocity.x = 0.0
+			if _t >= windup_time:
+				poke.scale.x = facing
+				poke.facing = facing
+				poke.reset_hits()
+				poke.monitoring = true
+				_go(S.STRIKE)
+		S.STRIKE:
+			if _t >= strike_time:
+				poke.monitoring = false
+				_go(S.RECOVER)
+		S.RECOVER:
+			velocity.x = -facing * 20.0   # petit recul
+			if _t >= recover_time:
+				_go(S.APPROACH)
+	play_anim(&"walk" if absf(velocity.x) > 1.0 else &"idle")
+
+
+func _go(next: S) -> void:
+	_s = next
+	_t = 0.0
+</script>
+<div class="callout concept"><span class="tag">Deux styles de machine à états</span><p>Pour Batman, une machine <strong>par nœuds</strong> : dix états, beaucoup de logique. Pour un clown de cinq états de quelques lignes, un <code>enum</code> et un <code>match</code> suffisent et se lisent d'un coup d'œil. La phase <code>WINDUP</code> (préparation) est essentielle : c'est elle qui laisse au joueur le temps de voir venir le coup. C'est de la <strong>télégraphie</strong>.</p></div>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>CharacterBody2D</code> nommée <code>Clown</code>, script <code>clown.gd</code>. Couche 4, masque 1 et 2. Enregistre en <code>res://enemies/clown.tscn</code>.</li>
+  <li>Construis cet arbre (le <code>Sprite</code> avec <code>placeholder_frames.tres</code>, scale (1, 2), offset y = -8, modulate violet) :</li>
+</ol>
+<pre class="tree">Clown (CharacterBody2D, clown.gd)   couche 4 « corps_ennemis » · masque 1+2
+├── Sprite (AnimatedSprite2D)       forme de substitution violette 16×32
+├── CollisionShape2D                rectangle 14×32, position (0, -16)
+├── Health                          max_health = 2 (À CALIBRER)
+├── Hurtbox                         couche 6 · masque vide · health = Health
+│   └── CollisionShape2D            rectangle 14×30, position (0, -16)
+├── ContactHitbox (Hitbox)          couche vide · masque 5 · damage 1 : toucher le corps fait mal
+│   └── CollisionShape2D            rectangle 12×28, position (0, -16)
+└── PokeHitbox (Hitbox)             couche vide · masque 5 · damage 1 · désactivée par défaut
+    └── CollisionShape2D            rectangle 16×8, position (14, -20)</pre>
+<ol start="3">
+  <li>Sur la racine, règle <strong>Drops</strong> : ajoute un élément, <code>weapon_pickup.tscn</code> ; <strong>Drop Chance</strong> = 0,3.</li>
+  <li>Places-en deux dans la salle de test : un au sol, un sur le balcon.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span>
+<ul>
+  <li>Les clowns marchent vers Batman, s'arrêtent, frappent, reculent.</li>
+  <li>Passe sous le clown du balcon : il saute dans la rue.</li>
+  <li>Deux tirs de batarang le tuent ; parfois il lâche un bonus.</li>
+  <li>Le crâne de l'étape 06 détruit maintenant tous les clowns à l'écran.</li>
+</ul></div>
+<div class="callout debug"><span class="tag">Si ça ne marche pas</span>
+<ul>
+  <li><strong>« Invalid get index 'hurt' (on base: 'null instance') »</strong> : un nœud n'a pas le nom attendu par <code>enemy.gd</code> (<code>Sprite</code>, <code>Health</code>, <code>Hurtbox</code>).</li>
+  <li><strong>Le clown traverse le sol</strong> : son masque doit contenir la couche 1.</li>
+  <li><strong>Le clown ne blesse pas Batman</strong> : ses hitbox doivent regarder la couche 5, et la Hurtbox de Batman être sur la couche 5.</li>
+</ul></div>
+
+<h3 class="step" id="e07-5">7.5 · Les vagues : <code>WaveData</code></h3>
+<div class="callout concept"><span class="tag">Concept : le « directeur » de rencontres</span><p>Plutôt que de placer 300 ennemis à la main, on décrit des <strong>vagues</strong> : quels ennemis, combien en même temps au maximum, combien à abattre. Un directeur lit cette description et fait apparaître les ennemis au bon rythme. Le level design devient un réglage de données, et seuls les ennemis réellement à l'écran existent en mémoire. Beaucoup de jeux modernes vont plus loin, avec un directeur qui adapte la pression au joueur.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/wave_data.gd">
+class_name WaveData
+extends Resource
+## Une vague : on fait apparaître des ennemis jusqu'à en avoir abattu « kill_quota ».
+
+@export var enemies: Array[PackedScene] = []    ## pris dans l'ordre, en boucle
+@export var kill_quota := 6
+@export var max_alive := 3                       ## jamais plus de N à l'écran
+@export var spawn_interval := 0.8
+## Origines possibles : "top" (tombe du ciel), "left", "right", "balcony", "below".
+@export var origins: PackedStringArray = ["top", "right", "left"]
+@export var formation: NodePath                  ## facultatif : Formation à lancer avec la vague
+</script>
+
+<h3 class="step" id="e07-6">7.6 · L'arène : <code>WaveArena</code></h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/wave_arena.gd">
+class_name WaveArena
+extends Area2D
+## Zone déclencheuse (masque 3). Quand Batman y entre : la caméra se fige,
+## les vagues s'enchaînent, puis « GO! » et la caméra repart.
+
+signal started
+signal cleared
+
+@export var waves: Array[WaveData] = []
+@export var ground_y := 208.0
+@export var balcony_y := 112.0
+@export var go_sign_scene: PackedScene      ## res://level/go_sign.tscn
+
+var _player: Player
+var _index := -1
+var _killed := 0
+var _alive := 0
+var _cooldown := 0.0
+var _running := false
+var _done := false
+
+
+func _ready() -> void:
+	body_entered.connect(_on_body_entered)
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if body is Player and _player == null and not _done:
+		_player = body
+		# Différé : la première vague peut lancer une Formation, donc ajouter des corps
+		# physiques. C'est interdit pendant un signal de collision comme body_entered.
+		_begin.call_deferred()
+
+
+func _begin() -> void:
+	_running = true
+	_player.camera.lock_on(global_position.x)
+	started.emit()
+	_next_wave()
+
+
+func _next_wave() -> void:
+	_index += 1
+	if _index >= waves.size():
+		_finish()
+		return
+	_killed = 0
+	_cooldown = 0.6
+	var w := waves[_index]
+	if not w.formation.is_empty():
+		var f := get_node(w.formation) as Formation
+		f.start()
+
+
+func _physics_process(delta: float) -> void:
+	if not _running:
+		return
+	var w := waves[_index]
+	if _killed >= w.kill_quota:
+		if _alive == 0:
+			_next_wave()   # écran nettoyé : vague suivante
+		return
+	_cooldown -= delta
+	if _cooldown <= 0.0 and _alive < w.max_alive and _killed + _alive < w.kill_quota:
+		_spawn(w)
+		_cooldown = w.spawn_interval
+
+
+func _spawn(w: WaveData) -> void:
+	if w.enemies.is_empty():
+		return
+	var scene := w.enemies[(_killed + _alive) % w.enemies.size()]
+	var e := scene.instantiate() as Enemy
+	e.killed.connect(func(_e: Enemy) -> void: _killed += 1)
+	e.tree_exiting.connect(func() -> void: _alive -= 1)   # tué OU sorti de l'écran
+	# Position fixée AVANT l'entrée dans l'arbre : le _ready() du ballon-mine la lit.
+	Fx.spawn(e, _origin_point(w.origins[randi() % w.origins.size()]))
+	_alive += 1
+
+
+func _origin_point(origin: String) -> Vector2:
+	var r := _player.camera.view_rect()
+	match origin:
+		"top":
+			return Vector2(randf_range(r.position.x + 40, r.end.x - 40), r.position.y - 20)
+		"left":
+			return Vector2(r.position.x - 20, ground_y)
+		"balcony":
+			return Vector2(randf_range(r.position.x + 40, r.end.x - 40), balcony_y - 1)
+		"below":   # ballons-mines du convoi (tome 09)
+			return Vector2(randf_range(r.position.x + 60, r.end.x + 20), r.end.y + 20)
+		_:
+			return Vector2(r.end.x + 20, ground_y)
+
+
+func _finish() -> void:
+	_running = false
+	_done = true
+	_player.camera.unlock()
+	if go_sign_scene:
+		get_tree().current_scene.add_child(go_sign_scene.instantiate())
+	cleared.emit()
+</script>
+<div class="callout godot"><span class="tag">Ce script utilise <code>Formation</code></span><p><code>wave_arena.gd</code> mentionne le type <code>Formation</code>, créé en 7.11. En attendant, l'éditeur affiche une erreur « Could not find type "Formation" ». Deux options : créer dès maintenant <code>res://enemies/formation.gd</code> avec le code de 7.11, ou commenter provisoirement les deux lignes qui utilisent <code>Formation</code>. Je te conseille la première.</p></div>
+<h4>Comprendre le code</h4>
+<ul>
+  <li><strong>Deux compteurs</strong> : <code>_killed</code> ne compte que les ennemis abattus (le quota) ; <code>_alive</code> compte ceux qui sont présents, quelle que soit la façon dont ils disparaissent. Sans <code>_alive</code>, un ennemi qui s'échappe de l'écran bloquerait l'arène pour toujours.</li>
+  <li><code>tree_exiting</code> : un signal émis par <em>tout</em> nœud qui quitte l'arbre. Une seule connexion couvre la mort, la sortie d'écran et le changement de scène.</li>
+  <li><code>_killed + _alive &lt; w.kill_quota</code> : on n'ajoute pas d'ennemi si ceux déjà présents suffisent à finir le quota.</li>
+  <li><code>_begin.call_deferred()</code> : <code>body_entered</code> est un signal de collision. Si la première vague lance une formation, elle ajoute des corps physiques ; Godot l'interdit pendant ce signal (erreur « Can't change this state while flushing queries »). On reporte donc le démarrage à la fin de l'image.</li>
+</ul>
+
+<h3 class="step" id="e07-7">7.7 · La bulle « GO! » et une première arène</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/go_sign.gd  (racine CanvasLayer de go_sign.tscn)">
+extends CanvasLayer
+## Bulle « GO! » au bord droit, qui clignote puis disparaît (vidéo 2:25, 7:49).
+## Enfant : TextureRect « Bubble » ancré au centre-droit de l'écran.
+
+@export var duration := 2.5
+@onready var bubble: TextureRect = $Bubble
+var _t := 0.0
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	bubble.visible = int(_t * 4.0) % 2 == 0   # clignote 2 fois par seconde
+	if _t >= duration:
+		queue_free()
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>CanvasLayer</code> nommée <code>GoSign</code>, script <code>go_sign.gd</code>, enregistrée en <code>res://level/go_sign.tscn</code>.</li>
+  <li>Enfant <code>TextureRect</code> nommé <code>Bubble</code> : dans la barre d'outils, <strong>Ancres</strong> → <strong>Centre droit</strong>, taille 40×20. Si tu n'as pas encore d'image de bulle, ajoute-lui un enfant <code>Label</code> « GO! » (taille de police 12, jaune) : il clignotera avec son parent.</li>
+  <li>Dans la salle de test, retire les clowns posés à la main. Ajoute une <code>WaveArena</code> en (600, 112), couche vide, masque 3, avec une forme rectangle 8×224 : une ligne verticale que Batman franchira.</li>
+  <li>Dans l'Inspecteur de l'arène : <strong>Go Sign Scene</strong> = <code>go_sign.tscn</code>. <strong>Waves</strong> : ajoute deux éléments, chacun <strong>Nouveau WaveData</strong>.
+    <ul><li>Vague 1 : <code>enemies</code> = [clown.tscn], <code>kill_quota</code> = 4, <code>max_alive</code> = 2, <code>origins</code> = ["top", "right"].</li>
+    <li>Vague 2 : <code>enemies</code> = [clown.tscn], <code>kill_quota</code> = 6, <code>max_alive</code> = 3, <code>origins</code> par défaut.</li></ul></li>
+  <li>Assure-toi que le sol de la salle s'étend bien au-delà de x = 800.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Cours vers la droite. En passant x = 600, la caméra se recentre sur l'arène et se fige. Des clowns tombent du haut et arrivent par la droite, jamais plus de deux à la fois. Après 4 morts et un écran vide, la deuxième vague démarre (trois à la fois). À la fin, « GO! » clignote à droite et la caméra repart.</p></div>
+<div class="callout method"><span class="tag">Méthode : régler le rythme avec les données</span><p>Joue l'arène trois fois en ne changeant que <code>max_alive</code> et <code>spawn_interval</code>. Avec 1 et 1,5 s, c'est une promenade ; avec 4 et 0,3 s, c'est l'enfer. Le même code donne des expériences très différentes : c'est le travail du level designer.</p></div>
+
+<h3 class="step" id="e07-8">7.8 · Le costaud qui empoigne</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://enemies/thug.gd">
+class_name Thug
+extends Enemy
+## Charge, attrape Batman (état Grabbed du tome 03), le serre jusqu'à ce qu'il se dégage.
+## Nœud enfant supplémentaire : GrabArea (Area2D, masque 3 « corps_joueur »).
+
+enum S { APPROACH, CHARGE, HOLD, STUNNED }
+
+@export var walk_speed := 40.0
+@export var charge_speed := 150.0
+@export var charge_trigger := 90.0
+@export var squeeze_interval := 0.7
+@export var squeeze_damage := 1
+
+var _s := S.APPROACH
+var _t := 0.0
+@onready var grab_area: Area2D = $GrabArea
+
+
+func think(delta: float) -> void:
+	_t += delta
+	match _s:
+		S.APPROACH:
+			face_player()
+			velocity.x = facing * walk_speed
+			if absf(dx_to_player()) < charge_trigger and absf(dy_to_player()) < 20.0:
+				_go(S.CHARGE)
+		S.CHARGE:
+			velocity.x = facing * charge_speed
+			if _try_grab():
+				_go(S.HOLD)
+			elif _t > 0.8:
+				_go(S.STUNNED)   # charge ratée : il s'essouffle
+		S.HOLD:
+			velocity.x = 0.0
+			if not _holding():
+				_go(S.STUNNED)
+			elif _t >= squeeze_interval:
+				_t = 0.0
+				player.health.damage(squeeze_damage)
+		S.STUNNED:
+			velocity.x = 0.0
+			if _t > 0.9:
+				_go(S.APPROACH)
+
+
+func _try_grab() -> bool:
+	if player == null or player.hurtbox.invincible:
+		return false
+	if player in grab_area.get_overlapping_bodies():
+		player.fsm.force(&"Grabbed", {"grabber": self})
+		return true
+	return false
+
+
+func _holding() -> bool:
+	return player != null and player.fsm.current_name() == &"Grabbed"
+
+
+## Appelé par l'état Grabbed du joueur quand il se dégage.
+func release() -> void:
+	_go(S.STUNNED)
+
+
+func _go(next: S) -> void:
+	_s = next
+	_t = 0.0
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée <code>res://enemies/thug.tscn</code> comme le clown, mais : pas de <code>PokeHitbox</code>, une forme plus large (20×34), Health 4, une couleur marron, et un enfant <code>GrabArea</code> (<code>Area2D</code>, couche vide, masque 3) avec un rectangle 26×30 en (0, -16).</li>
+  <li>Ajoute <code>thug.tscn</code> dans la liste <code>enemies</code> de la vague 2 : [clown, clown, thug].</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Le costaud s'approche, charge, et empoigne Batman (« Grabbed »). Il le serre toutes les 0,7 s. Martèle les boutons : Batman se libère avec un petit saut et quelques instants d'invincibilité ; le costaud reste étourdi. C'est la première fois que deux machines à états (celle de Batman, celle du costaud) se parlent : <code>fsm.force()</code> dans un sens, <code>release()</code> dans l'autre.</p></div>
+
+<h3 class="step" id="e07-9">7.9 · Le tireur et les balles ennemies</h3>
+<p>Les tirs ennemis réutilisent le projectile de l'étape 06 : seul le masque change.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://enemies/gunner.gd">
+class_name Gunner
+extends Enemy
+## Se poste, vise, tire une rafale, attend. Variante : le sbire rose au lance-flammes
+## (portée courte, grosse Hitbox au lieu de balles).
+
+@export var burst := 3
+@export var burst_gap := 0.15
+@export var rest_time := 1.4
+@export var bullet_speed := 140.0
+@export var aim_diagonal := true    ## vise en diagonale si Batman est plus haut ou plus bas
+
+var _t := 0.0
+var _shots_left := 0
+var _pool: Pool
+
+
+func _ready() -> void:
+	super._ready()
+	_pool = get_tree().get_first_node_in_group("enemy_bullets") as Pool
+	_t = rest_time * randf()
+
+
+func think(delta: float) -> void:
+	velocity.x = 0.0
+	face_player()
+	_t -= delta
+	if _t > 0.0:
+		return
+	if _shots_left == 0:
+		_shots_left = burst
+	_shoot()
+	_shots_left -= 1
+	_t = burst_gap if _shots_left > 0 else rest_time
+
+
+func _shoot() -> void:
+	if _pool == null or player == null:
+		return
+	var b := _pool.acquire() as Projectile
+	if b == null:
+		return
+	var dir := Vector2(facing, 0.0)
+	if aim_diagonal and absf(dy_to_player()) > 40.0:
+		dir.y = signf(dy_to_player())
+	b.fire(global_position + Vector2(12 * facing, -22), dir, bullet_speed, 1)
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Ouvre <code>projectile.tscn</code> → <span class="menu">Scène → Enregistrer la scène sous</span> → <code>res://enemies/enemy_bullet.tscn</code>. Dans la copie : masque 5 seul (au lieu de 6), et une teinte orange sur le <code>Sprite2D</code>.</li>
+  <li>Dans la salle de test, ajoute un nœud <code>Pool</code> nommé <code>EnemyBullets</code>, avec <strong>Scene</strong> = <code>enemy_bullet.tscn</code>, et mets-le dans le groupe <code>enemy_bullets</code>. Chaque section en aura un.</li>
+  <li>Crée <code>res://enemies/gunner.tscn</code> sur le modèle du clown (sans <code>PokeHitbox</code>), couleur verte, Health 2.</li>
+  <li>Place un tireur sur le balcon de la salle de test.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Le tireur se tourne vers Batman et tire des rafales de 3 balles. Depuis la rue, il tire en diagonale vers le bas. Accroupi, Batman esquive les balles horizontales (c'est la Hurtbox abaissée de l'étape 05 qui agit).</p></div>
+
+<h3 class="step" id="e07-10">7.10 · La bombe</h3>
+<p>Une seule bombe pour les têtes à hélice, Harley et le Joker : elle tombe, rebondit un nombre réglable de fois, puis explose.</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://enemies/bomb.gd">
+class_name Bomb
+extends Hitbox
+
+@export var fall_gravity := 500.0   ## « gravity » est déjà une propriété native d'Area2D
+@export var bounces := 1
+@export var bounce_damping := 0.55
+@export var fuse := 3.0
+var velocity := Vector2.ZERO
+@onready var ray: RayCast2D = $RayCast2D
+
+
+func _ready() -> void:
+	super._ready()
+	single_hit = true
+	landed.connect(func(_h: Hurtbox) -> void: explode())
+
+
+func _physics_process(delta: float) -> void:
+	velocity.y += fall_gravity * delta
+	global_position += velocity * delta
+	ray.force_raycast_update()
+	if velocity.y > 0.0 and ray.is_colliding():
+		global_position.y = ray.get_collision_point().y - 4.0
+		if bounces > 0:
+			bounces -= 1
+			velocity.y = -velocity.y * bounce_damping
+		else:
+			explode()
+	fuse -= delta
+	if fuse <= 0.0:
+		explode()
+
+
+func explode() -> void:
+	if is_queued_for_deletion():
+		return
+	Fx.explosion(global_position)
+	queue_free()
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Nouvelle scène, racine <code>Area2D</code> nommée <code>Bomb</code>, script <code>bomb.gd</code>, couche vide, masque 5. Enregistre en <code>res://enemies/bomb.tscn</code>.</li>
+  <li>Enfants : <code>Sprite2D</code> (<code>icon.svg</code>, scale 0,06, teinte noire), <code>CollisionShape2D</code> (cercle de rayon 4), <code>RayCast2D</code> (<strong>Target Position</strong> = (0, 6), masque 1 et 2).</li>
+</ol>
+<pre class="tree">Bomb (Area2D, bomb.gd)     masque 5 · damage 1 · single_hit
+├── Sprite2D
+├── CollisionShape2D
+└── RayCast2D              cible (0, 6) · masque 1+2 : détecte le sol</pre></div>
+<div class="callout godot"><span class="tag"><code>RayCast2D</code></span><p>Un rayon qui part du nœud et s'arrête au premier obstacle de son masque. La bombe n'est pas un corps physique (c'est une zone) : elle ne « tombe » pas toute seule sur le sol. Le rayon, pointé vers le bas, lui dit où est le sol. <code>force_raycast_update()</code> recalcule le rayon tout de suite, après le déplacement de ce tick.</p></div>
+
+<h3 class="step" id="e07-11">7.11 · Les formations de têtes à hélice</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t05-formations.jpg" alt="Formations de têtes à hélice" loading="lazy"><figcaption><b>Deux formations de têtes à hélice.</b> Une colonne qui descend puis serpente, puis une ligne qui traverse le haut de l'écran. Toutes deux se dessinent avec une <code>Path2D</code>.</figcaption></figure>
+<div class="callout concept"><span class="tag">Concept : la trajectoire dessinée plutôt que programmée</span><p>Une <code>Path2D</code> se dessine à la souris dans l'éditeur. Chaque membre de la formation suit la même courbe avec un retard : on obtient une « chenille » sans aucune équation. Le level designer règle tout à l'œil.</p></div>
+<script type="text/x-code" data-lang="gdscript" data-file="res://enemies/formation.gd">
+class_name Formation
+extends Path2D
+## Fait défiler N ennemis le long de la courbe, chacun avec un retard.
+## Dessine la courbe dans l'éditeur. Appelle start() (par exemple depuis une arène).
+
+signal finished   ## tous les membres sont morts ou sortis
+
+@export var enemy_scene: PackedScene
+@export var count := 6
+@export var delay := 0.35          ## s entre deux membres
+@export var duration := 6.0        ## s pour parcourir toute la courbe
+@export var autostart := false
+
+var _followers: Array[PathFollow2D] = []
+var _t := 0.0
+var _running := false
+
+
+func _ready() -> void:
+	if autostart:
+		start()
+
+
+func start() -> void:
+	for i in count:
+		var f := PathFollow2D.new()
+		f.rotates = false
+		f.loop = false
+		add_child(f)
+		var e: Node2D = enemy_scene.instantiate()
+		f.add_child(e)
+		f.visible = false
+		_followers.append(f)
+	_t = 0.0
+	_running = true
+
+
+func _physics_process(delta: float) -> void:
+	if not _running:
+		return
+	_t += delta
+	var alive := 0
+	for i in _followers.size():
+		var f := _followers[i]
+		if f.get_child_count() == 0:
+			continue   # l'ennemi a été détruit
+		alive += 1
+		var local_t := _t - i * delay
+		f.visible = local_t >= 0.0
+		f.progress_ratio = clampf(local_t / duration, 0.0, 1.0)
+		if local_t >= duration:
+			f.get_child(0).queue_free()   # sorti de l'écran : il s'échappe
+	if alive == 0:
+		_running = false
+		finished.emit()
+</script>
+<script type="text/x-code" data-lang="gdscript" data-file="res://enemies/propeller_head.gd">
+class_name PropellerHead
+extends Enemy
+## Tête de clown volante. Le mouvement vient de la Formation ; elle se contente de bombarder.
+
+@export var bomb_scene: PackedScene      ## res://enemies/bomb.tscn
+@export var bomb_interval := Vector2(1.5, 3.5)
+var _next := 0.0
+
+
+func _ready() -> void:
+	super._ready()
+	uses_gravity = false
+	_next = randf_range(bomb_interval.x, bomb_interval.y)
+
+
+func think(delta: float) -> void:
+	velocity = Vector2.ZERO
+	if not is_visible_in_tree():
+		return
+	_next -= delta
+	if _next <= 0.0 and bomb_scene:
+		_next = randf_range(bomb_interval.x, bomb_interval.y)
+		Fx.spawn(bomb_scene.instantiate() as Node2D, global_position + Vector2(0, 8))
+	play_anim(&"fly")
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée <code>res://enemies/propeller_head.tscn</code> : racine <code>CharacterBody2D</code>, couche 4, <strong>masque vide</strong> (elle vole et ne bute sur rien), forme de 14×14, Health 1, Hurtbox et ContactHitbox, couleur jaune. <strong>Bomb Scene</strong> = <code>bomb.tscn</code>.</li>
+  <li>Dans la salle de test, ajoute un enfant de l'arène : <code>Path2D</code> nommé <code>Caterpillar</code>, script <code>formation.gd</code>. Sélectionne-le : la barre d'outils propose des outils de courbe. Avec l'outil « Ajouter un point », clique pour dessiner une courbe qui descend du haut de l'écran puis serpente vers la gauche. Les coordonnées des points sont relatives au <code>Path2D</code>.</li>
+  <li><strong>Enemy Scene</strong> = <code>propeller_head.tscn</code>, <strong>Count</strong> = 8, <strong>Delay</strong> = 0,3.</li>
+  <li>Ajoute une troisième vague à l'arène : <code>kill_quota</code> = 0, <code>enemies</code> vide, et <strong>Formation</strong> = le chemin vers <code>Caterpillar</code> (bouton « Assigner »).</li>
+</ol></div>
+<div class="callout warn"><span class="tag">Quota 0 et formation</span><p>Avec <code>kill_quota = 0</code>, la vague se termine dès que <code>_alive</code> vaut 0. Les membres d'une formation ne sont pas comptés dans <code>_alive</code> : l'arène passe donc aussitôt à la suite pendant que la chenille vole. Si tu veux attendre la fin de la formation, connecte son signal <code>finished</code> à une méthode de l'arène qui appelle <code>_next_wave()</code>. C'est un bon exercice.</p></div>
+<div class="callout test"><span class="tag">Teste</span><p>À la troisième vague, une file de têtes jaunes suit ta courbe et lâche des bombes qui rebondissent puis explosent. Abattues, elles explosent <strong>sur place</strong> (sans suivre la trajectoire : c'est <code>Fx.explosion()</code> qui les place dans la scène courante).</p></div>
+
+<h3 class="step" id="e07-12">7.12 · Le ballon-mine</h3>
+<script type="text/x-code" data-lang="gdscript" data-file="res://enemies/balloon_mine.gd">
+class_name BalloonMine
+extends Enemy
+## Monte en oscillant. Explose si on le touche (ContactHitbox) ou si on le tire (Health 1).
+
+@export var rise_speed := 22.0
+@export var sway := 10.0
+@export var sway_rate := 2.2
+@export var colors: Array[Color] = [Color("e04b3a"), Color("43b05c"), Color("3f6fe0"), Color("f08a2c")]
+var _t := 0.0
+var _base_x := 0.0
+
+
+func _ready() -> void:
+	super._ready()
+	uses_gravity = false
+	_base_x = global_position.x
+	_t = randf() * TAU
+	sprite.self_modulate = colors.pick_random()
+	$ContactHitbox.landed.connect(func(_h: Hurtbox) -> void: kill())
+
+
+func think(delta: float) -> void:
+	_t += delta
+	var target_x := _base_x + sin(_t * sway_rate) * sway
+	# Asservissement simple : la vitesse est proportionnelle à l'écart à la cible.
+	velocity = Vector2((target_x - global_position.x) * 10.0, -rise_speed)
+	if global_position.y < -300.0:
+		queue_free()   # parti dans le ciel
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée <code>res://enemies/balloon_mine.tscn</code> : couche 4, masque vide, Health 1, Hurtbox, ContactHitbox (masque 5), forme ronde de rayon 8. Garde la <strong>Modulate</strong> du <code>Sprite</code> blanche : la couleur aléatoire passe par <code>self_modulate</code>.</li>
+  <li>Teste-le en ajoutant une vague <code>[balloon_mine.tscn]</code> avec <code>origins = ["below"]</code>, <code>max_alive</code> 6, <code>kill_quota</code> 8.</li>
+</ol></div>
+<div class="callout concept"><span class="tag">Concept : l'asservissement</span><p>On ne téléporte pas le ballon sur sa courbe sinusoïdale : on lui donne une vitesse proportionnelle à l'écart entre où il est et où il devrait être. Il suit sa cible en douceur et reste un vrai corps physique. C'est le principe du régulateur proportionnel, utilisé partout (caméras, tourelles, IA).</p></div>
+<div class="callout warn"><span class="tag">Remarque</span><p><code>kill()</code> donne des points même quand le ballon explose contre Batman. Pour l'éviter, ajoute à <code>kill()</code> un paramètre <code>award := true</code>.</p></div>
+
+<h3 class="step" id="e07-13">7.13 · Les objets cassables</h3>
+<figure class="concept"><img src="../batman-and-robin-godot-guide/img/concepts/t05-destructible-empoignade.jpg" alt="Poubelle qui éclate et costaud qui empoigne" loading="lazy"><figcaption><b>À gauche, une poubelle éclate et lâche un bonus ; à droite, un costaud empoigne Batman.</b></figcaption></figure>
+<p>Un seul script pour tout ce qui se casse : poubelles (bonus), petits cadeaux (bonus), paquet géant (un sbire en jaillit).</p>
+<script type="text/x-code" data-lang="gdscript" data-file="res://level/breakable.gd">
+class_name Breakable
+extends Node2D
+## Objet destructible : Health + Hurtbox (couche 6). Lâche des bonus et/ou un ennemi.
+
+@export var drops: Array[PackedScene] = []
+@export var spawn_enemy: PackedScene
+@export var score_value := 50
+@export var broken_texture: Texture2D   ## ex. vitrine brisée qui reste affichée
+
+@onready var health: Health = $Health
+
+
+func _ready() -> void:
+	health.died.connect(_break)
+
+
+func _break() -> void:
+	Game.add_score(score_value)
+	Fx.explosion(global_position)
+	for scene in drops:
+		_spawn(scene, Vector2(randf_range(-6, 6), -10))
+	if spawn_enemy:
+		_spawn(spawn_enemy, Vector2(0, -16))
+	if broken_texture and has_node("Sprite2D"):
+		$Sprite2D.texture = broken_texture
+		$Hurtbox.set_deferred("monitorable", false)
+	else:
+		queue_free()
+
+
+func _spawn(scene: PackedScene, offset: Vector2) -> void:
+	# Différé : _break() est appelé pendant un signal de collision.
+	Fx.spawn(scene.instantiate() as Node2D, global_position + offset, null, true)
+</script>
+<div class="callout do"><span class="tag">À faire</span><ol>
+  <li>Crée <code>res://level/trash_can.tscn</code> : racine <code>Node2D</code> (script <code>breakable.gd</code>), enfants <code>Sprite2D</code> (forme grise 12×16), <code>Health</code> (max 1), <code>Hurtbox</code> (couche 6, health = Health) avec sa forme.</li>
+  <li><strong>Drops</strong> = [weapon_pickup.tscn]. Places-en deux dans la salle de test, avant l'arène.</li>
+</ol></div>
+<div class="callout test"><span class="tag">Teste</span><p>Un tir sur la poubelle : elle explose et un bonus d'arme jaillit, puis se pose et change de couleur.</p></div>
+
+<h2 id="controle">Point de contrôle</h2>
+<div class="callout goal"><span class="tag">Tu as fini l'étape quand</span>
+<ul class="check">
+  <li>En entrant dans l'arène, la caméra se fige ; des clowns tombent du haut et arrivent par la droite, jamais plus que <code>max_alive</code> à la fois.</li>
+  <li>Après le quota, la vague suivante démarre une fois l'écran vide, puis « GO! » clignote et la caméra repart.</li>
+  <li>Un costaud attrape Batman ; marteler les boutons le libère.</li>
+  <li>Le tireur tire des rafales ; les têtes à hélice suivent ta courbe et bombardent.</li>
+  <li>Une poubelle détruite lâche un bonus d'arme ; le crâne détruit tout ce qui est à l'écran.</li>
+</ul></div>
+<div class="commit">git add -A &amp;&amp; git commit -m "Étape 07 : ennemis, arènes à vagues, formations, cassables"</div>
+
+<h2 id="retenir">Ce que tu retiens</h2>
+<details class="quiz"><summary>Pourquoi <code>Enemy</code> appelle-t-il <code>think()</code> au lieu de laisser chaque ennemi écrire son <code>_physics_process</code> ?</summary><div><p>Pour que le socle commun (gravité, déplacement, flash, minuteries) soit écrit une fois et appliqué dans le bon ordre. Les classes filles ne fournissent que ce qui les distingue. Si on corrige la gravité, tous les ennemis en profitent.</p></div></details>
+<details class="quiz"><summary>Que se passerait-il sans le compteur <code>_alive</code> ?</summary><div><p>L'arène compterait seulement les ennemis abattus. Un ennemi qui sort de l'écran sans mourir (une tête à hélice en fin de trajectoire) ne serait jamais « fini », et la vague suivante ne démarrerait jamais.</p></div></details>
+<details class="quiz"><summary>À quoi sert la phase <code>WINDUP</code> du clown ?</summary><div><p>À télégraphier l'attaque : un court délai visible avant le coup laisse au joueur le temps de réagir (reculer, sauter, frapper le premier). Sans elle, les coups paraissent injustes.</p></div></details>
+<details class="quiz"><summary>Pourquoi l'arène démarre-t-elle en différé ?</summary><div><p>Parce que <code>body_entered</code> est émis pendant le traitement des collisions, et qu'ajouter des corps physiques à ce moment-là est interdit. Si la première vague lance une formation, ses ennemis seraient ajoutés pendant ce signal. <code>call_deferred</code> reporte le démarrage à la fin de l'image.</p></div></details>
+
+<h2 id="plus-loin">Pour aller plus loin</h2>
+<ul>
+  <li>Connecte <code>Formation.finished</code> pour que l'arène attende la fin de la chenille.</li>
+  <li>Crée un clown « rapide » : une scène héritée de <code>clown.tscn</code> (clic droit → <strong>Nouvelle scène héritée</strong>) avec <code>walk_speed</code> à 90 et une autre couleur.</li>
+  <li>Crée le sbire au lance-flammes : un <code>Gunner</code> sans balles, avec une grande <code>Hitbox</code> activée pendant 0,6 s devant lui.</li>
+</ul>
+
+<nav class="prevnext" aria-label="Étapes précédente et suivante"></nav>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-glsl.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-gdscript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
+<script src="assets/tuto.js"></script>
+</body>
+</html>
